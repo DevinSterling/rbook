@@ -1,8 +1,24 @@
 [package]
+authors=["Devin Sterling"]
 name = "rbook"
-version = "0.0.0"
+version = "0.1.0"
 edition = "2021"
-description = "ebook library"
+description = """
+Simple ebook library
+"""
 license = "Apache-2.0"
+repository = "https://github.com/DevinSterling/rbook"
+documentation = "https://docs.rs/rbook"
+
+[features]
+default = ["reader", "statistics"]
+reader = []
+statistics = []
+
+[profile.dev]
+opt-level = 3
 
 [dependencies]
+thiserror = "1.0.38"
+lol_html = "0.3.2"
+zip = "0.6.3"
