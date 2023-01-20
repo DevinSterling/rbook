@@ -6,7 +6,6 @@
 An ebook library that supports parsing and reading the epub format.
 
 ## Usage
-___
 Including default features:
 ```toml
 [dependencies]
@@ -21,7 +20,6 @@ Default features are the following:
 - `reader`: Enables reading of the ebook file by file
 - `statistics`: Enables word/character counting
 ## Examples
-___
 Other examples can be found in the ['tests'](tests) directory.
 
 Opening and reading an epub file:
