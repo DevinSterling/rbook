@@ -15,9 +15,6 @@ default = ["reader", "statistics"]
 reader = []
 statistics = []
 
-[profile.dev]
-opt-level = 3
-
 [dependencies]
 thiserror = "1.0.38"
 lol_html = "0.3.2"
