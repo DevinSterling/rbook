@@ -5,9 +5,9 @@ use crate::utility;
 
 /// Retrieve associated metadata information about the epub.
 ///
-/// For convenience, when "meta" elements are encountered,
-/// the value of the name/property and content attributes
-/// are the name and value fields of the element.
+/// For convenience when `meta` elements are encountered,
+/// the value of the `name`/`property` and content attributes
+/// are the `name` and `value` fields of the element.
 ///
 /// # Examples
 /// Using metadata and manifest together:
@@ -63,7 +63,7 @@ impl Metadata {
     /// Retrieve the epub version associated with the ebook
     pub fn version(&self) -> &str {
         self.package.get_attribute("version")
-            .expect(r#"Package should have an epub "version" attribute"#)
+            .expect("Package should have an epub 'version' attribute")
             .value()
     }
 
@@ -198,7 +198,7 @@ impl Metadata {
     /// Prefixes/namespaces for metadata entries are ignored.
     ///
     /// The given string will retrieve all metadata whose
-    /// name or property field matches it.
+    /// `name` or `property` field matches it.
     pub fn get(&self, mut category: &str) -> Option<&Vec<Element>> {
         // Ignore namespace if provided
         if let Some((_, right)) = utility::split_where(category, ':') {

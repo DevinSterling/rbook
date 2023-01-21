@@ -2,8 +2,10 @@ use std::collections::HashMap;
 
 use crate::formats::xml::{self, Element};
 
-/// For convenience the value of the id and href attributes are the
-/// name and value fields of the element.
+/// Access all resources for the ebook, such as images, files, etc.
+///
+/// For convenience the value of the `id` and `href` attributes are the
+/// `name` and `value` fields of the element.
 ///
 /// # Examples
 /// Getting an item from the manifest:
@@ -79,36 +81,36 @@ impl Manifest {
         }
     }
 
-    /// Retrieve a certain element by its id from the manifest
+    /// Retrieve a certain element by its `id` from the manifest
     pub fn by_id(&self, id: &str) -> Option<&Element> {
         self.0.get(id)
     }
 
-    /// Check if an element with a certain id exists in the manifest
+    /// Check if an element with a certain `id` exists in the manifest
     pub fn contains_id(&self, id: &str) -> bool {
         self.0.contains_key(id)
     }
 
     /// Retrieve a certain element by the value of its
-    /// media type from the manifest
+    /// `media type` from the manifest
     pub fn by_media_type(&self, media_type: &str) -> Option<&Element> {
         self.find_attribute_by_value("media-type", media_type)
     }
 
-    /// Retrieve all elements that match a given media type
+    /// Retrieve all elements that match a given `media type`
     /// from the manifest. The returned vector contains at
     /// least one element.
     pub fn all_by_media_type(&self, media_type: &str) -> Option<Vec<&Element>> {
         self.find_attributes_by_value("media-type", media_type)
     }
 
-    /// Retrieve a certain element by the value of its property
+    /// Retrieve a certain element by the value of its `property`
     /// from the manifest
     pub fn by_property(&self, property: &str) -> Option<&Element> {
         self.find_attribute_by_value("properties", property)
     }
 
-    /// Retrieve all elements that match a given property value
+    /// Retrieve all elements that match a given `property` value
     /// from the manifest. The returned vector contains at least
     /// one element.
     pub fn all_by_property(&self, property: &str) -> Option<Vec<&Element>> {

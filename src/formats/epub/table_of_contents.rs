@@ -4,13 +4,13 @@ use crate::formats::xml::Element;
 
 /// Table of contents (toc) for the ebook.
 ///
-/// For convenience, when nav elements are encountered,
-/// the value of the text/label and href/src attributes
-/// are the name and value fields of the element.
+/// For convenience the value of the `text`/`label` and
+/// `href`/`src` attributes are the `name` and `value`
+/// fields of the element.
 ///
 /// If an ebook offers both variants of the navigation
-/// "table of contents" document, the Epub version 3 navigation
-/// document will take priority over the legacy opf epub2 variant.
+/// `table of contents` document, the epub3 version
+/// will take priority over the legacy `ncx` epub2 variant.
 ///
 /// # Examples
 /// Getting an item from the toc:

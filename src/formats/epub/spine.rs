@@ -1,7 +1,9 @@
 use crate::formats::xml::{Attribute, Element};
 
-/// For convenience the value of the idref attribute is the name
-/// field of the element
+/// Access the order of resources for the ebook.
+///
+/// For convenience the value of the `idref` attribute is the `name`
+/// field of the element.
 ///
 /// # Examples
 /// Getting an item from the spine:

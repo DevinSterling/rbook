@@ -32,14 +32,18 @@ pub trait Stats {
     /// To view and handle errors, [try_count_total(...)](Self::try_count_total) can be
     /// used instead.
     fn count_total<F: Fn(&[u8]) -> Result<usize, EbookError>>(&self, f: F) -> usize;
+
     /// Iterate through all resource elements and perform a function.
     fn try_count_total<F: Fn(&[u8]) -> Result<usize, EbookError>>(&self, f: F) -> Result<usize, EbookError>;
+
     /// Calculate the count of all characters from a given collection
     /// of bytes.
     fn count_chars(&self, data: &[u8]) -> Result<usize, EbookError>;
+
     /// Calculate the count of all characters from a given collection
     /// of bytes.
     fn count_words(&self, data: &[u8]) -> Result<usize, EbookError>;
+
     /// Calculate the count of all characters in the ebook file.
     ///
     /// If retrieving a page fails, the next will be retrieved
@@ -51,6 +55,7 @@ pub trait Stats {
     fn count_total_chars(&self) -> usize {
         self.count_total(|data| self.count_chars(data))
     }
+
     /// Calculate the count of all characters in the ebook file and
     /// handle errors if any.
     ///
@@ -59,6 +64,7 @@ pub trait Stats {
     fn try_count_total_chars(&self) -> Result<usize, EbookError> {
         self.try_count_total(|data| self.count_chars(data))
     }
+
     /// Calculate the count of all words in the ebook file. Any
     /// errors are skipped
     ///
@@ -71,6 +77,7 @@ pub trait Stats {
     fn count_total_words(&self) -> usize {
         self.count_total(|data| self.count_words(data))
     }
+
     /// Calculate the count of all words in the ebook file and
     /// handle errors if any.
     ///

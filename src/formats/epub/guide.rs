@@ -1,10 +1,12 @@
 use crate::formats::xml::{self, Element};
 
+/// Access important structural portions of the ebook.
+///
 /// Primarily used by epub2. Access to epub3 landmarks is
 /// accessible using the [landmarks()](super::Toc::landmarks) method in [Toc](super::Toc).
 ///
-/// For convenience the value of the title and href attributes are
-/// the name and value fields of the element.
+/// For convenience the value of the `title` and `href` attributes are
+/// the `name` and `value` fields of the element.
 ///
 /// # Examples
 /// Accessing the Guide:
@@ -29,16 +31,16 @@ impl Guide {
         &self.0
     }
 
-    /// Retrieve a certain element by the value of its type
+    /// Retrieve a certain element by the value of its `type`
     /// from the guide
     pub fn by_type(&self, property: &str) -> Option<&Element> {
         self.find_attribute_by_value("type", property)
     }
 
-    /// Retrieve all elements that match a given type value
+    /// Retrieve all elements that match a given `type` value
     /// from the guide. The returned vector contains at least
     /// one element.
-    pub fn all_by_property(&self, property: &str) -> Option<Vec<&Element>> {
+    pub fn all_by_type(&self, property: &str) -> Option<Vec<&Element>> {
         self.find_attributes_by_value("type", property)
     }
 

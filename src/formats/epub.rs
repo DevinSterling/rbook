@@ -40,7 +40,7 @@ const CONTAINER: &str = "META-INF/container.xml";
 /// - [Metadata](Metadata)
 /// - [Manifest](Manifest)
 /// - [Spine](Spine)
-/// - [Landmarks/Guide](Guide)
+/// - [Guide](Guide)
 /// - [Table of Contents (toc)](Toc)
 ///
 /// # Examples:
@@ -88,12 +88,12 @@ impl Epub {
         &self.manifest
     }
 
-    /// Access the page order for the ebook
+    /// Access the order of resources for the ebook.
     pub fn spine(&self) -> &Spine {
         &self.spine
     }
 
-    /// Access important structural portions of the ebook
+    /// Access important structural portions of the ebook.
     ///
     /// Primarily used by epub2. Access to epub3 landmarks is
     /// accessible using the [landmarks()](Toc::landmarks) method in [Toc](Toc).
@@ -189,7 +189,8 @@ impl Epub {
     /// Retrieve the file contents in bytes.
     ///
     /// The given path is appended to the root file directory if it
-    /// does not contain it. Please note that the root file directory
+    /// does not contain it. However, retrieving "META-INF/container.xml"
+    /// is an exception. Please note that the root file directory
     /// varies between ebooks.
     ///
     /// # Examples:

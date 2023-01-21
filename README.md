@@ -66,3 +66,32 @@ fn main() {
     assert_eq!("marc:relators", scheme.value());
 }
 ```
+
+Extracting images:
+```rust
+use rbook::Ebook;
+
+fn main() {
+    let epub = rbook::Epub::new("example.epub").unwrap();
+
+    let img_elements = epub.manifest().images().unwrap();
+
+    // Create new directory to store extracted images
+    let dir = Path::new("extracted_images");
+    fs::create_dir(&dir).unwrap();
+
+    for img_element in img_elements {
+        let img_href = img_element.value();
+
+        // Retrieve image contents
+        let img = epub.read_bytes_file(img_href).unwrap();
+
+        // Retrieve file name from image href
+        let file_name = Path::new(img_href).file_name().unwrap();
+
+        // Create new file
+        let mut file = File::create(dir.join(file_name)).unwrap();
+        file.write_all(&img).unwrap();
+    }
+}
+```
