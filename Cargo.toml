@@ -4,11 +4,12 @@ name = "rbook"
 version = "0.1.0"
 edition = "2021"
 description = """
-Simple ebook library
+An ebook library that supports parsing and reading the epub format.
 """
 license = "Apache-2.0"
 repository = "https://github.com/DevinSterling/rbook"
 documentation = "https://docs.rs/rbook"
+keywords = ["ebook", "e-book", "epub", "library"]
 
 [features]
 default = ["reader", "statistics"]
