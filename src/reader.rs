@@ -30,7 +30,7 @@ pub enum ReaderError {
 /// ```
 /// use rbook::Ebook;
 ///
-/// let epub = rbook::Epub::new("example.epub").unwrap();
+/// let epub = rbook::Epub::new("tests/ebooks/moby-dick.epub").unwrap();
 ///
 /// // Creating a reader instance
 /// let mut reader = epub.reader();
@@ -42,25 +42,25 @@ pub enum ReaderError {
 ///     println!("{content}")
 /// }
 ///
-/// assert_eq!(58, reader.current_index());
+/// assert_eq!(143, reader.current_index());
 /// ```
 /// Traversing and retrieving pages from a reader:
 /// ```
 /// # use rbook::Ebook;
-/// # let epub = rbook::Epub::new("example.epub").unwrap();
+/// # let epub = rbook::Epub::new("tests/ebooks/moby-dick.epub").unwrap();
 /// let mut reader = epub.reader();
 ///
 /// // Set reader position using an index or string
-/// let content1 = reader.set_current_page(3).unwrap();
-/// let content2 = reader.set_current_page_str("insert003.xhtml").unwrap();
+/// let content1 = reader.set_current_page(56).unwrap();
+/// let content2 = reader.set_current_page_str("chapter_051.xhtml").unwrap();
 ///
 /// assert_eq!(content1, content2);
 ///
 /// // Get a page without updating the reader index
-/// let content1 = reader.fetch_page(7).unwrap();
+/// let content1 = reader.fetch_page(1).unwrap();
 /// let content2 = reader.fetch_page_str("titlepage.xhtml").unwrap();
 ///
-/// assert_eq!(3, reader.current_index());
+/// assert_eq!(56, reader.current_index());
 /// assert_eq!(content1, content2);
 /// ```
 pub struct Reader<'a> {
@@ -83,6 +83,10 @@ impl<'a> Reader<'a> {
         self.current_index
     }
 
+    /// Retrieve the count of pages that can be traversed.
+    ///
+    /// The maximum value of the reader index is `page_count - 1`,
+    /// similar to an array.
     pub fn page_count(&self) -> usize {
         self.page_count
     }

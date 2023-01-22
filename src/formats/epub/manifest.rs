@@ -12,17 +12,17 @@ use crate::formats::xml::{self, Element};
 /// ```
 /// use rbook::Ebook;
 ///
-/// let epub = rbook::Epub::new("example.epub").unwrap();
+/// let epub = rbook::Epub::new("tests/ebooks/moby-dick.epub").unwrap();
 ///
 /// // get element in the manifest
-/// let element = epub.manifest().by_id("chapter009a").unwrap();
+/// let element = epub.manifest().by_id("xchapter_009").unwrap();
 ///
 /// // Get id and href from the element
 /// let id = element.name();
 /// let href = element.value();
 ///
-/// assert_eq!("chapter009a", id);
-/// assert_eq!("chapter009a.xhtml", href);
+/// assert_eq!("xchapter_009", id);
+/// assert_eq!("chapter_009.xhtml", href);
 /// ```
 #[derive(Debug)]
 pub struct Manifest(pub(crate) HashMap<String, Element>);
@@ -47,7 +47,7 @@ impl Manifest {
     /// Basic usage:
     /// ```
     /// # use rbook::Ebook;
-    /// # let epub = rbook::Epub::new("example.epub").unwrap();
+    /// # let epub = rbook::Epub::new("tests/ebooks/moby-dick.epub").unwrap();
     /// // Retrieving elements
     /// let images = epub.manifest().images().unwrap();
     /// let cover_image = epub.cover_image().unwrap();
@@ -58,7 +58,7 @@ impl Manifest {
     /// Retrieving image data:
     /// ```
     /// # use rbook::Ebook;
-    /// # let epub = rbook::Epub::new("example.epub").unwrap();
+    /// # let epub = rbook::Epub::new("tests/ebooks/childrens-literature.epub").unwrap();
     /// let images = epub.manifest().images().unwrap();
     ///
     /// for image_element in images {

@@ -9,12 +9,12 @@ An ebook library that supports parsing and reading the epub format.
 Including default features:
 ```toml
 [dependencies]
-rbook = "0.1.1"
+rbook = "0.1.2"
 ```
 Excluding default features:
 ```toml
 [dependencies]
-rbook = { version = "0.1.1", default-features = false }
+rbook = { version = "0.1.2", default-features = false }
 ```
 Default features are the following:
 - `reader`: Enables reading of the ebook file by file
@@ -95,3 +95,8 @@ fn main() {
     }
 }
 ```
+
+## Sample ebooks
+Sample ebooks in the ['tests/ebooks'](tests/ebooks) directory are provided as is from 
+[IDPF](https://idpf.github.io/epub3-samples/30/samples.html) under the 
+[CC-BY-SA 3.0](http://creativecommons.org/licenses/by-sa/3.0/) license.

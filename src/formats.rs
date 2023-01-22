@@ -34,7 +34,7 @@ pub trait Ebook {
     /// use rbook::Ebook;
     ///
     /// // Providing a file in epub format
-    /// let epub = rbook::Epub::new("example.epub").unwrap();
+    /// let epub = rbook::Epub::new("tests/ebooks/childrens-literature.epub").unwrap();
     ///
     /// // View contents
     /// println!("{epub:?}");
@@ -53,7 +53,7 @@ pub trait Ebook {
     /// ```
     /// use rbook::Ebook;
     ///
-    /// let file = std::fs::File::open("example.epub").unwrap();
+    /// let file = std::fs::File::open("tests/ebooks/childrens-literature.epub").unwrap();
     /// let epub = rbook::Epub::read_from(file);
     ///
     /// // View contents

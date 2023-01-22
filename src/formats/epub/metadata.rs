@@ -14,22 +14,26 @@ use crate::utility;
 /// ```
 /// use rbook::Ebook;
 ///
-/// let epub = rbook::Epub::new("example.epub").unwrap();
+/// let epub = rbook::Epub::new("tests/ebooks/moby-dick.epub").unwrap();
 ///
-/// println!("Title:{}", epub.metadata().title().value());
+/// assert_eq!("Moby-Dick", epub.metadata().title().value());
 ///
 /// // The cover is optional metadata
-/// let cover_id = epub.metadata().cover().unwrap().value();
-/// let cover_href = epub.manifest().by_id(&cover_id).unwrap().value();
-/// println!("cover image path:{}", cover_href);
+/// let cover1 = epub.manifest().by_property("cover-image").unwrap();
+/// let cover2 = epub.cover_image().unwrap();
+///
+/// // The following is also possible if the epub has a cover metadata element:
+/// // let cover_id = epub.metadata().cover().unwrap().value();
+/// // let cover3 = epub.manifest().by_id(&cover_id).unwrap();
+///
+/// assert_eq!(cover1, cover2);
+///
+/// assert_eq!("images/9780316000000.jpg", cover1.value());
 /// ```
 /// Accessing metadata attributes and child elements:
 /// ```
 /// # use rbook::Ebook;
-/// # let epub = rbook::Epub::new("example.epub").unwrap();
-/// // Retrieving the first creator metadata element
-/// let creator = epub.metadata().creators().unwrap().first().unwrap();
-///
+/// # let epub = rbook::Epub::new("tests/ebooks/moby-dick.epub").unwrap();
 /// // Retrieving the first creator metadata element
 /// let creator = epub.metadata().creators().unwrap().first().unwrap();
 ///
@@ -40,7 +44,7 @@ use crate::utility;
 /// let role = creator.get_child("role").unwrap();
 /// let scheme = role.get_attribute("scheme").unwrap();
 ///
-/// assert_eq!("creator01", id.value());
+/// assert_eq!("creator", id.value());
 /// assert_eq!("aut", role.value());
 /// assert_eq!("marc:relators", scheme.value());
 /// ```
@@ -97,6 +101,7 @@ impl Metadata {
     /// - UUID
     /// - DOI
     /// - ISBN
+    /// - URL
     pub fn unique_identifier(&self) -> &Element {
         // Retrieve uid from root package element
         let id = self.package.get_attribute("unique-identifier")
@@ -125,11 +130,11 @@ impl Metadata {
     /// Basic Usage:
     /// ```
     /// # use rbook::Ebook;
-    /// # let epub = rbook::Epub::new("example.epub").unwrap();
+    /// let epub = rbook::Epub::new("tests/ebooks/moby-dick.epub").unwrap();
     /// let r_id = epub.metadata().release_identifier().unwrap();
     ///
     /// assert_eq!(
-    ///     "urn:uuid:3c6d9d4f-15c4-4261-a9d2-0c6bda3ad832@2017-03-22T10:11:35Z",
+    ///     "code.google.com.epub-samples.moby-dick-basic@2012-01-18T12:47:00Z",
     ///     r_id
     /// );
     /// ```
@@ -188,7 +193,8 @@ impl Metadata {
     /// Retrieve the name and id values of the cover meta
     /// element. The retrieved id from this function can
     /// also be used to retrieve the image path by using
-    /// the [by_id(...)](super::Manifest::by_id) method in [Manifest](super::Manifest).
+    /// the [by_id(...)](super::Manifest::by_id) method
+    /// in [Manifest](super::Manifest).
     pub fn cover(&self) -> Option<&Element> {
         self.get_element("cover")
     }

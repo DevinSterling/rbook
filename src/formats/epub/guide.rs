@@ -13,7 +13,7 @@ use crate::formats::xml::{self, Element};
 /// ```
 /// use rbook::Ebook;
 ///
-/// let epub = rbook::Epub::new("example.epub").unwrap();
+/// let epub = rbook::Epub::new("tests/ebooks/moby-dick.epub").unwrap();
 ///
 /// // get element in the manifest
 /// let guide = epub.guide().elements();

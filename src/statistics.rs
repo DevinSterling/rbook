@@ -8,20 +8,20 @@ use crate::errors::EbookError;
 /// ```
 /// use rbook::{Ebook, Stats};
 ///
-/// let epub = rbook::Epub::new("example.epub").unwrap();
-/// let file_content = epub.read_bytes_file("chapter022.xhtml").unwrap();
+/// let epub = rbook::Epub::new("tests/ebooks/moby-dick.epub").unwrap();
+/// let file_content = epub.read_bytes_file("chapter_022.xhtml").unwrap();
 /// let word_count = epub.count_words(&file_content).unwrap();
 ///
-/// assert_eq!(3676, word_count);
+/// assert_eq!(1683, word_count);
 /// ```
 /// Counting total characters:
 /// ```
 /// use rbook::{Ebook, Stats};
 ///
-/// let epub = rbook::Epub::new("example.epub").unwrap();
+/// let epub = rbook::Epub::new("tests/ebooks/childrens-literature.epub").unwrap();
 /// let char_count = epub.try_count_total_chars().unwrap();
 ///
-/// assert_eq!(383619, char_count);
+/// assert_eq!(329289, char_count);
 /// ```
 pub trait Stats {
     /// Iterate through all resource elements and perform a function.

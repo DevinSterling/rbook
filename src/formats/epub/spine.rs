@@ -10,7 +10,7 @@ use crate::formats::xml::{Attribute, Element};
 /// ```
 /// use rbook::Ebook;
 ///
-/// let epub = rbook::Epub::new("example.epub").unwrap();
+/// let epub = rbook::Epub::new("tests/ebooks/moby-dick.epub").unwrap();
 ///
 /// // get element in the manifest
 /// let element = epub.spine().elements().get(31).unwrap();
@@ -18,7 +18,7 @@ use crate::formats::xml::{Attribute, Element};
 /// // Get idref from the element
 /// let idref = element.name();
 ///
-/// assert_eq!("chapter009a", idref);
+/// assert_eq!("xchapter_026", idref);
 /// ```
 #[derive(Debug)]
 pub struct Spine(pub(crate) Element);

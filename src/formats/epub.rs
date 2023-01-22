@@ -16,7 +16,7 @@ use std::fmt::{Debug, Formatter};
 use crate::utility;
 use crate::formats::{Ebook, EbookError};
 use crate::archive::{Archive, ZipArchive, DirArchive};
-use crate::formats::xml::{self, Element};
+use crate::formats::xml::{self, Element, Attribute};
 use crate::formats::xml::utility as xmlutil;
 #[cfg(feature = "reader")]
 use crate::reader::{ReaderError, Reader, Readable};
@@ -49,10 +49,10 @@ const CONTAINER: &str = "META-INF/container.xml";
 /// use rbook::Ebook;
 ///
 /// // Creating an epub instance
-/// let epub = rbook::Epub::new("example.epub").unwrap();
+/// let epub = rbook::Epub::new("tests/ebooks/moby-dick.epub").unwrap();
 ///
 /// // Retrieving the title
-/// println!("Title = {}", epub.metadata().title().value());
+/// assert_eq!("Moby-Dick", epub.metadata().title().value());
 ///
 /// // Creating a reader instance
 /// let mut reader = epub.reader();
@@ -61,6 +61,8 @@ const CONTAINER: &str = "META-INF/container.xml";
 /// while let Some(content) = reader.next_page() {
 ///     println!("{content}")
 /// }
+///
+/// assert_eq!(143, reader.current_index());
 /// ```
 pub struct Epub {
     archive: RefCell<Box<dyn Archive>>,
@@ -112,7 +114,7 @@ impl Epub {
     /// Retrieving cover image raw data:
     /// ```
     /// # use rbook::Ebook;
-    /// # let epub = rbook::Epub::new("example.epub").unwrap();
+    /// # let epub = rbook::Epub::new("tests/ebooks/childrens-literature.epub").unwrap();
     /// // Retrieve the href from the cover image element
     /// let cover_href = epub.cover_image().unwrap().value();
     ///
@@ -132,10 +134,10 @@ impl Epub {
     /// ```
     /// # use rbook::Ebook;
     /// # use std::path::PathBuf;
-    /// # let epub = rbook::Epub::new("example.epub").unwrap();
+    /// # let epub = rbook::Epub::new("tests/ebooks/moby-dick.epub").unwrap();
     /// let root_file = epub.root_file();
     ///
-    /// assert_eq!(PathBuf::from("OEBPS/package.opf"), root_file);
+    /// assert_eq!(PathBuf::from("OPS/package.opf"), root_file);
     /// ```
     pub fn root_file(&self) -> PathBuf {
         self.root_file.to_path_buf()
@@ -149,12 +151,12 @@ impl Epub {
     /// ```
     /// # use rbook::Ebook;
     /// # use std::path::PathBuf;
-    /// # let epub = rbook::Epub::new("example.epub").unwrap();
+    /// # let epub = rbook::Epub::new("tests/ebooks/moby-dick.epub").unwrap();
     /// let root_file_dir = epub.root_file_directory();
-    /// assert_eq!(PathBuf::from("OEBPS"), root_file_dir);
+    /// assert_eq!(PathBuf::from("OPS"), root_file_dir);
     ///
     /// let root_file = root_file_dir.join("package.opf");
-    /// assert_eq!(PathBuf::from("OEBPS/package.opf"), root_file);
+    /// assert_eq!(PathBuf::from("OPS/package.opf"), root_file);
     /// ```
     pub fn root_file_directory(&self) -> PathBuf {
         utility::get_parent_path(&self.root_file)
@@ -171,11 +173,11 @@ impl Epub {
     /// Basic usage:
     /// ```
     /// # use rbook::Ebook;
-    /// # let epub = rbook::Epub::new("example.epub").unwrap();
+    /// # let epub = rbook::Epub::new("tests/ebooks/moby-dick.epub").unwrap();
     /// // Without providing the root file directory
     /// let content1 = epub.read_file("package.opf").unwrap();
     /// // Providing the root file directory
-    /// let content2 = epub.read_file("OEBPS/package.opf").unwrap();
+    /// let content2 = epub.read_file("OPS/package.opf").unwrap();
     ///
     /// assert_eq!(content1, content2)
     /// ```
@@ -197,11 +199,11 @@ impl Epub {
     /// Basic usage:
     /// ```
     /// # use rbook::Ebook;
-    /// # let epub = rbook::Epub::new("example.epub").unwrap();
+    /// # let epub = rbook::Epub::new("tests/ebooks/moby-dick.epub").unwrap();
     /// // Without providing the root file directory
-    /// let content1 = epub.read_bytes_file("images/Art_insert1.jpg").unwrap();
+    /// let content1 = epub.read_bytes_file("images/9780316000000.jpg").unwrap();
     /// // Providing the root file directory
-    /// let content2 = epub.read_bytes_file("OEBPS/images/Art_insert1.jpg").unwrap();
+    /// let content2 = epub.read_bytes_file("OPS/images/9780316000000.jpg").unwrap();
     ///
     /// assert_eq!(content1, content2)
     /// ```
@@ -458,7 +460,8 @@ fn parse_package(data: &[u8]) -> Result<(Metadata, Manifest, Spine, Guide), Eboo
     // Keep track of latest metadata entry
     let current_meta = RefCell::new(None);
     // Track contents
-    let mut metadata_map: HashMap<String, Element> = HashMap::new(); // Metadata contents
+    let mut metadata_map: HashMap<String, Vec<Element>> = HashMap::new(); // Metadata contents
+    let mut id_map: HashMap<String, *mut Element> = HashMap::new(); // Track metadata relationships
     let mut item_map = HashMap::new(); // Manifest contents
     let mut itemref_vec = Vec::new(); // Spine contents
     let mut guide_vec = Vec::new(); // Guide contents (Epub 2 Only)
@@ -504,7 +507,7 @@ fn parse_package(data: &[u8]) -> Result<(Metadata, Manifest, Spine, Guide), Eboo
                 name = meta_name.value;
                 value = content.value;
 
-                attributes.push(xml::Attribute {
+                attributes.push(Attribute {
                     name: "_rbook_legacy_feature".to_string(),
                     value: "OPF2 meta".to_string(),
                 });
@@ -517,46 +520,41 @@ fn parse_package(data: &[u8]) -> Result<(Metadata, Manifest, Spine, Guide), Eboo
             name = right.to_string();
         }
 
+        // Add and retrieve metadata group (for categorization) to map
+        let meta_group = metadata_map.entry(name.to_string()).or_default();
+
         // Add element to metadata
-        let mut meta = Element {
+        let meta = Element {
             name,
             attributes,
             value,
             children: None,
         };
 
-        // If the entry has an id attribute, it most
-        // likely has children metadata further describing it
-        let key = if let Some(id) = element.get_attribute(xml::ID) {
-            meta.children = Some(Vec::new());
-            id
-        }
-        // If there is no id, give the meta entry a temporary id
-        // to avoid potential value replacements in the hash map.
-        else {
-            format!("_rbook_{}", metadata_map.len())
-        };
-
         // Add child metadata to parent metadata
         if let Some(refines) = element.get_attribute("refines") {
             let id = refines.replace('#', "");
-            let children = metadata_map.get_mut(&id)
-                .and_then(|parent| parent.children.as_mut());
 
-            if let Some(children) = children {
-                children.push(meta);
+            if let Some(parent) = id_map.get_mut(&id) {
+                // This should be guaranteed to have a valid address
+                unsafe {
+                    let children = (*(*parent)).children.as_mut().expect("Should have children");
+                    children.push(meta);
 
-                if let Some(last_child) = children.last_mut() {
-                    current_meta.borrow_mut().replace(last_child as *mut Element);
+                    let entry = children.last_mut().expect("Should have at least one child element");
+                    current_meta.borrow_mut().replace(entry as *mut Element);
                 }
             }
-        }
-        // Add new metadata entry
-        else {
-            metadata_map.insert(key.to_string(), meta);
+        } else {
+            // Add new metadata entry
+            meta_group.push(meta);
 
-            if let Some(last_entry) = metadata_map.get_mut(&key) {
-                current_meta.borrow_mut().replace(last_entry as *mut Element);
+            let entry = meta_group.last_mut().expect("Group should have at least one element");
+            current_meta.borrow_mut().replace(entry as *mut Element);
+
+            if let Some(id) = element.get_attribute(xml::ID) {
+                entry.children.replace(Vec::new());
+                id_map.insert(id, entry as *mut Element);
             }
         }
 
@@ -666,9 +664,11 @@ fn parse_package(data: &[u8]) -> Result<(Metadata, Manifest, Spine, Guide), Eboo
     // Finalize spine:
     let spine_root = is_valid_spine(spine_root, itemref_vec)?;
 
+    println!("{metadata_map:#?}");
+
     // Finalize metadata:
     // Transfer metadata contents to new hashmap with meta categories
-    let metadata_map = categorize_metadata(metadata_map);
+    //let metadata_map = categorize_metadata(metadata_map);
     // Check if metadata contains the required contents
     is_valid_metadata(&metadata_map)?;
 
@@ -680,14 +680,18 @@ fn parse_package(data: &[u8]) -> Result<(Metadata, Manifest, Spine, Guide), Eboo
     ))
 }
 
-fn is_valid_package(package: Option<Element>, metadata: &HashMap<String, Element>) -> Result<Element, EbookError> {
-    package.filter(|pkg| {
+fn is_valid_package(package: Option<Element>, metadata: &HashMap<String, Vec<Element>>) -> Result<Element, EbookError> {
+    package.filter(|pkg|
         pkg.get_attribute("unique-identifier")
             // Check if package contains a valid reference to a unique identifier
-            .map(|attr| metadata.contains_key(attr.value()))
+            .and_then(|unique| metadata.get("identifier")
+                // Access "identifier" metadata group and find the element
+                .map(|meta_group| meta_group.iter()
+                    // return true if an identifier matches the value of "unique-identifier"
+                    .any(|meta| xmlutil::equals_attribute_by_value(meta, xml::ID, unique.value()))))
             // Check if package contains an epub version attribute
             .unwrap_or(false) && pkg.contains_attribute("version")
-    }).ok_or(EbookError::Parse {
+    ).ok_or(EbookError::Parse {
         cause: "Required attributes are missing or invalid uid reference".to_string(),
         description: "The package element is missing the 'unique-identifier' \
                 or 'version' attribute. Please ensure 'unique-identifier' \
@@ -719,26 +723,6 @@ fn is_valid_metadata(metadata: &HashMap<String, Vec<Element>>) -> Result<(), Ebo
         }),
         None => Ok(())
     }
-}
-
-// Initially the keys in the map are id references for elements.
-// Return a new map that has meta categories as the key instead.
-fn categorize_metadata(metadata: HashMap<String, Element>) -> HashMap<String, Vec<Element>> {
-    let mut categorized_metadata: HashMap<String, Vec<Element>> = HashMap::new();
-
-    for (_, meta_element) in metadata {
-        // The name of each element is a meta category,
-        // such as "dc:identifier", there can be one or more
-        let category = meta_element.name();
-
-        // If the new map does not contain the category, add it
-        // and push the current element into its category
-        categorized_metadata.entry(category.to_string())
-            .or_default()
-            .push(meta_element);
-    }
-
-    categorized_metadata
 }
 
 fn parse_toc(mut data: &str) -> Result<Toc, EbookError> {

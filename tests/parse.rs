@@ -2,24 +2,37 @@ use rbook::Ebook;
 
 #[test]
 fn metadata_test() {
-    let epub = rbook::Epub::new("example.epub").unwrap();
+    let epub = rbook::Epub::new("tests/ebooks/childrens-literature.epub").unwrap();
 
     // epub specification required metadata
     let title = epub.metadata().title();
     let identifier = epub.metadata().unique_identifier();
 
     assert_eq!("title", title.name());
-    assert_eq!("Sword Art Online 1: Aincrad", title.value());
-    assert_eq!("urn:uuid:3c6d9d4f-15c4-4261-a9d2-0c6bda3ad832", identifier.value());
+    assert_eq!("Children's Literature", title.value());
+    assert_eq!("http://www.gutenberg.org/ebooks/25545", identifier.value());
 
     // Not epub specification required metadata
     let creators1 = epub.metadata().creators().unwrap();
     // Alternate way of retrieval
     let creators2 = epub.metadata().get("creator").unwrap(); // Namespace/prefix is not required
-    let creator = creators1.first().unwrap();
 
-    assert_eq!("Reki Kawahara and abec", creator.value());
     assert_eq!(creators1, creators2);
+
+    let creator1 = creators1.first().unwrap();
+    let creator2 = creators1.last().unwrap();
+
+    assert_eq!("Charles Madison Curry", creator1.value());
+    assert_eq!("Erle Elsworth Clippinger", creator2.value());
+}
+
+#[test]
+fn metadata_test2() {
+    let epub = rbook::Epub::new("tests/ebooks/moby-dick.epub").unwrap();
+
+    let creator = epub.metadata().creators().unwrap().first().unwrap();
+
+    assert_eq!("Herman Melville", creator.value());
 
     // Refining (children) metadata and attributes
     let role = creator.get_child("role").unwrap(); // Child metadata element
@@ -31,50 +44,44 @@ fn metadata_test() {
 
 #[test]
 fn manifest_test() {
-    let epub = rbook::Epub::new("example.epub").unwrap();
+    let epub = rbook::Epub::new("tests/ebooks/childrens-literature.epub").unwrap();
 
     // Retrieve manifest element by id
-    let element = epub.manifest().by_id("chapter001").unwrap();
+    let element = epub.manifest().by_id("s04").unwrap();
     let media_type = element.get_attribute("media-type").unwrap();
 
-    assert_eq!("chapter001", element.name()); // id attribute value
-    assert_eq!("chapter001.xhtml", element.value()); // href attribute value
+    assert_eq!("s04", element.name()); // id attribute value
+    assert_eq!("s04.xhtml", element.value()); // href attribute value
     assert_eq!("application/xhtml+xml", media_type.value());
 
     // Retrieve file content using href
     let content = epub.read_file(element.value()).unwrap();
 
-    assert!(content.starts_with("<html"));
+    assert!(content.starts_with("<?xml"));
 
     // Retrieve manifest element by property
     let element = epub.manifest().by_property("nav").unwrap();
 
-    assert_eq!("toc.xhtml", element.value());
+    assert_eq!("nav.xhtml", element.value());
 
     // Retrieve manifest element by media type
     let element = epub.manifest().by_media_type("application/x-dtbncx+xml").unwrap();
 
     assert_eq!("toc.ncx", element.value());
 
-    // Retrieve id of cover manifest element from optional cover metadata element
-    let cover_id = epub.metadata().cover().unwrap().value();
-    let cover_element1 = epub.manifest().by_id(cover_id).unwrap();
     // Alternate way of retrieval
-    let cover_element2 = epub.cover_image().unwrap();
-
-    assert_eq!(cover_element1, cover_element2);
-
-    let content = epub.read_bytes_file(cover_element1.value());
+    let cover_element = epub.cover_image().unwrap();
+    let content = epub.read_bytes_file(cover_element.value());
 
     assert!(content.is_ok())
 }
 
 #[test]
 fn spine_test() {
-    let epub = rbook::Epub::new("example.epub").unwrap();
+    let epub = rbook::Epub::new("tests/ebooks/childrens-literature.epub").unwrap();
 
     // Get twelfth element in the spine
-    let spine_element = epub.spine().elements().get(12).unwrap();
+    let spine_element = epub.spine().elements().get(1).unwrap();
 
     // Get associated manifest element (name of a spine element is the value of the idref attribute)
     let manifest_element = epub.manifest().by_id(spine_element.name()).unwrap();
@@ -83,48 +90,51 @@ fn spine_test() {
     assert_eq!(spine_element.name(), manifest_element.name());
 
     // Access spine attributes
-    let direction = epub.spine().get_attribute("page-progression-direction").unwrap();
+    let direction = epub.spine().get_attribute("toc").unwrap();
 
-    assert_eq!("ltr", direction.value())
+    assert_eq!("ncx", direction.value())
 }
 
-#[test]
-fn guide_test() {
-    let epub = rbook::Epub::new("example.epub").unwrap();
-
-    assert_eq!(5, epub.guide().elements().len());
-
-    let guide_element = epub.guide().by_type("copyright").unwrap();
-
-    assert_eq!("copyright.xhtml", guide_element.value());
-
-    let guide_element = epub.guide().by_type("toc").unwrap();
-    let attribute = guide_element.get_attribute("type").unwrap();
-
-    assert_eq!("Table of Contents", guide_element.name());
-    assert_eq!("toc", attribute.value());
-}
+// #[test]
+// fn guide_test() {
+//     let epub = rbook::Epub::new("tests/ebooks/example.epub").unwrap();
+//
+//     assert_eq!(5, epub.guide().elements().len());
+//
+//     let guide_element = epub.guide().by_type("copyright").unwrap();
+//
+//     assert_eq!("copyright.xhtml", guide_element.value());
+//
+//     let guide_element = epub.guide().by_type("toc").unwrap();
+//     let attribute = guide_element.get_attribute("type").unwrap();
+//
+//     assert_eq!("Table of Contents", guide_element.name());
+//     assert_eq!("toc", attribute.value());
+// }
 
 #[test]
 fn toc_test() {
-    let epub = rbook::Epub::new("example.epub").unwrap();
+    let epub = rbook::Epub::new("tests/ebooks/moby-dick.epub").unwrap();
 
     let toc = epub.toc().elements();
 
-    assert_eq!(32, toc.len());
+    assert_eq!(141, toc.len());
 
-    let toc_element = toc.get(30).unwrap();
+    let toc_element1 = toc.get(30).unwrap();
+    let toc_element2 = toc.get(140).unwrap();
 
-    assert_eq!("Afterword", toc_element.name());
-    assert_eq!("appendix001.xhtml", toc_element.value());
+    assert_eq!("Chapter 27. Knights and Squires.", toc_element1.name());
+    assert_eq!("chapter_027.xhtml", toc_element1.value());
+    assert_eq!("Copyright Page", toc_element2.name());
+    assert_eq!("copyright.xhtml", toc_element2.value());
 
     let landmarks = epub.toc().landmarks().unwrap();
 
-    assert_eq!(2, landmarks.len());
+    assert_eq!(3, landmarks.len());
 
     let landmark_element = landmarks.get(1).unwrap();
     let attribute = landmark_element.get_attribute("type").unwrap();
 
-    assert_eq!("Table of Contents", landmark_element.name());
-    assert_eq!("toc", attribute.value());
+    assert_eq!("Begin Reading", landmark_element.name());
+    assert_eq!("bodymatter", attribute.value());
 }

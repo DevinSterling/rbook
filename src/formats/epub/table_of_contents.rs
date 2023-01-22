@@ -13,21 +13,44 @@ use crate::formats::xml::Element;
 /// will take priority over the legacy `ncx` epub2 variant.
 ///
 /// # Examples
-/// Getting an item from the toc:
+/// Getting an item from nested toc:
 /// ```
 /// use rbook::Ebook;
 ///
-/// let epub = rbook::Epub::new("example.epub").unwrap();
+/// let epub = rbook::Epub::new("tests/ebooks/childrens-literature.epub").unwrap();
 ///
-/// // get element in the manifest
-/// let element = epub.toc().elements().get(10).unwrap();
+/// let toc_nested = epub.toc().elements();
 ///
-/// // Get label and href from the element
-/// let label = element.name();
-/// let href = element.value();
+/// // get element from toc
+/// let element = toc_nested.first().unwrap();
 ///
-/// assert_eq!("Chapter 6", label);
-/// assert_eq!("chapter006.xhtml", href);
+/// assert_eq!("SECTION IV FAIRY STORIES—MODERN FANTASTIC TALES", element.name());
+/// assert_eq!("s04.xhtml#pgepubid00492", element.value());
+///
+/// // Get nested child element
+/// let nested_element1 = element.children().unwrap().get(10).unwrap();
+///
+/// assert_eq!("John Ruskin", nested_element1.name());
+/// assert_eq!("", nested_element1.value());
+///
+/// // Get further nested child element
+/// let nested_element2 = nested_element1.children().unwrap().first().unwrap();
+///
+/// assert_eq!("204 THE KING OF THE GOLDEN RIVER OR THE BLACK BROTHERS", nested_element2.name());
+/// assert_eq!("s04.xhtml#pgepubid00602", nested_element2.value());
+/// ```
+///
+/// Getting an item from flattened toc
+/// ```
+/// # use rbook::Ebook;
+/// # let epub = rbook::Epub::new("tests/ebooks/childrens-literature.epub").unwrap();
+/// let toc_flat = epub.toc().elements_flat();
+///
+/// // get element from flattened toc
+/// let element = toc_flat.get(30).unwrap();
+///
+/// assert_eq!("204 THE KING OF THE GOLDEN RIVER OR THE BLACK BROTHERS", element.name());
+/// assert_eq!("s04.xhtml#pgepubid00602", element.value());
 /// ```
 #[derive(Debug)]
 pub struct Toc(pub(crate) HashMap<String, Element>);
@@ -66,6 +89,7 @@ impl Toc {
         if let Some(elements) = self.get_elements(name) {
             let mut output = Vec::new();
             recursive_flatten(elements, &mut output);
+
             Some(output)
         } else {
             None
@@ -77,7 +101,7 @@ fn recursive_flatten<'a>(elements: &'a [Element], output: &mut Vec<&'a Element>)
     for element in elements {
         output.push(element);
 
-        if let Some(children) = &element.children {
+        if let Some(children) = element.children() {
             recursive_flatten(children, output);
         }
     }

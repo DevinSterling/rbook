@@ -8,8 +8,7 @@ pub(super) const HREF: &str = "href";
 /// Basic Usage:
 /// ```
 /// # use rbook::Ebook;
-/// # let epub = rbook::Epub::new("example.epub").unwrap();
-/// # let creator = epub.metadata().creators().unwrap().first().unwrap();
+/// # let epub = rbook::Epub::new("tests/ebooks/moby-dick.epub").unwrap();
 /// // Retrieving an element from the metadata of an epub
 /// let element = epub.metadata().creators().unwrap().first().unwrap();
 ///
@@ -19,7 +18,7 @@ pub(super) const HREF: &str = "href";
 /// // Retrieving a child element
 /// let child_element = element.get_child("role").unwrap();
 ///
-/// assert_eq!("creator01", attribute.value());
+/// assert_eq!("creator", attribute.value());
 /// assert_eq!("aut", child_element.value());
 /// ```
 #[derive(Debug, PartialEq)]
@@ -87,9 +86,9 @@ impl Element {
 /// Basic Usage:
 /// ```
 /// # use rbook::Ebook;
-/// # let epub = rbook::Epub::new("example.epub").unwrap();
+/// # let epub = rbook::Epub::new("tests/ebooks/moby-dick.epub").unwrap();
 /// // Retrieving an element from the manifest of an epub
-/// let element = epub.manifest().by_id("chapter009a").unwrap();
+/// let element = epub.manifest().by_id("xchapter_009").unwrap();
 ///
 /// // Retrieving attributes
 /// let attribute = element.get_attribute("media-type").unwrap();
@@ -120,7 +119,9 @@ pub(crate) mod utility {
 
     pub(crate) fn equals_attribute_by_value(element: &Element, field: &str, value: &str) -> bool {
         element.get_attribute(field)
-            .map_or_else(|| false, |attribute| attribute.value() == value)
+            .map_or_else(|| false, |attribute| attribute.value()
+                .split_whitespace()
+                .any(|slice| slice == value))
     }
 
     pub(crate) fn copy_attributes(old_attributes: &[LolAttribute]) -> Vec<Attribute> {
