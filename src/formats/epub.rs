@@ -664,8 +664,6 @@ fn parse_package(data: &[u8]) -> Result<(Metadata, Manifest, Spine, Guide), Eboo
     // Finalize spine:
     let spine_root = is_valid_spine(spine_root, itemref_vec)?;
 
-    println!("{metadata_map:#?}");
-
     // Finalize metadata:
     // Transfer metadata contents to new hashmap with meta categories
     //let metadata_map = categorize_metadata(metadata_map);
