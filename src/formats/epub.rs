@@ -52,7 +52,7 @@ const CONTAINER: &str = "META-INF/container.xml";
 /// let epub = rbook::Epub::new("tests/ebooks/moby-dick.epub").unwrap();
 ///
 /// // Retrieving the title
-/// assert_eq!("Moby-Dick", epub.metadata().title().value());
+/// assert_eq!("Moby-Dick", epub.metadata().title().unwrap().value());
 ///
 /// // Creating a reader instance
 /// let mut reader = epub.reader();
@@ -159,7 +159,7 @@ impl Epub {
     /// assert_eq!(PathBuf::from("OPS/package.opf"), root_file);
     /// ```
     pub fn root_file_directory(&self) -> PathBuf {
-        utility::get_parent_path(&self.root_file)
+        utility::get_parent_path(&self.root_file).into_owned()
     }
 
     /// Retrieve the file contents.
@@ -659,16 +659,10 @@ fn parse_package(data: &[u8]) -> Result<(Metadata, Manifest, Spine, Guide), Eboo
 
     // Finalize package:
     // Check if the package references a valid unique identifier and contains the epub version
-    let package_root = is_valid_package(package_root, &metadata_map)?;
+    let package_root = is_valid_package(package_root)?;
 
     // Finalize spine:
     let spine_root = is_valid_spine(spine_root, itemref_vec)?;
-
-    // Finalize metadata:
-    // Transfer metadata contents to new hashmap with meta categories
-    //let metadata_map = categorize_metadata(metadata_map);
-    // Check if metadata contains the required contents
-    is_valid_metadata(&metadata_map)?;
 
     Ok((
         Metadata::new(package_root, metadata_map),
@@ -678,23 +672,14 @@ fn parse_package(data: &[u8]) -> Result<(Metadata, Manifest, Spine, Guide), Eboo
     ))
 }
 
-fn is_valid_package(package: Option<Element>, metadata: &HashMap<String, Vec<Element>>) -> Result<Element, EbookError> {
+fn is_valid_package(package: Option<Element>) -> Result<Element, EbookError> {
     package.filter(|pkg|
-        pkg.get_attribute("unique-identifier")
-            // Check if package contains a valid reference to a unique identifier
-            .and_then(|unique| metadata.get("identifier")
-                // Access "identifier" metadata group and find the element
-                .map(|meta_group| meta_group.iter()
-                    // return true if an identifier matches the value of "unique-identifier"
-                    .any(|meta| xmlutil::equals_attribute_by_value(meta, xml::ID, unique.value()))))
-            // Check if package contains an epub version attribute
-            .unwrap_or(false) && pkg.contains_attribute("version")
+        pkg.contains_attribute("version")
     ).ok_or(EbookError::Parse {
-        cause: "Required attributes are missing or invalid uid reference".to_string(),
-        description: "The package element is missing the 'unique-identifier' \
-                or 'version' attribute. Please ensure 'unique-identifier' \
-                references a valid identifier. This can be fixed in the .opf \
-                file".to_string(),
+        cause: "Required epub version attribute is missing".to_string(),
+        description: "The package element is missing the 'version' attribute.\
+                Please ensure the epub version is provided. This can be fixed \
+                in the '.opf' file".to_string(),
     })
 }
 
@@ -706,21 +691,6 @@ fn is_valid_spine(spine: Option<Element>, children: Vec<Element>) -> Result<Elem
         cause: "Required element is missing".to_string(),
         description: "Please ensure the 'spine' element exists in the .opf file".to_string(),
     })
-}
-
-fn is_valid_metadata(metadata: &HashMap<String, Vec<Element>>) -> Result<(), EbookError> {
-    let required_keys = ["title", "identifier", "language"];
-    let missing_key = required_keys.into_iter()
-        .find(|key| !metadata.contains_key(*key));
-
-    match missing_key {
-        Some(key) => Err(EbookError::Parse {
-            cause: format!("Required metadata '{key}' is missing"),
-            description: "Please ensure the required metadata is not absent in \
-             the .opf file.".to_string()
-        }),
-        None => Ok(())
-    }
 }
 
 fn parse_toc(mut data: &str) -> Result<Toc, EbookError> {

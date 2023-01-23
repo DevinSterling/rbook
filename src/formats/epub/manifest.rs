@@ -86,6 +86,8 @@ impl Manifest {
         self.0.get(id)
     }
 
+    //pub fn by_href() {}
+
     /// Check if an element with a certain `id` exists in the manifest
     pub fn contains_id(&self, id: &str) -> bool {
         self.0.contains_key(id)

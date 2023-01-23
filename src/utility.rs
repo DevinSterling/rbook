@@ -27,10 +27,32 @@ pub(crate) fn get_path_metadata<P: AsRef<Path>>(path: P) -> Result<Metadata, Ebo
     })
 }
 
-pub(crate) fn get_parent_path<P: AsRef<Path>>(path: P) -> PathBuf {
-    // Return an empty path if there is no parent
+pub(crate) fn get_parent_path<P: AsRef<Path>>(path: &P) -> Cow<Path> {
+    // Return `path` itself if there is no parent
     path.as_ref().parent()
-        .map_or_else(|| PathBuf::from(""), |parent| parent.to_path_buf())
+        .map_or_else(|| Cow::Borrowed(path.as_ref()), |parent| Cow::Owned(parent.to_path_buf()))
+}
+
+// Function to normalize paths. ex: `EPUB//.//OPS/../../toc.ncx` -> `toc.ncx`
+pub(crate) fn normalize_path<P: AsRef<Path>>(path: P) -> PathBuf {
+    let mut normalized_path = PathBuf::new();
+    let mut stack = Vec::new();
+
+    for component in path.as_ref().components() {
+        let temp_str = component.as_os_str().to_string_lossy();
+
+        if temp_str == ".." {
+            stack.pop();
+        } else {
+            stack.push(PathBuf::from(&*temp_str));
+        }
+    }
+
+    for component in stack {
+        normalized_path.push(component);
+    }
+
+    normalized_path
 }
 
 // Support for UTF-16 by converting it to UTF-8

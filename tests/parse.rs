@@ -5,8 +5,8 @@ fn metadata_test() {
     let epub = rbook::Epub::new("tests/ebooks/childrens-literature.epub").unwrap();
 
     // epub specification required metadata
-    let title = epub.metadata().title();
-    let identifier = epub.metadata().unique_identifier();
+    let title = epub.metadata().title().unwrap();
+    let identifier = epub.metadata().unique_identifier().unwrap();
 
     assert_eq!("title", title.name());
     assert_eq!("Children's Literature", title.value());

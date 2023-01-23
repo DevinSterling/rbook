@@ -13,7 +13,7 @@
 //! let epub = rbook::Epub::new("tests/ebooks/moby-dick.epub").unwrap();
 //!
 //! // Retrieving the title
-//! assert_eq!("Moby-Dick", epub.metadata().title().value());
+//! assert_eq!("Moby-Dick", epub.metadata().title().unwrap().value());
 //!
 //! // Creating a reader instance
 //! let mut reader = epub.reader();

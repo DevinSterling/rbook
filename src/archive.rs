@@ -42,7 +42,9 @@ impl<T: Read + Seek> ZipArchive<T> {
     }
 
     fn get_file<P: AsRef<Path>>(&mut self, path: P) -> Result<ZipFile, ArchiveError> {
-        let mut path = path.as_ref().to_str().ok_or_else(|| ArchiveError::InvalidEncoding {
+        let normalized_path = utility::normalize_path(&path);
+
+        let mut path_str = normalized_path.to_str().ok_or_else(|| ArchiveError::InvalidEncoding {
             cause: "Non UTF-8 encoded path".to_string(),
             description: format!("The provided path does not contain valid utf-8: '{:?}'", path.as_ref())
         })?.to_string();
@@ -50,14 +52,14 @@ impl<T: Read + Seek> ZipArchive<T> {
         // Paths on windows contain backslashes. However, paths to files
         // in a zip archive requires only forward slashes.
         if cfg!(windows) {
-            path = path.replace('\\', "/");
+            path_str = path_str.replace('\\', "/");
         }
 
-        match self.0.by_name(&path) {
+        match self.0.by_name(&path_str) {
             Ok(zip_file) => Ok(ZipFile(zip_file)),
             Err(error) => Err(ArchiveError::InvalidPath {
                 cause: "Unable to access zip file".to_string(),
-                description: format!("Unable to retrieve file '{path}' from zip archive: {error}")
+                description: format!("Unable to retrieve file '{path_str}' from zip archive: {error}")
             }),
         }
     }
@@ -131,9 +133,11 @@ impl DirArchive {
 
     pub fn get_path<P: AsRef<Path>>(&self, path: P) -> Result<PathBuf, ArchiveError> {
         let join_path = self.0.join(&path);
+        let normalized_path = utility::normalize_path(join_path);
 
-        if join_path.is_file() {
-            Ok(join_path)
+        // Path traversal mitigation
+        if normalized_path.starts_with(&self.0) && normalized_path.is_file() {
+            Ok(normalized_path)
         } else {
             Err(ArchiveError::InvalidPath {
                 cause: "Provided path is inaccessible or not a file".to_string(),

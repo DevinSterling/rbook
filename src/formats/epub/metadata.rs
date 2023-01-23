@@ -16,7 +16,7 @@ use crate::utility;
 ///
 /// let epub = rbook::Epub::new("tests/ebooks/moby-dick.epub").unwrap();
 ///
-/// assert_eq!("Moby-Dick", epub.metadata().title().value());
+/// assert_eq!("Moby-Dick", epub.metadata().title().unwrap().value());
 ///
 /// // The cover is optional metadata
 /// let cover1 = epub.manifest().by_property("cover-image").unwrap();
@@ -72,13 +72,14 @@ impl Metadata {
     }
 
     // Convenient DCMES Required Metadata methods
+    // Although rare, some epubs may not contain the metadata.
+    // Having them as optional broadens support.
     /// Retrieve the title of ebook.
     ///
     /// If the ebook contains multiple titles, using the method
     /// [get("title")](Self::get) can be used to retrieve them all.
-    pub fn title(&self) -> &Element {
+    pub fn title(&self) -> Option<&Element> {
         self.get_element("title")
-            .expect("Should have a title; title is missing")
     }
 
     /// Language the ebook supports.
@@ -87,11 +88,11 @@ impl Metadata {
     /// [get("language")](Self::get) can be used to retrieve them all.
     ///
     /// Values conform to the **BCP47** standard.
-    pub fn language(&self) -> &Element {
+    pub fn language(&self) -> Option<&Element> {
         self.get_element("language")
-            .expect("Should have a language; language is missing")
     }
 
+    // Although rare, some ebooks may not have the identifier metadata entry
     /// Unique identifier associated with the ebook.
     ///
     /// If the ebook contains multiple identifiers, the method
@@ -102,23 +103,16 @@ impl Metadata {
     /// - DOI
     /// - ISBN
     /// - URL
-    pub fn unique_identifier(&self) -> &Element {
+    pub fn unique_identifier(&self) -> Option<&Element> {
         // Retrieve uid from root package element
-        let id = self.package.get_attribute("unique-identifier")
-            .expect(r#"Package should have a "unique-identifier" attribute"#)
-            .value();
-
-        // Retrieve identifier meta element
-        self.get_elements("identifier")
-            .expect("Should have identifier; identifier is missing")
-            .iter()
-            .find(|element| {
-                if let Some(attribute) = element.get_attribute(xml::ID) {
-                    attribute.value() == id
-                } else {
-                    false
-                }
-            }).expect("epub should have a unique-identifier")
+        self.package.get_attribute("unique-identifier")
+            // Find identifier metadata element that matches
+            .and_then(|id| self.get_elements("identifier")
+                .and_then(|elements| elements.iter()
+                    // Check if element has an id attribute
+                    .find(|element| element.get_attribute(xml::ID)
+                        // If so, see if its value matches the unique-identifier
+                        .map_or_else(|| false, |attribute| attribute.value() == id.value()))))
     }
 
     /// Retrieve the concatenation of the unique identifier and
@@ -139,9 +133,10 @@ impl Metadata {
     /// );
     /// ```
     pub fn release_identifier(&self) -> Option<String> {
-        let u_id = self.unique_identifier().value().to_string() + "@";
-
-        self.modified().map(|modified| u_id + modified.value())
+        self.unique_identifier().and_then(|unique_identifier| {
+            let u_id = unique_identifier.value().to_string() + "@";
+            self.modified().map(|modified| u_id + modified.value())
+        })
     }
 
     /// The date of when the ebook rendition was last modified
