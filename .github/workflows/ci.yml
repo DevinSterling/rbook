@@ -15,9 +15,9 @@ jobs:
     - uses: dtolnay/rust-toolchain@stable
 
     - name: Build
-    - run: cargo build
+      run: cargo build
     - name: Run tests
-    - run: cargo test
+      run: cargo test
 
   clippy:
     runs-on: ubuntu-latest
@@ -29,4 +29,4 @@ jobs:
         components: clippy
 
     - name: Run clippy
-    - run: cargo clippy
+      run: cargo clippy
