@@ -1,7 +1,10 @@
-// elements
+// Paths
+pub(crate) const CONTAINER: &str = "META-INF/container.xml"; // Used to identify the root `.opf` file
+
+// Elements
 pub(crate) const PACKAGE: &str = "package";
 
-// metadata elements
+// Metadata elements
 pub(crate) const TITLE: &str = "title"; // Also used for Guide title attribute
 pub(crate) const LANGUAGE: &str = "language";
 pub(crate) const IDENTIFIER: &str = "identifier";
@@ -15,23 +18,23 @@ pub(crate) const SUBJECT: &str = "subject";
 pub(crate) const TYPE: &str = "type"; // Also used for Guide type attribute
 pub(crate) const COVER: &str = "cover";
 
-// container attributes
+// Container attributes
 pub(crate) const FULL_PATH: &str = "full-path";
 
-// package attributes
+// Package attributes
 pub(crate) const VERSION: &str = "version";
 pub(crate) const UNIQUE_ID: &str = "unique-identifier";
 
-// metadata attributes
+// Metadata attributes
 pub(crate) const PROPERTY: &str = "property";
 pub(crate) const NAME: &str = "name";
 pub(crate) const CONTENT: &str = "content";
 pub(crate) const REFINES: &str = "refines";
 
-// spine attributes
+// Spine attributes
 pub(crate) const IDREF: &str = "idref";
 
-// toc attributes
+// Toc attributes
 pub(crate) const TOC_TYPE: &str = "epub:type";
 pub(crate) const TOC: &str = "toc";
 pub(crate) const LANDMARKS: &str = "landmarks";
@@ -39,12 +42,12 @@ pub(crate) const PAGE_LIST2: &str = "pageList"; // epub2
 pub(crate) const PAGE_LIST3: &str = "page-list"; // epub3
 pub(crate) const PLAY_ORDER: &str = "playOrder"; // epub2 only
 
-// properties
+// Properties
 pub(crate) const PROPERTIES: &str = "properties";
 pub(crate) const COVER_PROPERTY: &str = "cover-image";
 pub(crate) const NAV_PROPERTY: &str = "nav";
 
-// media types
+// Media types
 pub(crate) const MEDIA_TYPE: &str = "media-type";
 pub(crate) const PACKAGE_TYPE: &str = "application/oebps-package+xml";
 pub(crate) const NCX_TYPE: &str = "application/x-dtbncx+xml";
@@ -52,5 +55,5 @@ pub(crate) const NCX_TYPE: &str = "application/x-dtbncx+xml";
 // rbook specific
 // Used to indicate and differentiate between non-legacy and legacy
 // features if not possible otherwise.
-pub(crate) const LEGACY_FEATURE: &str = "_rbook_legacy_feature";
+pub(crate) const LEGACY_FEATURE: &str = "_epub_legacy_feature";
 pub(crate) const LEGACY_META: &str = "OPF2 meta";

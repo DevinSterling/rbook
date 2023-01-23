@@ -1,39 +1,35 @@
 mod constants;
-mod spine;
-mod manifest;
 mod guide;
+mod manifest;
 mod metadata;
+mod spine;
 mod table_of_contents;
 
-use lol_html::{element, text, doc_text, HtmlRewriter, Settings, Selector, ElementContentHandlers, DocumentContentHandlers};
-use std::rc::Rc;
+use lol_html::{
+    doc_text, element, text, DocumentContentHandlers, ElementContentHandlers, HtmlRewriter,
+    Selector, Settings,
+};
 use std::borrow::Cow;
 use std::cell::RefCell;
 use std::collections::HashMap;
+use std::fmt::{Debug, Formatter};
 use std::io::{BufReader, Read, Seek};
 use std::path::{Path, PathBuf};
-use std::fmt::{Debug, Formatter};
+use std::rc::Rc;
 
-use crate::utility;
-use crate::formats::{Ebook, EbookError};
-use crate::archive::{Archive, ZipArchive, DirArchive};
-use crate::formats::xml::{self, Element, Attribute};
+use crate::archive::{Archive, DirArchive, ZipArchive};
 use crate::formats::xml::utility as xmlutil;
+use crate::formats::xml::{self, Attribute, Element};
+use crate::formats::{Ebook, EbookError};
 #[cfg(feature = "reader")]
-use crate::reader::{ReaderError, Reader, Readable};
+use crate::reader::{Readable, Reader, ReaderError};
 #[cfg(feature = "statistics")]
 use crate::statistics::Stats;
+use crate::utility;
 
 pub use self::{
-    metadata::Metadata,
-    manifest::Manifest,
-    guide::Guide,
-    spine::Spine,
-    table_of_contents::Toc,
+    guide::Guide, manifest::Manifest, metadata::Metadata, spine::Spine, table_of_contents::Toc,
 };
-
-// Location of .xml file that leads to the package.opf
-const CONTAINER: &str = "META-INF/container.xml";
 
 /// Electronic Publication (epub) format
 ///
@@ -184,7 +180,8 @@ impl Epub {
     /// ```
     pub fn read_file<P: AsRef<Path>>(&self, path: P) -> Result<String, EbookError> {
         let path = self.parse_path(&path);
-        self.archive.borrow_mut()
+        self.archive
+            .borrow_mut()
             .read_file(&path)
             .map_err(EbookError::Archive)
     }
@@ -210,7 +207,8 @@ impl Epub {
     /// ```
     pub fn read_bytes_file<P: AsRef<Path>>(&self, path: P) -> Result<Vec<u8>, EbookError> {
         let path = self.parse_path(&path);
-        self.archive.borrow_mut()
+        self.archive
+            .borrow_mut()
             .read_bytes_file(&path)
             .map_err(EbookError::Archive)
     }
@@ -221,18 +219,19 @@ impl Epub {
         let root_file_dir = utility::get_parent_path(&self.root_file);
         let path = path.as_ref();
 
-        // if the given path is not the container and does not contain the
-        // root file dir, concat the user supplied path to the root file dir
-        if !(PathBuf::from(CONTAINER) == path || path.starts_with(&root_file_dir)) {
-            Cow::Owned(root_file_dir.join(path))
-        } else {
+        // If the path is the container or contains the root file dir, return the
+        // original. If not, concat the user supplied path to the root file dir.
+        if Path::new(constants::CONTAINER) == path || path.starts_with(&root_file_dir) {
             Cow::Borrowed(path)
+        } else {
+            Cow::Owned(root_file_dir.join(path))
         }
     }
 
     fn build(mut archive: Box<dyn Archive>) -> Result<Self, EbookError> {
         // Parse "META-INF/container.xml"
-        let content_meta_inf = archive.read_bytes_file(Path::new(CONTAINER))
+        let content_meta_inf = archive
+            .read_bytes_file(Path::new(constants::CONTAINER))
             .map_err(EbookError::Archive)?;
         let root_file = parse_container(&content_meta_inf)?;
 
@@ -240,19 +239,17 @@ impl Epub {
         let root_file_dir = utility::get_parent_path(&root_file);
 
         // Parse "package.opf"
-        let content_pkg_opf = archive.read_bytes_file(&root_file)
+        let content_pkg_opf = archive
+            .read_bytes_file(&root_file)
             .map_err(EbookError::Archive)?;
-        let (metadata,
-            manifest,
-            spine,
-            guide
-        ) = parse_package(&content_pkg_opf)?;
+        let (metadata, manifest, spine, guide) = parse_package(&content_pkg_opf)?;
 
         // Get toc.xhtml/ncx href value
         let toc_href = get_toc(&manifest)?.value();
 
         // Parse "toc.xhtml/ncx"
-        let content_toc = archive.read_file(&root_file_dir.join(toc_href))
+        let content_toc = archive
+            .read_file(&root_file_dir.join(toc_href))
             .map_err(EbookError::Archive)?;
         let toc = parse_toc(&content_toc)?;
 
@@ -274,7 +271,7 @@ impl Debug for Epub {
             .field("root_file", &self.root_file)
             .field("metadata", &self.metadata)
             .field("manifest", &self.manifest)
-            .field("spine",&self.spine)
+            .field("spine", &self.spine)
             .field("landmarks", &self.guide)
             .field("toc", &self.toc)
             .finish()
@@ -310,42 +307,53 @@ impl Readable for Epub {
         // Avoid freeing reference to elements while still in use
         let manifest_elements = self.manifest.elements();
 
-        let manifest_element = manifest_elements.iter()
+        let manifest_element = manifest_elements
+            .iter()
             .find(|element| element.value() == path)
             .ok_or_else(|| ReaderError::InvalidReference {
-            cause: "Invalid path provided".to_string(),
-            description: format!("Please ensure a manifest element's href \
-                attribute references the path: '{path}'.")
+                cause: "Invalid path provided".to_string(),
+                description: format!(
+                    "Please ensure a manifest element's href \
+                     attribute references the path: '{path}'."
+                ),
             })?;
 
         // Get index of the spine element
-        let spine_element_index = self.spine.elements()
+        let spine_element_index = self.spine
+            .elements()
             .iter()
             .position(|element| element.name() == manifest_element.name())
             .ok_or_else(|| ReaderError::InvalidReference {
                 cause: "Manifest element is not referenced".to_string(),
-                description: format!("Please ensure a spine element's idref attribute \
-                references the manifest element with an id of: '{}'", manifest_element.name())
+                description: format!(
+                    "Please ensure a spine element's idref attribute \
+                    references the manifest element with an id of: '{}'",
+                    manifest_element.name()
+                ),
             })?;
 
         Ok(spine_element_index)
     }
 
     fn navigate(&self, index: usize) -> Result<String, ReaderError> {
-        let spine_element = self.spine.elements().get(index)
+        let spine_element = self.spine
+            .elements()
+            .get(index)
             .ok_or_else(|| ReaderError::OutOfBounds {
                 cause: format!("Provided index '{index}' is out of bounds"),
                 description: "Please ensure the index is in bounds".to_string(),
             })?;
 
-        let manifest_element = self.manifest.by_id(spine_element.name())
+        let manifest_element = self.manifest
+            .by_id(spine_element.name())
             .ok_or_else(|| ReaderError::InvalidReference {
                 cause: "Invalid manifest reference".to_string(),
                 description: "Please ensure all spine elements reference a \
                 valid manifest element.".to_string(),
             })?;
 
-        let file_content = self.read_file(manifest_element.value())
+        let file_content = self
+            .read_file(manifest_element.value())
             .map_err(ReaderError::NoContent)?;
 
         Ok(file_content)
@@ -355,7 +363,8 @@ impl Readable for Epub {
 #[cfg(feature = "statistics")]
 impl Stats for Epub {
     fn count_total<F: Fn(&[u8]) -> Result<usize, EbookError>>(&self, f: F) -> usize {
-        self.spine.elements()
+        self.spine
+            .elements()
             .iter()
             .filter_map(|element| self.manifest.by_id(element.name()))
             .filter_map(|element| self.read_bytes_file(element.value()).ok())
@@ -363,21 +372,23 @@ impl Stats for Epub {
             .sum()
     }
 
-    fn try_count_total<F: Fn(&[u8]) -> Result<usize, EbookError>>(&self, f: F) -> Result<usize, EbookError> {
-        self.spine.elements()
-            .iter()
-            .try_fold(0, |total, element| {
-                let manifest_el = self.manifest.by_id(element.name())
-                    .ok_or_else(|| EbookError::Parse {
-                        cause: "Invalid manifest reference".to_string(),
-                        description: "Please ensure all spine elements reference a \
-                        valid manifest element.".to_string(),
-                    })?;
-                let content = self.read_bytes_file(manifest_el.value())?;
-                let count = f(&content)?;
+    fn try_count_total<F: Fn(&[u8]) -> Result<usize, EbookError>>(
+        &self,
+        f: F,
+    ) -> Result<usize, EbookError> {
+        self.spine.elements().iter().try_fold(0, |total, element| {
+            let manifest_el = self.manifest
+                .by_id(element.name())
+                .ok_or_else(|| EbookError::Parse {
+                    cause: "Invalid manifest reference".to_string(),
+                    description: "Please ensure all spine elements reference a \
+                    valid manifest element.".to_string(),
+                })?;
+            let content = self.read_bytes_file(manifest_el.value())?;
+            let count = f(&content)?;
 
-                Ok(total + count)
-            })
+            Ok(total + count)
+        })
     }
 
     fn count_chars(&self, data: &[u8]) -> Result<usize, EbookError> {
@@ -389,11 +400,7 @@ impl Stats for Epub {
             Ok(())
         });
 
-        parse_xhtml_data(
-            vec![char_handler],
-            vec![],
-            data
-        )?;
+        parse_xhtml_data(vec![char_handler], vec![], data)?;
 
         Ok(char_count)
     }
@@ -402,7 +409,8 @@ impl Stats for Epub {
         let mut word_count: usize = 0;
 
         let text_handler = text!("body > *", |text| {
-            word_count += text.as_str()
+            word_count += text
+                .as_str()
                 .split(|character: char| !character.is_alphanumeric())
                 .filter(|capture| !capture.is_empty())
                 .count();
@@ -410,11 +418,7 @@ impl Stats for Epub {
             Ok(())
         });
 
-        parse_xhtml_data(
-            vec![text_handler],
-            vec![],
-            data
-        )?;
+        parse_xhtml_data(vec![text_handler], vec![], data)?;
 
         Ok(word_count)
     }
@@ -426,11 +430,13 @@ fn parse_container(data: &[u8]) -> Result<PathBuf, EbookError> {
     let root_file_handler = element!("rootfile", |element| {
         // Although rare, multiple package.opf locations could
         // exist. Only accept first path, ignore all others
-        if !opf_location.is_empty() { return Ok(()) }
+        if !opf_location.is_empty() {
+            return Ok(());
+        }
 
         if let (Some(media_type), Some(full_path)) = (
             element.get_attribute(constants::MEDIA_TYPE),
-            element.get_attribute(constants::FULL_PATH)
+            element.get_attribute(constants::FULL_PATH),
         ) {
             if media_type == constants::PACKAGE_TYPE {
                 opf_location.push_str(&full_path);
@@ -440,11 +446,7 @@ fn parse_container(data: &[u8]) -> Result<PathBuf, EbookError> {
         Ok(())
     });
 
-    parse_xhtml_data(
-        vec![root_file_handler],
-        vec![],
-        data
-    )?;
+    parse_xhtml_data(vec![root_file_handler], vec![], data)?;
 
     if opf_location.is_empty() {
         Err(EbookError::Parse {
@@ -497,12 +499,10 @@ fn parse_package(data: &[u8]) -> Result<(Metadata, Manifest, Spine, Guide), Eboo
         match (
             xmlutil::take_attribute(&mut attributes, constants::PROPERTY),
             xmlutil::take_attribute(&mut attributes, constants::NAME),
-            xmlutil::take_attribute(&mut attributes, constants::CONTENT)
+            xmlutil::take_attribute(&mut attributes, constants::CONTENT),
         ) {
             // Newer meta element
-            (Some(property), _, _) => {
-                name = property.value
-            },
+            (Some(property), _, _) => name = property.value,
             // Legacy OPF2.0 meta element
             (_, Some(meta_name), Some(content)) => {
                 name = meta_name.value;
@@ -512,7 +512,7 @@ fn parse_package(data: &[u8]) -> Result<(Metadata, Manifest, Spine, Guide), Eboo
                     name: constants::LEGACY_FEATURE.to_string(),
                     value: constants::LEGACY_META.to_string(),
                 });
-            },
+            }
             _ => (),
         }
 
@@ -539,10 +539,13 @@ fn parse_package(data: &[u8]) -> Result<(Metadata, Manifest, Spine, Guide), Eboo
             if let Some(parent) = id_map.get_mut(&id) {
                 // This should be guaranteed to have a valid address
                 unsafe {
-                    let children = (*(*parent)).children.as_mut().expect("Should have children");
+                    let children = (*(*parent)).children
+                        .as_mut()
+                        .expect("Should have children");
                     children.push(meta);
 
-                    let entry = children.last_mut().expect("Should have at least one child element");
+                    let entry = children.last_mut()
+                        .expect("Should have at least one child element");
                     current_meta.borrow_mut().replace(entry as *mut Element);
                 }
             }
@@ -550,7 +553,8 @@ fn parse_package(data: &[u8]) -> Result<(Metadata, Manifest, Spine, Guide), Eboo
             // Add new metadata entry
             meta_group.push(meta);
 
-            let entry = meta_group.last_mut().expect("Group should have at least one element");
+            let entry = meta_group.last_mut()
+                .expect("Group should have at least one element");
             current_meta.borrow_mut().replace(entry as *mut Element);
 
             if let Some(id) = element.get_attribute(xml::ID) {
@@ -568,7 +572,9 @@ fn parse_package(data: &[u8]) -> Result<(Metadata, Manifest, Spine, Guide), Eboo
         let value = text.as_str().trim().to_string();
 
         // Ignore empty chunks/strings
-        if value.is_empty() { return Ok(()) }
+        if value.is_empty() {
+            return Ok(());
+        }
 
         // Add missing metadata value to current metadata entry
         // TODO: ensure function only runs when text is encased in "metadata" tags
@@ -586,7 +592,7 @@ fn parse_package(data: &[u8]) -> Result<(Metadata, Manifest, Spine, Guide), Eboo
         // the name of manifest items will be the value of its id attribute
         let (name, value) = match (
             xmlutil::take_attribute(&mut attributes, xml::ID),
-            xmlutil::take_attribute(&mut attributes, xml::HREF)
+            xmlutil::take_attribute(&mut attributes, xml::HREF),
         ) {
             (Some(id), Some(href)) => (id.value, href.value),
             _ => return Ok(()),
@@ -599,7 +605,7 @@ fn parse_package(data: &[u8]) -> Result<(Metadata, Manifest, Spine, Guide), Eboo
                 attributes,
                 value,
                 children: None,
-            }
+            },
         );
 
         Ok(())
@@ -611,7 +617,7 @@ fn parse_package(data: &[u8]) -> Result<(Metadata, Manifest, Spine, Guide), Eboo
         // the name of spine items will be the value of its idref attribute
         let name = match xmlutil::take_attribute(&mut attributes, constants::IDREF) {
             Some(idref) => idref.value,
-            _ => return Ok(())
+            _ => return Ok(()),
         };
 
         itemref_vec.push(Element {
@@ -630,7 +636,7 @@ fn parse_package(data: &[u8]) -> Result<(Metadata, Manifest, Spine, Guide), Eboo
 
         let (name, value) = match (
             xmlutil::take_attribute(&mut attributes, constants::TITLE),
-            xmlutil::take_attribute(&mut attributes, xml::HREF)
+            xmlutil::take_attribute(&mut attributes, xml::HREF),
         ) {
             (Some(title), Some(href)) => (title.value, href.value),
             _ => return Ok(()),
@@ -655,7 +661,7 @@ fn parse_package(data: &[u8]) -> Result<(Metadata, Manifest, Spine, Guide), Eboo
             guide_handler,
         ],
         vec![metadata_text_value_handler],
-        data
+        data,
     )?;
 
     // Finalize package:
@@ -674,24 +680,26 @@ fn parse_package(data: &[u8]) -> Result<(Metadata, Manifest, Spine, Guide), Eboo
 }
 
 fn is_valid_package(package: Option<Element>) -> Result<Element, EbookError> {
-    package.filter(|pkg|
-        pkg.contains_attribute(constants::VERSION)
-    ).ok_or(EbookError::Parse {
-        cause: "Required epub version attribute is missing".to_string(),
-        description: "The package element is missing the 'version' attribute.\
-                Please ensure the epub version is provided. This can be fixed \
-                in the '.opf' file".to_string(),
-    })
+    package
+        .filter(|pkg| pkg.contains_attribute(constants::VERSION))
+        .ok_or(EbookError::Parse {
+            cause: "Required epub version attribute is missing".to_string(),
+            description: "The package element is missing the 'version' attribute. \
+            Please ensure the epub version is provided. This can be fixed \
+            in the '.opf' file".to_string(),
+        })
 }
 
 fn is_valid_spine(spine: Option<Element>, children: Vec<Element>) -> Result<Element, EbookError> {
-    spine.map(|mut spine| {
-        spine.children.replace(children);
-        spine
-    }).ok_or(EbookError::Parse {
-        cause: "Required element is missing".to_string(),
-        description: "Please ensure the 'spine' element exists in the .opf file".to_string(),
-    })
+    spine
+        .map(|mut spine| {
+            spine.children.replace(children);
+            spine
+        })
+        .ok_or(EbookError::Parse {
+            cause: "Required element is missing".to_string(),
+            description: "Please ensure the 'spine' element exists in the .opf file".to_string(),
+        })
 }
 
 fn parse_toc(mut data: &str) -> Result<Toc, EbookError> {
@@ -736,7 +744,7 @@ fn parse_toc(mut data: &str) -> Result<Toc, EbookError> {
                     attributes,
                     value: String::new(),
                     children: Some(current_nav_group.replace(Vec::new())),
-                }
+                },
             );
 
             Ok(())
@@ -762,15 +770,13 @@ fn parse_toc(mut data: &str) -> Result<Toc, EbookError> {
 
             match (stack.pop(), stack.last_mut()) {
                 // Nav element has a parent
-                (Some(nav_entry), Some(nav_parent)) => {
-                    match nav_parent.children.as_mut() {
-                        Some(children) => children.push(nav_entry),
-                        None => nav_parent.children = Some(vec![nav_entry]),
-                    }
+                (Some(nav_entry), Some(nav_parent)) => match nav_parent.children.as_mut() {
+                    Some(children) => children.push(nav_entry),
+                    None => nav_parent.children = Some(vec![nav_entry]),
                 },
                 // Nav element does not have a parent
                 (Some(nav_entry), _) => toc.borrow_mut().push(nav_entry),
-                _ => ()
+                _ => (),
             }
 
             Ok(())
@@ -816,7 +822,7 @@ fn parse_toc(mut data: &str) -> Result<Toc, EbookError> {
             nav_text_handler,
         ],
         vec![],
-        data.as_bytes()
+        data.as_bytes(),
     )?;
 
     is_valid_toc(&nav_groups.borrow())?;
@@ -840,7 +846,7 @@ fn is_valid_toc(toc: &HashMap<String, Element>) -> Result<(), EbookError> {
 fn parse_xhtml_data(
     element_content_handlers: Vec<(Cow<Selector>, ElementContentHandlers)>,
     document_content_handlers: Vec<DocumentContentHandlers>,
-    data: &[u8]
+    data: &[u8],
 ) -> Result<(), EbookError> {
     let mut reader = HtmlRewriter::new(
         Settings {
@@ -848,7 +854,7 @@ fn parse_xhtml_data(
             document_content_handlers,
             ..Settings::default()
         },
-        |_: &[u8]| ()
+        |_: &[u8]| (),
     );
 
     // Convert data to utf-8 if necessary and start parsing
@@ -863,7 +869,8 @@ fn parse_xhtml_data(
 
 fn get_toc(manifest: &Manifest) -> Result<&Element, EbookError> {
     // Attempt to retrieve newer toc format first
-    manifest.by_property(constants::NAV_PROPERTY)
+    manifest
+        .by_property(constants::NAV_PROPERTY)
         // Fallback to older toc format
         .or_else(|| manifest.by_media_type(constants::NCX_TYPE))
         .ok_or(EbookError::Parse {

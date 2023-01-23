@@ -1,8 +1,8 @@
-use zip::{self, read};
-use thiserror::Error;
 use std::borrow::Cow;
-use std::io::{Seek, Read};
+use std::io::{Read, Seek};
 use std::path::{Path, PathBuf};
+use thiserror::Error;
+use zip::{self, read};
 
 use crate::formats::EbookError;
 use crate::utility;
@@ -44,10 +44,16 @@ impl<T: Read + Seek> ZipArchive<T> {
     fn get_file<P: AsRef<Path>>(&mut self, path: P) -> Result<ZipFile, ArchiveError> {
         let normalized_path = utility::normalize_path(&path);
 
-        let mut path_str = normalized_path.to_str().ok_or_else(|| ArchiveError::InvalidEncoding {
-            cause: "Non UTF-8 encoded path".to_string(),
-            description: format!("The provided path does not contain valid utf-8: '{:?}'", path.as_ref())
-        })?.to_string();
+        let mut path_str = normalized_path
+            .to_str()
+            .ok_or_else(|| ArchiveError::InvalidEncoding {
+                cause: "Non UTF-8 encoded path".to_string(),
+                description: format!(
+                    "The provided path does not contain valid utf-8: '{:?}'",
+                    path.as_ref()
+                )
+            })?
+            .to_string();
 
         // Paths on windows contain backslashes. However, paths to files
         // in a zip archive requires only forward slashes.
@@ -59,7 +65,9 @@ impl<T: Read + Seek> ZipArchive<T> {
             Ok(zip_file) => Ok(ZipFile(zip_file)),
             Err(error) => Err(ArchiveError::InvalidPath {
                 cause: "Unable to access zip file".to_string(),
-                description: format!("Unable to retrieve file '{path_str}' from zip archive: {error}")
+                description: format!(
+                    "Unable to retrieve file '{path_str}' from zip archive: {error}"
+                ),
             }),
         }
     }
@@ -91,14 +99,14 @@ impl ZipFile<'_> {
 
         let bytes = match data {
             Cow::Owned(_) => data.into_owned(), // Return new byte data
-            _ => bytes // Return original byte data
+            _ => bytes,                         // Return original byte data
         };
 
         match String::from_utf8(bytes) {
             Ok(string) => Ok(string),
             Err(err) => Err(ArchiveError::CannotRead {
                 cause: "Cannot read zip file contents to string".to_string(),
-                description: err.to_string()
+                description: err.to_string(),
             }),
         }
     }
@@ -110,7 +118,7 @@ impl ZipFile<'_> {
             Ok(_) => Ok(buf),
             Err(err) => Err(ArchiveError::CannotRead {
                 cause: "Cannot read zip file contents to bytes vector".to_string(),
-                description: err.to_string()
+                description: err.to_string(),
             }),
         }
     }
@@ -126,8 +134,8 @@ impl DirArchive {
             Ok(_) => Ok(Self(path_buf)),
             Err(error) => Err(EbookError::IO {
                 cause: "Provided path is inaccessible".to_string(),
-                description: format!("Path '{:?}': {error}", path.as_ref())
-            })
+                description: format!("Path '{:?}': {error}", path.as_ref()),
+            }),
         }
     }
 
@@ -141,7 +149,7 @@ impl DirArchive {
         } else {
             Err(ArchiveError::InvalidPath {
                 cause: "Provided path is inaccessible or not a file".to_string(),
-                description: format!("Please ensure the file exists: '{:?}'", path.as_ref())
+                description: format!("Please ensure the file exists: '{:?}'", path.as_ref()),
             })
         }
     }
@@ -154,14 +162,14 @@ impl Archive for DirArchive {
 
         let bytes = match data {
             Cow::Owned(_) => data.into_owned(), // Return new byte data
-            _ => bytes // Return original byte data
+            _ => bytes,                         // Return original byte data
         };
 
         match String::from_utf8(bytes) {
             Ok(content) => Ok(content),
-            Err(error) =>  Err(ArchiveError::CannotRead {
+            Err(error) => Err(ArchiveError::CannotRead {
                 cause: "Cannot read file contents to string".to_string(),
-                description: format!("Path: '{path:?}': {error}")
+                description: format!("Path: '{path:?}': {error}"),
             }),
         }
     }
@@ -171,9 +179,9 @@ impl Archive for DirArchive {
 
         match std::fs::read(&path) {
             Ok(content) => Ok(content),
-            Err(error) =>  Err(ArchiveError::CannotRead {
+            Err(error) => Err(ArchiveError::CannotRead {
                 cause: "Cannot read file contents to bytes vector".to_string(),
-                description: format!("Path: '{path:?}': {error}")
+                description: format!("Path: '{path:?}': {error}"),
             }),
         }
     }

@@ -9,28 +9,32 @@ use crate::formats::EbookError;
 pub(crate) fn split_where(string: &str, character: char) -> Option<(&str, &str)> {
     string.find(character)
         .map(|index| string.split_at(index))
-        .map(|(left,right)| (left, &right[1..]))
+        .map(|(left, right)| (left, &right[1..]))
 }
 
 pub(crate) fn get_file<P: AsRef<Path>>(path: P) -> Result<File, EbookError> {
     File::open(&path).map_err(|error| EbookError::IO {
         cause: "Unable to open file".to_string(),
-        description: format!("File path: '{:?}': {error}", path.as_ref())
+        description: format!("File path: '{:?}': {error}", path.as_ref()),
     })
 }
 
 pub(crate) fn get_path_metadata<P: AsRef<Path>>(path: P) -> Result<Metadata, EbookError> {
-    path.as_ref().metadata()
+    path.as_ref()
+        .metadata()
         .map_err(|error| EbookError::IO {
-        cause: "Unable to access path metadata".to_string(),
-        description: format!("Path: '{:?}': {error}", path.as_ref())
-    })
+            cause: "Unable to access path metadata".to_string(),
+            description: format!("Path: '{:?}': {error}", path.as_ref()),
+        })
 }
 
 pub(crate) fn get_parent_path<P: AsRef<Path>>(path: &P) -> Cow<Path> {
     // Return `path` itself if there is no parent
-    path.as_ref().parent()
-        .map_or(Cow::Borrowed(path.as_ref()), |parent| Cow::Owned(parent.to_path_buf()))
+    path.as_ref()
+        .parent()
+        .map_or(Cow::Borrowed(path.as_ref()), |parent| {
+            Cow::Owned(parent.to_path_buf())
+        })
 }
 
 // Function to normalize paths. ex: `EPUB//.//OPS/../../toc.ncx` -> `toc.ncx`
@@ -66,7 +70,8 @@ pub(crate) fn to_utf8(data: &[u8]) -> Cow<[u8]> {
             u16::from_be_bytes
         };
 
-        let utf16_data: Vec<_> = data[2..].chunks_exact(2)
+        let utf16_data: Vec<_> = data[2..]
+            .chunks_exact(2)
             .map(|chunk| endian([chunk[0], chunk[1]]))
             .collect();
         let utf8_data = String::from_utf16_lossy(&utf16_data);

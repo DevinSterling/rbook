@@ -47,15 +47,17 @@ impl Guide {
     }
 
     fn find_attribute_by_value(&self, field: &str, value: &str) -> Option<&Element> {
-        self.elements().iter().find(|element| {
-            xml::utility::equals_attribute_by_value(element, field, value)
-        })
+        self.elements()
+            .iter()
+            .find(|element| xml::utility::equals_attribute_by_value(element, field, value))
     }
 
     fn find_attributes_by_value(&self, field: &str, value: &str) -> Option<Vec<&Element>> {
-        let vec: Vec<_> = self.elements().iter().filter(|element| {
-            xml::utility::equals_attribute_by_value(element, field, value)
-        }).collect();
+        let vec: Vec<_> = self
+            .elements()
+            .iter()
+            .filter(|element| xml::utility::equals_attribute_by_value(element, field, value))
+            .collect();
 
         if vec.is_empty() {
             None

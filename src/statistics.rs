@@ -34,7 +34,10 @@ pub trait Stats {
     fn count_total<F: Fn(&[u8]) -> Result<usize, EbookError>>(&self, f: F) -> usize;
 
     /// Iterate through all resource elements and perform a function.
-    fn try_count_total<F: Fn(&[u8]) -> Result<usize, EbookError>>(&self, f: F) -> Result<usize, EbookError>;
+    fn try_count_total<F: Fn(&[u8]) -> Result<usize, EbookError>>(
+        &self,
+        f: F,
+    ) -> Result<usize, EbookError>;
 
     /// Calculate the count of all characters from a given collection
     /// of bytes.

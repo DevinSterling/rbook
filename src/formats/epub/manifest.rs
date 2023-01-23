@@ -68,12 +68,15 @@ impl Manifest {
     /// }
     /// ```
     pub fn images(&self) -> Option<Vec<&Element>> {
-        let vec: Vec<_> = self.0.values().filter(|element| {
-            match element.get_attribute(constants::MEDIA_TYPE) {
-                Some(attribute) => attribute.value().starts_with("image"),
-                None => false,
-            }
-        }).collect();
+        let vec: Vec<_> = self.0
+            .values()
+            .filter(
+                |element| match element.get_attribute(constants::MEDIA_TYPE) {
+                    Some(attribute) => attribute.value().starts_with("image"),
+                    None => false,
+                },
+            )
+            .collect();
 
         if vec.is_empty() {
             None
@@ -124,15 +127,16 @@ impl Manifest {
     }
 
     fn find_attribute_by_value(&self, field: &str, value: &str) -> Option<&Element> {
-        self.0.values().find(|element| {
-            xml::utility::equals_attribute_by_value(element, field, value)
-        })
+        self.0
+            .values()
+            .find(|element| xml::utility::equals_attribute_by_value(element, field, value))
     }
 
     fn find_attributes_by_value(&self, field: &str, value: &str) -> Option<Vec<&Element>> {
-        let vec: Vec<_> = self.0.values().filter(|element| {
-            xml::utility::equals_attribute_by_value(element, field, value)
-        }).collect();
+        let vec: Vec<_> = self.0
+            .values()
+            .filter(|element| xml::utility::equals_attribute_by_value(element, field, value))
+            .collect();
 
         if vec.is_empty() {
             None

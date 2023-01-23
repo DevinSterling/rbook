@@ -73,11 +73,14 @@ impl Toc {
 
     /// Retrieve toc elements in flattened form.
     pub fn elements_flat(&self) -> Vec<&Element> {
-        let elements = self.get_elements_flat(constants::TOC)
+        let elements = self
+            .get_elements_flat(constants::TOC)
             .expect("Should have a toc element");
 
         // Order navPoint elements
-        if elements.first().map_or(false, |element| element.contains_attribute(constants::PLAY_ORDER)) {
+        if elements.first().map_or(false, |element| {
+            element.contains_attribute(constants::PLAY_ORDER)
+        }) {
             sort_nav_points(elements)
         } else {
             elements
@@ -96,7 +99,9 @@ impl Toc {
 
     fn get_elements(&self, name: &str) -> Option<&[Element]> {
         if let Some(elements) = self.0.get(name) {
-            Some(elements.children().expect("Should have nav children elements"))
+            Some(
+                elements.children().expect("Should have nav children elements")
+            )
         } else {
             None
         }
@@ -118,7 +123,8 @@ fn sort_nav_points(nav_points: Vec<&Element>) -> Vec<&Element> {
     let mut ordered_element = Vec::new();
 
     for nav_point in nav_points {
-        let value: usize = nav_point.get_attribute(constants::PLAY_ORDER)
+        let value: usize = nav_point
+            .get_attribute(constants::PLAY_ORDER)
             .and_then(|play_order| play_order.value().parse().ok())
             .unwrap_or(0);
 
@@ -127,7 +133,10 @@ fn sort_nav_points(nav_points: Vec<&Element>) -> Vec<&Element> {
 
     // Sort by nav point play order
     ordered_element.sort_by(|(play_order1, _), (play_order2, _)| play_order1.cmp(play_order2));
-    ordered_element.into_iter().map(|(_, nav_point)| nav_point).collect()
+    ordered_element
+        .into_iter()
+        .map(|(_, nav_point)| nav_point)
+        .collect()
 }
 
 fn recursive_flatten<'a>(elements: &'a [Element], output: &mut Vec<&'a Element>) {

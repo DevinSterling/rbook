@@ -27,7 +27,7 @@ pub struct Element {
     pub(super) name: String,
     pub(super) attributes: Vec<Attribute>,
     pub(super) value: String,
-    pub(super) children: Option<Vec<Element>>
+    pub(super) children: Option<Vec<Element>>,
 }
 
 impl Element {
@@ -47,14 +47,16 @@ impl Element {
     /// Retrieve the specified attribute. Namespace/prefix
     /// may be omitted from the argument.
     pub fn get_attribute(&self, name: &str) -> Option<&Attribute> {
-        self.attributes.iter()
+        self.attributes
+            .iter()
             .find(|attribute| attribute.name().ends_with(&name.to_lowercase()))
     }
 
     /// Check if the element contains the specified attribute.
     /// Namespace/prefix may be omitted from the argument.
     pub fn contains_attribute(&self, name: &str) -> bool {
-        self.attributes.iter()
+        self.attributes
+            .iter()
             .any(|attribute| attribute.name().ends_with(&name.to_lowercase()))
     }
 
@@ -67,7 +69,8 @@ impl Element {
     /// may be omitted from the argument.
     pub fn get_child(&self, name: &str) -> Option<&Element> {
         self.children()
-            .and_then(|children| children.iter()
+            .and_then(|children| children
+                .iter()
                 .find(|child| child.name().ends_with(&name.to_lowercase())))
     }
 
@@ -75,7 +78,8 @@ impl Element {
     /// Namespace/prefix may be omitted from the argument.
     pub fn contains_child(&self, name: &str) -> bool {
         self.children()
-            .map_or(false, |children| children.iter()
+            .map_or(false, |children| children
+                .iter()
                 .any(|child| child.name().ends_with(&name.to_lowercase())))
     }
 }
@@ -115,21 +119,24 @@ impl Attribute {
 
 // Utility functions module
 pub(crate) mod utility {
+    use super::{Attribute, Element};
     use lol_html::html_content::Attribute as LolAttribute;
-    use super::{Element, Attribute};
 
     pub(crate) fn equals_attribute_by_value(element: &Element, field: &str, value: &str) -> bool {
         element.get_attribute(field)
-            .map_or(false, |attribute| attribute.value()
+            .map_or(false, |attribute| attribute
+                .value()
                 .split_whitespace()
                 .any(|slice| slice == value))
     }
 
     pub(crate) fn copy_attributes(old_attributes: &[LolAttribute]) -> Vec<Attribute> {
-        old_attributes.iter().map(|attr| Attribute {
-            name: attr.name(),
-            value: attr.value(),
-        }).collect()
+        old_attributes.iter()
+            .map(|attr| Attribute {
+                name: attr.name(),
+                value: attr.value(),
+            })
+            .collect()
     }
 
     pub(crate) fn take_attribute(attributes: &mut Vec<Attribute>, field: &str) -> Option<Attribute> {

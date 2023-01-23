@@ -3,9 +3,9 @@ pub mod epub;
 // pub mod cbz;
 pub mod xml;
 
-use thiserror::Error;
 use std::io::{Read, Seek};
 use std::path::Path;
+use thiserror::Error;
 
 use crate::archive::ArchiveError;
 
@@ -74,5 +74,5 @@ pub enum EbookError {
     #[error("[Parse Error][{cause}]: {description}")]
     Parse { cause: String, description: String },
     #[error("[Archive Error]{0}")]
-    Archive(ArchiveError)
+    Archive(ArchiveError),
 }

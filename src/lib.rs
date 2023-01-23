@@ -46,21 +46,15 @@
 //! assert_eq!("marc:relators", scheme.value())
 //! ```
 
-mod formats;
-mod utility;
 mod archive;
+mod formats;
 #[cfg(feature = "reader")]
 mod reader;
 #[cfg(feature = "statistics")]
 mod statistics;
+mod utility;
 
-pub use self::{
-    formats::{
-        xml,
-        Ebook,
-        epub::Epub,
-    }
-};
+pub use self::formats::{epub::Epub, xml, Ebook};
 #[cfg(feature = "reader")]
 pub use self::reader::Reader;
 #[cfg(feature = "statistics")]
@@ -68,21 +62,12 @@ pub use self::statistics::Stats;
 
 pub mod epub {
     //! Access to the contents that make up an epub:
-    pub use super::formats::epub::{
-        Metadata,
-        Manifest,
-        Spine,
-        Guide,
-        Toc,
-    };
+    pub use super::formats::epub::{Guide, Manifest, Metadata, Spine, Toc};
 }
 
 pub mod errors {
     //! Possible errors that can be encountered using rbook.
-    pub use super::{
-        formats::EbookError,
-        archive::ArchiveError,
-    };
     #[cfg(feature = "reader")]
     pub use super::reader::ReaderError;
+    pub use super::{archive::ArchiveError, formats::EbookError};
 }

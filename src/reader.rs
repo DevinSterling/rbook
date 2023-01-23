@@ -1,5 +1,5 @@
-use thiserror::Error;
 use crate::formats::EbookError;
+use thiserror::Error;
 
 pub(crate) trait Readable {
     // Reader navigation using a string
@@ -20,7 +20,7 @@ pub enum ReaderError {
     #[error("[InvalidReference Error][{cause}]: {description}")]
     InvalidReference { cause: String, description: String },
     #[error("[NoContent Error]{0}")]
-    NoContent(EbookError)
+    NoContent(EbookError),
 }
 
 /// Reader that allows traversal of an ebook file by file
@@ -164,7 +164,7 @@ impl<'a> Reader<'a> {
                 self.current_index = page_index;
                 Ok(page_content)
             }
-            Err(error) => Err(error)
+            Err(error) => Err(error),
         }
     }
 
@@ -176,7 +176,7 @@ impl<'a> Reader<'a> {
     pub fn set_current_page_str(&mut self, path: &str) -> Result<String, ReaderError> {
         match self.ebook.navigate_str(path) {
             Ok(index) => self.set_current_page(index),
-            Err(error) => Err(error)
+            Err(error) => Err(error),
         }
     }
 
@@ -197,7 +197,7 @@ impl<'a> Reader<'a> {
     pub fn fetch_page_str(&self, path: &str) -> Result<String, ReaderError> {
         match self.ebook.navigate_str(path) {
             Ok(index) => self.fetch_page(index),
-            Err(error) => Err(error)
+            Err(error) => Err(error),
         }
     }
 }

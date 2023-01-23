@@ -1,5 +1,5 @@
-use rbook::Ebook;
 use rbook::errors::ReaderError;
+use rbook::Ebook;
 
 #[test]
 fn reader_test() -> Result<(), ReaderError> {

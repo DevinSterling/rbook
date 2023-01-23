@@ -67,7 +67,8 @@ impl Metadata {
 
     /// Retrieve the epub version associated with the ebook
     pub fn version(&self) -> &str {
-        self.package.get_attribute(constants::VERSION)
+        self.package
+            .get_attribute(constants::VERSION)
             .expect("Package should have an epub 'version' attribute")
             .value()
     }
@@ -106,7 +107,8 @@ impl Metadata {
     /// - URL
     pub fn unique_identifier(&self) -> Option<&Element> {
         // Retrieve uid from root package element
-        self.package.get_attribute(constants::UNIQUE_ID)
+        self.package
+            .get_attribute(constants::UNIQUE_ID)
             // Find identifier metadata element that matches
             .and_then(|id| self.get_elements(constants::IDENTIFIER)
                 .and_then(|elements| elements.iter()
@@ -212,9 +214,11 @@ impl Metadata {
 
     fn get_element(&self, meta_name: &str) -> Option<&Element> {
         match self.map.get(meta_name) {
-            Some(elements) => Some(elements.first()
-                .expect("Category should not be empty; missing child elements")),
-            None => None
+            Some(elements) => Some(
+                elements.first()
+                    .expect("Category should not be empty; missing child elements")
+            ),
+            None => None,
         }
     }
 
