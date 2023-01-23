@@ -1,6 +1,6 @@
 name: CI
 
-on: [push, pull-request]
+on: [push, pull_request]
 
 job:
   build_and_test:
