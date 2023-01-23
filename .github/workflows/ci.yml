@@ -2,7 +2,7 @@ name: CI
 
 on: [push, pull_request]
 
-job:
+jobs:
   build_and_test:
     strategy:
       matrix:
