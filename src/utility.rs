@@ -30,7 +30,7 @@ pub(crate) fn get_path_metadata<P: AsRef<Path>>(path: P) -> Result<Metadata, Ebo
 pub(crate) fn get_parent_path<P: AsRef<Path>>(path: &P) -> Cow<Path> {
     // Return `path` itself if there is no parent
     path.as_ref().parent()
-        .map_or_else(|| Cow::Borrowed(path.as_ref()), |parent| Cow::Owned(parent.to_path_buf()))
+        .map_or(Cow::Borrowed(path.as_ref()), |parent| Cow::Owned(parent.to_path_buf()))
 }
 
 // Function to normalize paths. ex: `EPUB//.//OPS/../../toc.ncx` -> `toc.ncx`

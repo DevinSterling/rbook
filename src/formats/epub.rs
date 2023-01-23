@@ -1,3 +1,4 @@
+mod constants;
 mod spine;
 mod manifest;
 mod guide;
@@ -123,7 +124,7 @@ impl Epub {
     pub fn cover_image(&self) -> Option<&Element> {
         match self.metadata.cover() {
             Some(cover_meta) => self.manifest.by_id(cover_meta.value()),
-            None => self.manifest.by_property("cover-image"),
+            None => self.manifest.by_property(constants::COVER_PROPERTY),
         }
     }
 
@@ -428,10 +429,10 @@ fn parse_container(data: &[u8]) -> Result<PathBuf, EbookError> {
         if !opf_location.is_empty() { return Ok(()) }
 
         if let (Some(media_type), Some(full_path)) = (
-            element.get_attribute("media-type"),
-            element.get_attribute("full-path")
+            element.get_attribute(constants::MEDIA_TYPE),
+            element.get_attribute(constants::FULL_PATH)
         ) {
-            if media_type == "application/oebps-package+xml" {
+            if media_type == constants::PACKAGE_TYPE {
                 opf_location.push_str(&full_path);
             }
         }
@@ -472,7 +473,7 @@ fn parse_package(data: &[u8]) -> Result<(Metadata, Manifest, Spine, Guide), Eboo
     let parent_element_handler = element!("package, spine", |element| {
         let name = element.tag_name();
         let root = match name.as_str() {
-            "package" => &mut package_root,
+            constants::PACKAGE => &mut package_root,
             _ => &mut spine_root,
         };
 
@@ -494,9 +495,9 @@ fn parse_package(data: &[u8]) -> Result<(Metadata, Manifest, Spine, Guide), Eboo
         // Change name to the value of the name or
         // property attribute of a meta element
         match (
-            xmlutil::take_attribute(&mut attributes, "property"),
-            xmlutil::take_attribute(&mut attributes, "name"),
-            xmlutil::take_attribute(&mut attributes, "content")
+            xmlutil::take_attribute(&mut attributes, constants::PROPERTY),
+            xmlutil::take_attribute(&mut attributes, constants::NAME),
+            xmlutil::take_attribute(&mut attributes, constants::CONTENT)
         ) {
             // Newer meta element
             (Some(property), _, _) => {
@@ -508,8 +509,8 @@ fn parse_package(data: &[u8]) -> Result<(Metadata, Manifest, Spine, Guide), Eboo
                 value = content.value;
 
                 attributes.push(Attribute {
-                    name: "_rbook_legacy_feature".to_string(),
-                    value: "OPF2 meta".to_string(),
+                    name: constants::LEGACY_FEATURE.to_string(),
+                    value: constants::LEGACY_META.to_string(),
                 });
             },
             _ => (),
@@ -532,7 +533,7 @@ fn parse_package(data: &[u8]) -> Result<(Metadata, Manifest, Spine, Guide), Eboo
         };
 
         // Add child metadata to parent metadata
-        if let Some(refines) = element.get_attribute("refines") {
+        if let Some(refines) = element.get_attribute(constants::REFINES) {
             let id = refines.replace('#', "");
 
             if let Some(parent) = id_map.get_mut(&id) {
@@ -608,7 +609,7 @@ fn parse_package(data: &[u8]) -> Result<(Metadata, Manifest, Spine, Guide), Eboo
         let mut attributes = xmlutil::copy_attributes(element.attributes());
 
         // the name of spine items will be the value of its idref attribute
-        let name = match xmlutil::take_attribute(&mut attributes, "idref") {
+        let name = match xmlutil::take_attribute(&mut attributes, constants::IDREF) {
             Some(idref) => idref.value,
             _ => return Ok(())
         };
@@ -628,7 +629,7 @@ fn parse_package(data: &[u8]) -> Result<(Metadata, Manifest, Spine, Guide), Eboo
         let mut attributes = xmlutil::copy_attributes(element.attributes());
 
         let (name, value) = match (
-            xmlutil::take_attribute(&mut attributes, "title"),
+            xmlutil::take_attribute(&mut attributes, constants::TITLE),
             xmlutil::take_attribute(&mut attributes, xml::HREF)
         ) {
             (Some(title), Some(href)) => (title.value, href.value),
@@ -674,7 +675,7 @@ fn parse_package(data: &[u8]) -> Result<(Metadata, Manifest, Spine, Guide), Eboo
 
 fn is_valid_package(package: Option<Element>) -> Result<Element, EbookError> {
     package.filter(|pkg|
-        pkg.contains_attribute("version")
+        pkg.contains_attribute(constants::VERSION)
     ).ok_or(EbookError::Parse {
         cause: "Required epub version attribute is missing".to_string(),
         description: "The package element is missing the 'version' attribute.\
@@ -716,12 +717,12 @@ fn parse_toc(mut data: &str) -> Result<Toc, EbookError> {
         let current_nav_group = Rc::clone(&current_nav_group);
         let groups = Rc::clone(&nav_groups);
         element.on_end_tag(move |_| {
-            let nav_group_name = match xmlutil::take_attribute(&mut attributes, "epub:type") {
+            let nav_group_name = match xmlutil::take_attribute(&mut attributes, constants::TOC_TYPE) {
                 Some(nav_type) => nav_type.value,
                 // If the element is pageList
-                None if element_name == "pageList" => "page-list".to_string(),
+                None if element_name == constants::PAGE_LIST2 => constants::PAGE_LIST3.to_string(),
                 // Default the group name to "table of contents" (toc)
-                _ => "toc".to_string(),
+                _ => constants::TOC.to_string(),
             };
 
             // Clear stack
@@ -784,7 +785,7 @@ fn parse_toc(mut data: &str) -> Result<Toc, EbookError> {
         if let Some(nav_entry) = parent_stack.borrow_mut().last_mut() {
             for attribute in xmlutil::copy_attributes(element.attributes()) {
                 match attribute.name() {
-                    "href" | "src" => nav_entry.value = attribute.value,
+                    xml::HREF | xml::SRC => nav_entry.value = attribute.value,
                     _ => nav_entry.attributes.push(attribute),
                 }
             }
@@ -824,7 +825,7 @@ fn parse_toc(mut data: &str) -> Result<Toc, EbookError> {
 }
 
 fn is_valid_toc(toc: &HashMap<String, Element>) -> Result<(), EbookError> {
-    if toc.contains_key("toc") {
+    if toc.contains_key(constants::TOC) {
         Ok(())
     } else {
         Err(EbookError::Parse {
@@ -862,9 +863,9 @@ fn parse_xhtml_data(
 
 fn get_toc(manifest: &Manifest) -> Result<&Element, EbookError> {
     // Attempt to retrieve newer toc format first
-    manifest.by_property("nav")
+    manifest.by_property(constants::NAV_PROPERTY)
         // Fallback to older toc format
-        .or_else(|| manifest.by_media_type("application/x-dtbncx+xml"))
+        .or_else(|| manifest.by_media_type(constants::NCX_TYPE))
         .ok_or(EbookError::Parse {
             cause: "Missing table of contents (toc)".to_string(),
             description: "The toc element cannot be found within the \

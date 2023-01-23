@@ -79,6 +79,7 @@ impl<'a> Reader<'a> {
         }
     }
 
+    /// Retrieve the current index of the reader.
     pub fn current_index(&self) -> usize {
         self.current_index
     }

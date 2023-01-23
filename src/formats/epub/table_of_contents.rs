@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use crate::formats::epub::constants;
 use crate::formats::xml::Element;
 
 /// Table of contents (toc) for the ebook.
@@ -56,25 +57,41 @@ use crate::formats::xml::Element;
 pub struct Toc(pub(crate) HashMap<String, Element>);
 
 impl Toc {
-    /// Retrieve toc elements in its nested form
+    /// Retrieve toc elements in its nested form.
+    ///
+    /// # Epub2 navPoint
+    /// The `playOrder` of `navPoint` elements from an `.ncx` file
+    /// will not be checked if this method is called. However, on
+    /// most cases `navPoint` elements are in proper order by default.
+    ///
+    /// To ensure `playOrder` for `navPoint` elements, use
+    /// [elements_flat()](Self::elements_flat) instead.
     pub fn elements(&self) -> &[Element] {
-        self.get_elements("toc")
+        self.get_elements(constants::TOC)
             .expect("Should have a toc element")
     }
 
-    /// Retrieve toc elements in flattened form
+    /// Retrieve toc elements in flattened form.
     pub fn elements_flat(&self) -> Vec<&Element> {
-        self.get_elements_flat("toc")
-            .expect("Should have a toc element")
+        let elements = self.get_elements_flat(constants::TOC)
+            .expect("Should have a toc element");
+
+        // Order navPoint elements
+        if elements.first().map_or(false, |element| element.contains_attribute(constants::PLAY_ORDER)) {
+            sort_nav_points(elements)
+        } else {
+            elements
+        }
     }
 
+    /// Retrieve landmark toc elements.
     pub fn landmarks(&self) -> Option<Vec<&Element>> {
-        self.get_elements_flat("landmarks")
+        self.get_elements_flat(constants::LANDMARKS)
     }
 
-    /// Retrieve page list elements that represent physical pages
+    /// Retrieve page list toc elements that represent physical pages.
     pub fn page_list(&self) -> Option<Vec<&Element>> {
-        self.get_elements_flat("page-list")
+        self.get_elements_flat(constants::PAGE_LIST3)
     }
 
     fn get_elements(&self, name: &str) -> Option<&[Element]> {
@@ -95,6 +112,22 @@ impl Toc {
             None
         }
     }
+}
+
+fn sort_nav_points(nav_points: Vec<&Element>) -> Vec<&Element> {
+    let mut ordered_element = Vec::new();
+
+    for nav_point in nav_points {
+        let value: usize = nav_point.get_attribute(constants::PLAY_ORDER)
+            .and_then(|play_order| play_order.value().parse().ok())
+            .unwrap_or(0);
+
+        ordered_element.push((value, nav_point))
+    }
+
+    // Sort by nav point play order
+    ordered_element.sort_by(|(play_order1, _), (play_order2, _)| play_order1.cmp(play_order2));
+    ordered_element.into_iter().map(|(_, nav_point)| nav_point).collect()
 }
 
 fn recursive_flatten<'a>(elements: &'a [Element], output: &mut Vec<&'a Element>) {

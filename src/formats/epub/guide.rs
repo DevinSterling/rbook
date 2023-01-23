@@ -1,3 +1,4 @@
+use crate::formats::epub::constants;
 use crate::formats::xml::{self, Element};
 
 /// Access important structural portions of the ebook.
@@ -27,6 +28,7 @@ use crate::formats::xml::{self, Element};
 pub struct Guide(pub(crate) Vec<Element>);
 
 impl Guide {
+    /// Retrieve all `guide` elements
     pub fn elements(&self) -> &[Element] {
         &self.0
     }
@@ -34,14 +36,14 @@ impl Guide {
     /// Retrieve a certain element by the value of its `type`
     /// from the guide
     pub fn by_type(&self, property: &str) -> Option<&Element> {
-        self.find_attribute_by_value("type", property)
+        self.find_attribute_by_value(constants::TYPE, property)
     }
 
     /// Retrieve all elements that match a given `type` value
     /// from the guide. The returned vector contains at least
     /// one element.
     pub fn all_by_type(&self, property: &str) -> Option<Vec<&Element>> {
-        self.find_attributes_by_value("type", property)
+        self.find_attributes_by_value(constants::TYPE, property)
     }
 
     fn find_attribute_by_value(&self, field: &str, value: &str) -> Option<&Element> {

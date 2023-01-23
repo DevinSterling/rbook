@@ -67,6 +67,7 @@ pub use self::reader::Reader;
 pub use self::statistics::Stats;
 
 pub mod epub {
+    //! Access to the contents that make up an epub:
     pub use super::formats::epub::{
         Metadata,
         Manifest,
@@ -77,6 +78,7 @@ pub mod epub {
 }
 
 pub mod errors {
+    //! Possible errors that can be encountered using rbook.
     pub use super::{
         formats::EbookError,
         archive::ArchiveError,

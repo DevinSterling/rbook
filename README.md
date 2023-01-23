@@ -9,12 +9,12 @@ An ebook library that supports parsing and reading the epub format.
 Including default features:
 ```toml
 [dependencies]
-rbook = "0.1.2"
+rbook = "0.1.4"
 ```
 Excluding default features:
 ```toml
 [dependencies]
-rbook = { version = "0.1.2", default-features = false }
+rbook = { version = "0.1.4", default-features = false }
 ```
 Default features are the following:
 - `reader`: Enables reading of the ebook file by file
@@ -31,7 +31,7 @@ fn main() {
     let epub = rbook::Epub::new("example.epub").unwrap();
 
     // Retrieving the title
-    println!("Title = {}", epub.metadata().title().value());
+    println!("Title = {}", epub.metadata().title().unwrap().value());
 
     // Creating a reader instance
     let mut reader = epub.reader();

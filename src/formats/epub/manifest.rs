@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use crate::formats::epub::constants;
 use crate::formats::xml::{self, Element};
 
 /// Access all resources for the ebook, such as images, files, etc.
@@ -68,7 +69,7 @@ impl Manifest {
     /// ```
     pub fn images(&self) -> Option<Vec<&Element>> {
         let vec: Vec<_> = self.0.values().filter(|element| {
-            match element.get_attribute("media-type") {
+            match element.get_attribute(constants::MEDIA_TYPE) {
                 Some(attribute) => attribute.value().starts_with("image"),
                 None => false,
             }
@@ -81,12 +82,15 @@ impl Manifest {
         }
     }
 
-    /// Retrieve a certain element by its `id` from the manifest
+    /// Retrieve a certain element by the value of its `id` from the manifest
     pub fn by_id(&self, id: &str) -> Option<&Element> {
         self.0.get(id)
     }
 
-    //pub fn by_href() {}
+    /// Retrieve a certain element by the value of its `href` from the manifest
+    pub fn by_href(&self, href: &str) -> Option<&Element> {
+        self.find_attribute_by_value(xml::HREF, href)
+    }
 
     /// Check if an element with a certain `id` exists in the manifest
     pub fn contains_id(&self, id: &str) -> bool {
@@ -96,27 +100,27 @@ impl Manifest {
     /// Retrieve a certain element by the value of its
     /// `media type` from the manifest
     pub fn by_media_type(&self, media_type: &str) -> Option<&Element> {
-        self.find_attribute_by_value("media-type", media_type)
+        self.find_attribute_by_value(constants::MEDIA_TYPE, media_type)
     }
 
     /// Retrieve all elements that match a given `media type`
     /// from the manifest. The returned vector contains at
     /// least one element.
     pub fn all_by_media_type(&self, media_type: &str) -> Option<Vec<&Element>> {
-        self.find_attributes_by_value("media-type", media_type)
+        self.find_attributes_by_value(constants::MEDIA_TYPE, media_type)
     }
 
     /// Retrieve a certain element by the value of its `property`
     /// from the manifest
     pub fn by_property(&self, property: &str) -> Option<&Element> {
-        self.find_attribute_by_value("properties", property)
+        self.find_attribute_by_value(constants::PROPERTIES, property)
     }
 
     /// Retrieve all elements that match a given `property` value
     /// from the manifest. The returned vector contains at least
     /// one element.
     pub fn all_by_property(&self, property: &str) -> Option<Vec<&Element>> {
-        self.find_attributes_by_value("properties", property)
+        self.find_attributes_by_value(constants::PROPERTIES, property)
     }
 
     fn find_attribute_by_value(&self, field: &str, value: &str) -> Option<&Element> {

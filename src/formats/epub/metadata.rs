@@ -1,5 +1,6 @@
 use std::collections::HashMap;
 
+use crate::formats::epub::constants;
 use crate::formats::xml::{self, Element};
 use crate::utility;
 
@@ -59,14 +60,14 @@ impl Metadata {
         Self { package, map }
     }
 
-    /// Retrieve metadata elements
+    /// Retrieve all metadata elements
     pub fn elements(&self) -> Vec<&Element> {
         self.map.values().flatten().collect()
     }
 
     /// Retrieve the epub version associated with the ebook
     pub fn version(&self) -> &str {
-        self.package.get_attribute("version")
+        self.package.get_attribute(constants::VERSION)
             .expect("Package should have an epub 'version' attribute")
             .value()
     }
@@ -79,7 +80,7 @@ impl Metadata {
     /// If the ebook contains multiple titles, using the method
     /// [get("title")](Self::get) can be used to retrieve them all.
     pub fn title(&self) -> Option<&Element> {
-        self.get_element("title")
+        self.get_element(constants::TITLE)
     }
 
     /// Language the ebook supports.
@@ -89,7 +90,7 @@ impl Metadata {
     ///
     /// Values conform to the **BCP47** standard.
     pub fn language(&self) -> Option<&Element> {
-        self.get_element("language")
+        self.get_element(constants::LANGUAGE)
     }
 
     // Although rare, some ebooks may not have the identifier metadata entry
@@ -105,14 +106,14 @@ impl Metadata {
     /// - URL
     pub fn unique_identifier(&self) -> Option<&Element> {
         // Retrieve uid from root package element
-        self.package.get_attribute("unique-identifier")
+        self.package.get_attribute(constants::UNIQUE_ID)
             // Find identifier metadata element that matches
-            .and_then(|id| self.get_elements("identifier")
+            .and_then(|id| self.get_elements(constants::IDENTIFIER)
                 .and_then(|elements| elements.iter()
                     // Check if element has an id attribute
                     .find(|element| element.get_attribute(xml::ID)
                         // If so, see if its value matches the unique-identifier
-                        .map_or_else(|| false, |attribute| attribute.value() == id.value()))))
+                        .map_or(false, |attribute| attribute.value() == id.value()))))
     }
 
     /// Retrieve the concatenation of the unique identifier and
@@ -141,23 +142,23 @@ impl Metadata {
 
     /// The date of when the ebook rendition was last modified
     pub fn modified(&self) -> Option<&Element> {
-        self.get_element("modified")
+        self.get_element(constants::MODIFIED)
     }
 
     // Convenient DCMES Optional Metadata methods
     /// Contributors of the ebook, such as editors
     pub fn contributors(&self) -> Option<&Vec<Element>> {
-        self.get_elements("contributor")
+        self.get_elements(constants::CONTRIBUTOR)
     }
 
     /// Creators of the ebook, such as authors
     pub fn creators(&self) -> Option<&Vec<Element>> {
-        self.get_elements("creator")
+        self.get_elements(constants::CREATOR)
     }
 
     /// The date of publication date for an ebook
     pub fn date(&self) -> Option<&Element> {
-        self.get_element("date")
+        self.get_element(constants::DATE)
     }
 
     /// Retrieve the title of ebook.
@@ -165,24 +166,24 @@ impl Metadata {
     /// If the ebook contains multiple descriptions, the method
     /// [get("description")](Self::get) can be used to retrieve them all.
     pub fn description(&self) -> Option<&Element> {
-        self.get_element("description")
+        self.get_element(constants::DESCRIPTION)
     }
 
     pub fn publisher(&self) -> Option<&Vec<Element>> {
-        self.get_elements("publisher")
+        self.get_elements(constants::PUBLISHER)
     }
 
     /// Indicates the subject of the ebook, such as genre.
     /// May contain **BISAC** codes to specify genres.
     pub fn subject(&self) -> Option<&Vec<Element>> {
-        self.get_elements("subject")
+        self.get_elements(constants::SUBJECT)
     }
 
     /// Indicates whether the ebook is a specialized type. Types
     /// can be used to specify if the ebook is in the form of a
     /// dictionary, annotations, etc.
     pub fn r#type(&self) -> Option<&Vec<Element>> {
-        self.get_elements("type")
+        self.get_elements(constants::TYPE)
     }
 
     /// Retrieve the name and id values of the cover meta
@@ -191,7 +192,7 @@ impl Metadata {
     /// the [by_id(...)](super::Manifest::by_id) method
     /// in [Manifest](super::Manifest).
     pub fn cover(&self) -> Option<&Element> {
-        self.get_element("cover")
+        self.get_element(constants::COVER)
     }
 
     /// Retrieve metadata fields not explicitly provided by the API.
