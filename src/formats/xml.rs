@@ -68,19 +68,21 @@ impl Element {
     /// Retrieve the specified child element. Namespace/prefix
     /// may be omitted from the argument.
     pub fn get_child(&self, name: &str) -> Option<&Element> {
-        self.children()
-            .and_then(|children| children
+        self.children().and_then(|children| {
+            children
                 .iter()
-                .find(|child| child.name().ends_with(&name.to_lowercase())))
+                .find(|child| child.name().ends_with(&name.to_lowercase()))
+        })
     }
 
     /// Check if the element contains the specified child element.
     /// Namespace/prefix may be omitted from the argument.
     pub fn contains_child(&self, name: &str) -> bool {
-        self.children()
-            .map_or(false, |children| children
+        self.children().map_or(false, |children| {
+            children
                 .iter()
-                .any(|child| child.name().ends_with(&name.to_lowercase())))
+                .any(|child| child.name().ends_with(&name.to_lowercase()))
+        })
     }
 }
 
@@ -123,15 +125,17 @@ pub(crate) mod utility {
     use lol_html::html_content::Attribute as LolAttribute;
 
     pub(crate) fn equals_attribute_by_value(element: &Element, field: &str, value: &str) -> bool {
-        element.get_attribute(field)
-            .map_or(false, |attribute| attribute
+        element.get_attribute(field).map_or(false, |attribute| {
+            attribute
                 .value()
                 .split_whitespace()
-                .any(|slice| slice == value))
+                .any(|slice| slice == value)
+        })
     }
 
     pub(crate) fn copy_attributes(old_attributes: &[LolAttribute]) -> Vec<Attribute> {
-        old_attributes.iter()
+        old_attributes
+            .iter()
             .map(|attr| Attribute {
                 name: attr.name(),
                 value: attr.value(),
@@ -139,8 +143,12 @@ pub(crate) mod utility {
             .collect()
     }
 
-    pub(crate) fn take_attribute(attributes: &mut Vec<Attribute>, field: &str) -> Option<Attribute> {
-        attributes.iter()
+    pub(crate) fn take_attribute(
+        attributes: &mut Vec<Attribute>,
+        field: &str,
+    ) -> Option<Attribute> {
+        attributes
+            .iter()
             .position(|attribute| attribute.name() == field)
             .map(|index| attributes.remove(index))
     }

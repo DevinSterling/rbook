@@ -3,6 +3,27 @@ name: CI
 on: [push, pull_request]
 
 jobs:
+  fmt:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+
+      - name: Run fmt
+        run: cargo fmt -- --check
+
+  clippy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v3
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+
+      - name: Run clippy
+        run: cargo clippy
+
   build_and_test:
     strategy:
       matrix:
@@ -18,15 +39,3 @@ jobs:
       run: cargo build
     - name: Run tests
       run: cargo test
-
-  clippy:
-    runs-on: ubuntu-latest
-
-    steps:
-    - uses: actions/checkout@v3
-    - uses: dtolnay/rust-toolchain@stable
-      with:
-        components: clippy
-
-    - name: Run clippy
-      run: cargo clippy

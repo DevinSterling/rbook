@@ -65,7 +65,10 @@ fn manifest_test() {
     assert_eq!("nav.xhtml", element.value());
 
     // Retrieve manifest element by media type
-    let element = epub.manifest().by_media_type("application/x-dtbncx+xml").unwrap();
+    let element = epub
+        .manifest()
+        .by_media_type("application/x-dtbncx+xml")
+        .unwrap();
 
     assert_eq!("toc.ncx", element.value());
 

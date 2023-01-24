@@ -51,7 +51,7 @@ impl<T: Read + Seek> ZipArchive<T> {
                 description: format!(
                     "The provided path does not contain valid utf-8: '{:?}'",
                     path.as_ref()
-                )
+                ),
             })?
             .to_string();
 

@@ -314,12 +314,13 @@ impl Readable for Epub {
                 cause: "Invalid path provided".to_string(),
                 description: format!(
                     "Please ensure a manifest element's href \
-                     attribute references the path: '{path}'."
+                     attribute references the path: `{path}`."
                 ),
             })?;
 
         // Get index of the spine element
-        let spine_element_index = self.spine
+        let spine_element_index = self
+            .spine
             .elements()
             .iter()
             .position(|element| element.name() == manifest_element.name())
@@ -336,21 +337,23 @@ impl Readable for Epub {
     }
 
     fn navigate(&self, index: usize) -> Result<String, ReaderError> {
-        let spine_element = self.spine
-            .elements()
-            .get(index)
-            .ok_or_else(|| ReaderError::OutOfBounds {
-                cause: format!("Provided index '{index}' is out of bounds"),
-                description: "Please ensure the index is in bounds".to_string(),
-            })?;
+        let spine_element =
+            self.spine
+                .elements()
+                .get(index)
+                .ok_or_else(|| ReaderError::OutOfBounds {
+                    cause: format!("Provided index '{index}' is out of bounds"),
+                    description: "Please ensure the index is in bounds".to_string(),
+                })?;
 
-        let manifest_element = self.manifest
-            .by_id(spine_element.name())
-            .ok_or_else(|| ReaderError::InvalidReference {
+        let manifest_element = self.manifest.by_id(spine_element.name()).ok_or_else(|| {
+            ReaderError::InvalidReference {
                 cause: "Invalid manifest reference".to_string(),
-                description: "Please ensure all spine elements reference a \
-                valid manifest element.".to_string(),
-            })?;
+                description: "Please ensure all spine elements \
+                    reference a valid manifest element."
+                    .to_string(),
+            }
+        })?;
 
         let file_content = self
             .read_file(manifest_element.value())
@@ -377,13 +380,15 @@ impl Stats for Epub {
         f: F,
     ) -> Result<usize, EbookError> {
         self.spine.elements().iter().try_fold(0, |total, element| {
-            let manifest_el = self.manifest
-                .by_id(element.name())
-                .ok_or_else(|| EbookError::Parse {
-                    cause: "Invalid manifest reference".to_string(),
-                    description: "Please ensure all spine elements reference a \
-                    valid manifest element.".to_string(),
-                })?;
+            let manifest_el =
+                self.manifest
+                    .by_id(element.name())
+                    .ok_or_else(|| EbookError::Parse {
+                        cause: "Invalid manifest reference".to_string(),
+                        description: "Please ensure all spine elements \
+                            reference a valid manifest element."
+                            .to_string(),
+                    })?;
             let content = self.read_bytes_file(manifest_el.value())?;
             let count = f(&content)?;
 
@@ -451,8 +456,9 @@ fn parse_container(data: &[u8]) -> Result<PathBuf, EbookError> {
     if opf_location.is_empty() {
         Err(EbookError::Parse {
             cause: "Missing .opf location".to_string(),
-            description: "Please ensure that there is a valid 'rootfile' \
-            that leads to the .opf file in 'META-INF/container.xml'.".to_string(),
+            description: "Please ensure that there is a valid `rootfile` \
+                that leads to the `.opf` file in `META-INF/container.xml`."
+                .to_string(),
         })
     } else {
         Ok(PathBuf::from(opf_location))
@@ -539,12 +545,14 @@ fn parse_package(data: &[u8]) -> Result<(Metadata, Manifest, Spine, Guide), Eboo
             if let Some(parent) = id_map.get_mut(&id) {
                 // This should be guaranteed to have a valid address
                 unsafe {
-                    let children = (*(*parent)).children
+                    let children = (*(*parent))
+                        .children
                         .as_mut()
                         .expect("Should have children");
                     children.push(meta);
 
-                    let entry = children.last_mut()
+                    let entry = children
+                        .last_mut()
                         .expect("Should have at least one child element");
                     current_meta.borrow_mut().replace(entry as *mut Element);
                 }
@@ -553,7 +561,8 @@ fn parse_package(data: &[u8]) -> Result<(Metadata, Manifest, Spine, Guide), Eboo
             // Add new metadata entry
             meta_group.push(meta);
 
-            let entry = meta_group.last_mut()
+            let entry = meta_group
+                .last_mut()
                 .expect("Group should have at least one element");
             current_meta.borrow_mut().replace(entry as *mut Element);
 
@@ -684,9 +693,10 @@ fn is_valid_package(package: Option<Element>) -> Result<Element, EbookError> {
         .filter(|pkg| pkg.contains_attribute(constants::VERSION))
         .ok_or(EbookError::Parse {
             cause: "Required epub version attribute is missing".to_string(),
-            description: "The package element is missing the 'version' attribute. \
-            Please ensure the epub version is provided. This can be fixed \
-            in the '.opf' file".to_string(),
+            description: "The package element is missing the `version` \
+                attribute. Please ensure the epub version is provided. \
+                This can be fixed in the `.opf` file"
+                .to_string(),
         })
 }
 
@@ -725,7 +735,8 @@ fn parse_toc(mut data: &str) -> Result<Toc, EbookError> {
         let current_nav_group = Rc::clone(&current_nav_group);
         let groups = Rc::clone(&nav_groups);
         element.on_end_tag(move |_| {
-            let nav_group_name = match xmlutil::take_attribute(&mut attributes, constants::TOC_TYPE) {
+            let nav_group_name = match xmlutil::take_attribute(&mut attributes, constants::TOC_TYPE)
+            {
                 Some(nav_type) => nav_type.value,
                 // If the element is pageList
                 None if element_name == constants::PAGE_LIST2 => constants::PAGE_LIST3.to_string(),
@@ -836,8 +847,9 @@ fn is_valid_toc(toc: &HashMap<String, Element>) -> Result<(), EbookError> {
     } else {
         Err(EbookError::Parse {
             cause: "Missing toc element".to_string(),
-            description: "The nav or navMap element for the toc is \
-            missing. Please ensure it exists.".to_string(),
+            description: "The nav or navMap element for the \
+                toc is missing. Please ensure it exists."
+                .to_string(),
         })
     }
 }
@@ -875,8 +887,9 @@ fn get_toc(manifest: &Manifest) -> Result<&Element, EbookError> {
         .or_else(|| manifest.by_media_type(constants::NCX_TYPE))
         .ok_or(EbookError::Parse {
             cause: "Missing table of contents (toc)".to_string(),
-            description: "The toc element cannot be found within the \
-            manifest. Please ensure there is a valid element that references \
-            the table of contents file".to_string(),
+            description: "The toc element cannot be found within \
+                the manifest. Please ensure there is a valid element \
+                that references the table of contents file"
+                .to_string(),
         })
 }

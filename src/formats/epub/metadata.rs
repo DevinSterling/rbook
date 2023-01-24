@@ -110,12 +110,10 @@ impl Metadata {
         self.package
             .get_attribute(constants::UNIQUE_ID)
             // Find identifier metadata element that matches
-            .and_then(|id| self.get_elements(constants::IDENTIFIER)
-                .and_then(|elements| elements.iter()
-                    // Check if element has an id attribute
-                    .find(|element| element.get_attribute(xml::ID)
-                        // If so, see if its value matches the unique-identifier
-                        .map_or(false, |attribute| attribute.value() == id.value()))))
+            .and_then(|id| {
+                self.get_elements(constants::IDENTIFIER)
+                    .and_then(|elements| find_unique_identifier(elements, id.value()))
+            })
     }
 
     /// Retrieve the concatenation of the unique identifier and
@@ -215,8 +213,9 @@ impl Metadata {
     fn get_element(&self, meta_name: &str) -> Option<&Element> {
         match self.map.get(meta_name) {
             Some(elements) => Some(
-                elements.first()
-                    .expect("Category should not be empty; missing child elements")
+                elements
+                    .first()
+                    .expect("Category should not be empty; missing child elements"),
             ),
             None => None,
         }
@@ -225,4 +224,13 @@ impl Metadata {
     fn get_elements(&self, meta_name: &str) -> Option<&Vec<Element>> {
         self.map.get(meta_name)
     }
+}
+
+fn find_unique_identifier<'a>(
+    elements: &'a [Element],
+    unique_identifier: &str,
+) -> Option<&'a Element> {
+    elements.iter().find(|element| {
+        xml::utility::equals_attribute_by_value(element, xml::ID, unique_identifier)
+    })
 }

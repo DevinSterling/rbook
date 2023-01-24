@@ -7,7 +7,8 @@ use crate::formats::EbookError;
 // Splits a string into two separate strings and excludes
 // the split character
 pub(crate) fn split_where(string: &str, character: char) -> Option<(&str, &str)> {
-    string.find(character)
+    string
+        .find(character)
         .map(|index| string.split_at(index))
         .map(|(left, right)| (left, &right[1..]))
 }
@@ -20,12 +21,10 @@ pub(crate) fn get_file<P: AsRef<Path>>(path: P) -> Result<File, EbookError> {
 }
 
 pub(crate) fn get_path_metadata<P: AsRef<Path>>(path: P) -> Result<Metadata, EbookError> {
-    path.as_ref()
-        .metadata()
-        .map_err(|error| EbookError::IO {
-            cause: "Unable to access path metadata".to_string(),
-            description: format!("Path: '{:?}': {error}", path.as_ref()),
-        })
+    path.as_ref().metadata().map_err(|error| EbookError::IO {
+        cause: "Unable to access path metadata".to_string(),
+        description: format!("Path: '{:?}': {error}", path.as_ref()),
+    })
 }
 
 pub(crate) fn get_parent_path<P: AsRef<Path>>(path: &P) -> Cow<Path> {

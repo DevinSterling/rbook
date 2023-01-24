@@ -100,7 +100,9 @@ impl Toc {
     fn get_elements(&self, name: &str) -> Option<&[Element]> {
         if let Some(elements) = self.0.get(name) {
             Some(
-                elements.children().expect("Should have nav children elements")
+                elements
+                    .children()
+                    .expect("Should have nav children elements"),
             )
         } else {
             None

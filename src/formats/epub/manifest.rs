@@ -68,7 +68,8 @@ impl Manifest {
     /// }
     /// ```
     pub fn images(&self) -> Option<Vec<&Element>> {
-        let vec: Vec<_> = self.0
+        let vec: Vec<_> = self
+            .0
             .values()
             .filter(
                 |element| match element.get_attribute(constants::MEDIA_TYPE) {
@@ -133,7 +134,8 @@ impl Manifest {
     }
 
     fn find_attributes_by_value(&self, field: &str, value: &str) -> Option<Vec<&Element>> {
-        let vec: Vec<_> = self.0
+        let vec: Vec<_> = self
+            .0
             .values()
             .filter(|element| xml::utility::equals_attribute_by_value(element, field, value))
             .collect();
