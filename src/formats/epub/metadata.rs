@@ -7,7 +7,7 @@ use crate::utility;
 /// Retrieve associated metadata information about the epub.
 ///
 /// For convenience when `meta` elements are encountered,
-/// the value of the `name`/`property` and content attributes
+/// the value of the `name`/`property` and `content` attributes
 /// are the `name` and `value` fields of the element.
 ///
 /// # Examples

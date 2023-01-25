@@ -12,17 +12,19 @@ pub trait Archive {
     fn read_bytes_file(&mut self, path: &Path) -> Result<Vec<u8>, ArchiveError>;
 }
 
-/// Possible errors for an Archive
-/// - **InvalidPath**: When a given path does not point to a valid location
-/// - **CannotRead**: When the contents of a requested file cannot be read
-/// - **InvalidEncoding**: When a path contains characters from an unsupported
-/// encoding
+/// Possible errors for an Archive:
+/// - **[InvalidPath](Self::InvalidPath)**
+/// - **[CannotRead](Self::CannotRead)**
+/// - **[InvalidEncoding](Self::InvalidEncoding)**
 #[derive(Error, Debug)]
 pub enum ArchiveError {
+    /// When a given path does not point to a valid location.
     #[error("[InvalidPath][{cause}]: {description}")]
     InvalidPath { cause: String, description: String },
+    /// When the contents of a requested file cannot be read.
     #[error("[CannotRead][{cause}]: {description}")]
     CannotRead { cause: String, description: String },
+    /// When a path contains characters from an unsupported encoding.
     #[error("[InvalidEncoding][{cause}]: {description}")]
     InvalidEncoding { cause: String, description: String },
 }

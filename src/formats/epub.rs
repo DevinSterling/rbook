@@ -20,9 +20,11 @@ use std::rc::Rc;
 use crate::archive::{Archive, DirArchive, ZipArchive};
 use crate::formats::xml::utility as xmlutil;
 use crate::formats::xml::{self, Attribute, Element};
-use crate::formats::{Ebook, EbookError};
+use crate::formats::{Ebook, EbookError, EbookResult};
 #[cfg(feature = "reader")]
-use crate::reader::{Readable, Reader, ReaderError};
+use crate::reader::content::{Content, ContentType};
+#[cfg(feature = "reader")]
+use crate::reader::{Readable, Reader, ReaderError, ReaderResult};
 #[cfg(feature = "statistics")]
 use crate::statistics::Stats;
 use crate::utility;
@@ -161,8 +163,8 @@ impl Epub {
 
     /// Retrieve the file contents.
     ///
-    /// The given path is appended to the root file directory if it
-    /// does not contain it. However, retrieving "META-INF/container.xml"
+    /// The given path is normalized and appended to the root file directory
+    /// if it does not contain it. However, retrieving "META-INF/container.xml"
     /// is an exception. Please note that the root file directory
     /// varies between ebooks.
     ///
@@ -176,9 +178,15 @@ impl Epub {
     /// // Providing the root file directory
     /// let content2 = epub.read_file("OPS/package.opf").unwrap();
     ///
-    /// assert_eq!(content1, content2)
+    /// assert_eq!(content1, content2);
+    ///
+    /// // Accessing container.xml
+    /// let content3 = epub.read_file("META-INF/container.xml").unwrap();
+    /// let content4 = epub.read_file("OPS/../META-INF//./container.xml").unwrap();
+    ///
+    /// assert_eq!(content3, content4);
     /// ```
-    pub fn read_file<P: AsRef<Path>>(&self, path: P) -> Result<String, EbookError> {
+    pub fn read_file<P: AsRef<Path>>(&self, path: P) -> EbookResult<String> {
         let path = self.parse_path(&path);
         self.archive
             .borrow_mut()
@@ -188,8 +196,8 @@ impl Epub {
 
     /// Retrieve the file contents in bytes.
     ///
-    /// The given path is appended to the root file directory if it
-    /// does not contain it. However, retrieving "META-INF/container.xml"
+    /// The given path is normalized and appended to the root file directory
+    /// if it does not contain it. However, retrieving "META-INF/container.xml"
     /// is an exception. Please note that the root file directory
     /// varies between ebooks.
     ///
@@ -205,7 +213,7 @@ impl Epub {
     ///
     /// assert_eq!(content1, content2)
     /// ```
-    pub fn read_bytes_file<P: AsRef<Path>>(&self, path: P) -> Result<Vec<u8>, EbookError> {
+    pub fn read_bytes_file<P: AsRef<Path>>(&self, path: P) -> EbookResult<Vec<u8>> {
         let path = self.parse_path(&path);
         self.archive
             .borrow_mut()
@@ -228,7 +236,7 @@ impl Epub {
         }
     }
 
-    fn build(mut archive: Box<dyn Archive>) -> Result<Self, EbookError> {
+    fn build(mut archive: Box<dyn Archive>) -> EbookResult<Self> {
         // Parse "META-INF/container.xml"
         let content_meta_inf = archive
             .read_bytes_file(Path::new(constants::CONTAINER))
@@ -281,7 +289,7 @@ impl Debug for Epub {
 impl Ebook for Epub {
     type Format = Self;
 
-    fn new<P: AsRef<Path>>(path: P) -> Result<Self, EbookError> {
+    fn new<P: AsRef<Path>>(path: P) -> EbookResult<Self> {
         let metadata = utility::get_path_metadata(&path)?;
 
         // Unzip the file if it is not directory. If it is, the contents can
@@ -296,14 +304,14 @@ impl Ebook for Epub {
         Epub::build(archive)
     }
 
-    fn read_from<R: Seek + Read + 'static>(reader: R) -> Result<Self::Format, EbookError> {
+    fn read_from<R: Seek + Read + 'static>(reader: R) -> EbookResult<Self> {
         Epub::build(Box::new(ZipArchive::new(reader)?))
     }
 }
 
 #[cfg(feature = "reader")]
 impl Readable for Epub {
-    fn navigate_str(&self, path: &str) -> Result<usize, ReaderError> {
+    fn navigate_str(&self, path: &str) -> ReaderResult<usize> {
         // Avoid freeing reference to elements while still in use
         let manifest_elements = self.manifest.elements();
 
@@ -336,7 +344,7 @@ impl Readable for Epub {
         Ok(spine_element_index)
     }
 
-    fn navigate(&self, index: usize) -> Result<String, ReaderError> {
+    fn navigate(&self, index: usize) -> ReaderResult<Content> {
         let spine_element =
             self.spine
                 .elements()
@@ -355,17 +363,42 @@ impl Readable for Epub {
             }
         })?;
 
-        let file_content = self
+        let content = self
             .read_file(manifest_element.value())
             .map_err(ReaderError::NoContent)?;
 
-        Ok(file_content)
+        let mut fields = vec![
+            (
+                ContentType::Id.as_str(),
+                Cow::Borrowed(manifest_element.name()),
+            ),
+            (
+                ContentType::Path.as_str(),
+                Cow::Owned(
+                    self.parse_path(&manifest_element.value())
+                        .to_string_lossy()
+                        .replace('\\', "/"),
+                ),
+            ),
+        ];
+
+        if let Some(media_type) = manifest_element.get_attribute(constants::MEDIA_TYPE) {
+            fields.push((
+                ContentType::Type.as_str(),
+                Cow::Borrowed(media_type.value()),
+            ));
+        }
+
+        Ok(Content { content, fields })
     }
 }
 
 #[cfg(feature = "statistics")]
 impl Stats for Epub {
-    fn count_total<F: Fn(&[u8]) -> Result<usize, EbookError>>(&self, f: F) -> usize {
+    fn count_total<F>(&self, f: F) -> usize
+    where
+        F: Fn(&[u8]) -> EbookResult<usize>,
+    {
         self.spine
             .elements()
             .iter()
@@ -375,10 +408,10 @@ impl Stats for Epub {
             .sum()
     }
 
-    fn try_count_total<F: Fn(&[u8]) -> Result<usize, EbookError>>(
-        &self,
-        f: F,
-    ) -> Result<usize, EbookError> {
+    fn try_count_total<F>(&self, f: F) -> EbookResult<usize>
+    where
+        F: Fn(&[u8]) -> EbookResult<usize>,
+    {
         self.spine.elements().iter().try_fold(0, |total, element| {
             let manifest_el =
                 self.manifest
@@ -396,7 +429,7 @@ impl Stats for Epub {
         })
     }
 
-    fn count_chars(&self, data: &[u8]) -> Result<usize, EbookError> {
+    fn count_chars(&self, data: &[u8]) -> EbookResult<usize> {
         let mut char_count: usize = 0;
 
         let char_handler = text!("body > *", |text| {
@@ -410,7 +443,7 @@ impl Stats for Epub {
         Ok(char_count)
     }
 
-    fn count_words(&self, data: &[u8]) -> Result<usize, EbookError> {
+    fn count_words(&self, data: &[u8]) -> EbookResult<usize> {
         let mut word_count: usize = 0;
 
         let text_handler = text!("body > *", |text| {
@@ -429,7 +462,7 @@ impl Stats for Epub {
     }
 }
 
-fn parse_container(data: &[u8]) -> Result<PathBuf, EbookError> {
+fn parse_container(data: &[u8]) -> EbookResult<PathBuf> {
     let mut opf_location = String::new();
 
     let root_file_handler = element!("rootfile", |element| {
@@ -465,7 +498,7 @@ fn parse_container(data: &[u8]) -> Result<PathBuf, EbookError> {
     }
 }
 
-fn parse_package(data: &[u8]) -> Result<(Metadata, Manifest, Spine, Guide), EbookError> {
+fn parse_package(data: &[u8]) -> EbookResult<(Metadata, Manifest, Spine, Guide)> {
     // Keep track of latest metadata entry
     let current_meta = RefCell::new(None);
     // Track contents
@@ -688,7 +721,7 @@ fn parse_package(data: &[u8]) -> Result<(Metadata, Manifest, Spine, Guide), Eboo
     ))
 }
 
-fn is_valid_package(package: Option<Element>) -> Result<Element, EbookError> {
+fn is_valid_package(package: Option<Element>) -> EbookResult<Element> {
     package
         .filter(|pkg| pkg.contains_attribute(constants::VERSION))
         .ok_or(EbookError::Parse {
@@ -700,7 +733,7 @@ fn is_valid_package(package: Option<Element>) -> Result<Element, EbookError> {
         })
 }
 
-fn is_valid_spine(spine: Option<Element>, children: Vec<Element>) -> Result<Element, EbookError> {
+fn is_valid_spine(spine: Option<Element>, children: Vec<Element>) -> EbookResult<Element> {
     spine
         .map(|mut spine| {
             spine.children.replace(children);
@@ -712,7 +745,7 @@ fn is_valid_spine(spine: Option<Element>, children: Vec<Element>) -> Result<Elem
         })
 }
 
-fn parse_toc(mut data: &str) -> Result<Toc, EbookError> {
+fn parse_toc(mut data: &str) -> EbookResult<Toc> {
     // Keep track of latest nav element entry
     let parent_stack = Rc::new(RefCell::new(Vec::new()));
     let current_nav_group = Rc::new(RefCell::new(Vec::new()));
@@ -841,7 +874,7 @@ fn parse_toc(mut data: &str) -> Result<Toc, EbookError> {
     Ok(Toc(nav_groups.take()))
 }
 
-fn is_valid_toc(toc: &HashMap<String, Element>) -> Result<(), EbookError> {
+fn is_valid_toc(toc: &HashMap<String, Element>) -> EbookResult<()> {
     if toc.contains_key(constants::TOC) {
         Ok(())
     } else {
@@ -859,7 +892,7 @@ fn parse_xhtml_data(
     element_content_handlers: Vec<(Cow<Selector>, ElementContentHandlers)>,
     document_content_handlers: Vec<DocumentContentHandlers>,
     data: &[u8],
-) -> Result<(), EbookError> {
+) -> EbookResult<()> {
     let mut reader = HtmlRewriter::new(
         Settings {
             element_content_handlers,
@@ -879,7 +912,7 @@ fn parse_xhtml_data(
     }
 }
 
-fn get_toc(manifest: &Manifest) -> Result<&Element, EbookError> {
+fn get_toc(manifest: &Manifest) -> EbookResult<&Element> {
     // Attempt to retrieve newer toc format first
     manifest
         .by_property(constants::NAV_PROPERTY)

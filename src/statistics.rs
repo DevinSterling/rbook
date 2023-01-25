@@ -1,4 +1,4 @@
-use crate::errors::EbookError;
+use crate::formats::EbookResult;
 
 /// Retrieve simple statistical information, such as the character
 /// or word count of an ebook.
@@ -31,21 +31,22 @@ pub trait Stats {
     ///
     /// To view and handle errors, [try_count_total(...)](Self::try_count_total) can be
     /// used instead.
-    fn count_total<F: Fn(&[u8]) -> Result<usize, EbookError>>(&self, f: F) -> usize;
+    fn count_total<F>(&self, f: F) -> usize
+    where
+        F: Fn(&[u8]) -> EbookResult<usize>;
 
     /// Iterate through all resource elements and perform a function.
-    fn try_count_total<F: Fn(&[u8]) -> Result<usize, EbookError>>(
-        &self,
-        f: F,
-    ) -> Result<usize, EbookError>;
+    fn try_count_total<F>(&self, f: F) -> EbookResult<usize>
+    where
+        F: Fn(&[u8]) -> EbookResult<usize>;
 
     /// Calculate the count of all characters from a given collection
     /// of bytes.
-    fn count_chars(&self, data: &[u8]) -> Result<usize, EbookError>;
+    fn count_chars(&self, data: &[u8]) -> EbookResult<usize>;
 
     /// Calculate the count of all characters from a given collection
     /// of bytes.
-    fn count_words(&self, data: &[u8]) -> Result<usize, EbookError>;
+    fn count_words(&self, data: &[u8]) -> EbookResult<usize>;
 
     /// Calculate the count of all characters in the ebook file.
     ///
@@ -64,7 +65,7 @@ pub trait Stats {
     ///
     /// To ignore errors, [count_total_chars()](Self::count_total_chars)
     /// can be used instead.
-    fn try_count_total_chars(&self) -> Result<usize, EbookError> {
+    fn try_count_total_chars(&self) -> EbookResult<usize> {
         self.try_count_total(|data| self.count_chars(data))
     }
 
@@ -86,7 +87,7 @@ pub trait Stats {
     ///
     /// To ignore errors, [count_total_words()](Self::count_total_words)
     /// can be used instead.
-    fn try_count_total_words(&self) -> Result<usize, EbookError> {
+    fn try_count_total_words(&self) -> EbookResult<usize> {
         self.try_count_total(|data| self.count_words(data))
     }
 }

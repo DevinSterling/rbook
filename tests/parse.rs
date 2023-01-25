@@ -74,9 +74,13 @@ fn manifest_test() {
 
     // Alternate way of retrieval
     let cover_element = epub.cover_image().unwrap();
-    let content = epub.read_bytes_file(cover_element.value());
+    let content1 = epub.read_bytes_file(cover_element.value()).unwrap();
+    // Provided paths are normalized
+    let content2 = epub
+        .read_bytes_file("EPUB//./images//primary/..///./cover.png")
+        .unwrap();
 
-    assert!(content.is_ok())
+    assert_eq!(content1, content2);
 }
 
 #[test]
@@ -140,4 +144,31 @@ fn toc_test() {
 
     assert_eq!("Begin Reading", landmark_element.name());
     assert_eq!("bodymatter", attribute.value());
+}
+
+#[test]
+fn directory_test() {
+    let epub = rbook::Epub::new("tests/ebooks/example_epub").unwrap();
+
+    let title = epub.metadata().title().unwrap();
+    let creator = epub.metadata().creators().unwrap().first().unwrap();
+    let role = creator.get_child("role").unwrap();
+    let source = epub.metadata().get("source").unwrap().first().unwrap();
+
+    assert_eq!("Directory Example", title.value());
+    assert_eq!("Devin Sterling", creator.value());
+    assert_eq!("aut", role.value());
+    assert_eq!("rbook", source.value());
+
+    let manifest_element = epub.manifest().by_id("c2").unwrap();
+
+    assert_eq!("c2.xhtml", manifest_element.value());
+    assert_eq!(4, epub.spine().elements().len());
+
+    let toc_element = epub.toc().elements().get(1).unwrap();
+
+    assert_eq!("rbook c1", toc_element.name());
+    assert_eq!("EPUB/c1.xhtml", toc_element.value());
+
+    assert_eq!(None, epub.cover_image());
 }

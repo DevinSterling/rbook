@@ -1,24 +1,33 @@
+pub mod content;
+
 use crate::formats::EbookError;
+use crate::reader::content::Content;
 use thiserror::Error;
+
+/// Result type with [ReaderError](ReaderError) as the error.
+pub type ReaderResult<T> = Result<T, ReaderError>;
 
 pub(crate) trait Readable {
     // Reader navigation using a string
-    fn navigate_str(&self, path: &str) -> Result<usize, ReaderError>;
+    fn navigate_str(&self, path: &str) -> ReaderResult<usize>;
     // Reader navigation using an index
-    fn navigate(&self, index: usize) -> Result<String, ReaderError>;
+    fn navigate(&self, index: usize) -> ReaderResult<Content>;
 }
 
 /// Possible errors for [Reader](Reader)
-/// - **OutOfBounds**: When a given index exceeds the reader's bounds.
-/// - **InvalidReference**: When the reader fails to retrieve content
-/// due to lack of proper references. Usually caused by malformed files.
-/// - **NoContent**: When retrieval of content to display fails.
+/// - **[OutOfBounds](Self::OutOfBounds)**
+/// - **[InvalidReference](Self::InvalidReference)**
+/// - **[NoContent](Self::NoContent)**
 #[derive(Error, Debug)]
 pub enum ReaderError {
+    /// When a given index exceeds the reader's bounds.
     #[error("[OutOfBounds Error][{cause}]: {description}")]
     OutOfBounds { cause: String, description: String },
+    /// When the reader fails to retrieve content due to lack of
+    /// proper references. Usually caused by malformed files.
     #[error("[InvalidReference Error][{cause}]: {description}")]
     InvalidReference { cause: String, description: String },
+    /// When retrieval of content to display fails.
     #[error("[NoContent Error]{0}")]
     NoContent(EbookError),
 }
@@ -69,7 +78,7 @@ pub struct Reader<'a> {
     current_index: usize,
 }
 
-impl<'a> Reader<'a> {
+impl<'a: 'b, 'b> Reader<'a> {
     // TODO: Potentially remove the page count argument here...
     pub(crate) fn new(ebook: &'a dyn Readable, page_count: usize) -> Self {
         Self {
@@ -97,7 +106,7 @@ impl<'a> Reader<'a> {
     ///
     /// # Errors
     /// Possible errors are described in [ReaderError](ReaderError).
-    pub fn current_page(&self) -> Result<String, ReaderError> {
+    pub fn current_page(&self) -> ReaderResult<Content> {
         self.fetch_page(self.current_index)
     }
 
@@ -107,7 +116,7 @@ impl<'a> Reader<'a> {
     ///
     /// To view and handle errors, [try_previous_page()](Reader::try_next_page) can be used
     /// instead.
-    pub fn next_page(&mut self) -> Option<String> {
+    pub fn next_page(&mut self) -> Option<Content> {
         while self.current_index < self.page_count - 1 {
             match self.try_next_page() {
                 Ok(page_content) => return Some(page_content),
@@ -124,7 +133,7 @@ impl<'a> Reader<'a> {
     ///
     /// To view and handle errors, [try_previous_page()](Reader::try_previous_page) can be used
     /// instead.
-    pub fn previous_page(&mut self) -> Option<String> {
+    pub fn previous_page(&mut self) -> Option<Content> {
         while self.current_index > 0 {
             match self.try_previous_page() {
                 Ok(page_content) => return Some(page_content),
@@ -140,7 +149,7 @@ impl<'a> Reader<'a> {
     ///
     /// # Errors
     /// Possible errors are described in [ReaderError](ReaderError).
-    pub fn try_next_page(&mut self) -> Result<String, ReaderError> {
+    pub fn try_next_page(&mut self) -> ReaderResult<Content<'b>> {
         self.set_current_page(self.current_index + 1)
     }
 
@@ -149,7 +158,7 @@ impl<'a> Reader<'a> {
     ///
     /// # Errors
     /// Possible errors are described in [ReaderError](ReaderError).
-    pub fn try_previous_page(&mut self) -> Result<String, ReaderError> {
+    pub fn try_previous_page(&mut self) -> ReaderResult<Content<'b>> {
         self.set_current_page(self.current_index - 1)
     }
 
@@ -158,7 +167,7 @@ impl<'a> Reader<'a> {
     ///
     /// # Errors
     /// Possible errors are described in [ReaderError](ReaderError).
-    pub fn set_current_page(&mut self, page_index: usize) -> Result<String, ReaderError> {
+    pub fn set_current_page(&mut self, page_index: usize) -> ReaderResult<Content<'b>> {
         match self.fetch_page(page_index) {
             Ok(page_content) => {
                 self.current_index = page_index;
@@ -173,7 +182,7 @@ impl<'a> Reader<'a> {
     ///
     /// # Errors
     /// Possible errors are described in [ReaderError](ReaderError).
-    pub fn set_current_page_str(&mut self, path: &str) -> Result<String, ReaderError> {
+    pub fn set_current_page_str(&mut self, path: &str) -> ReaderResult<Content> {
         match self.ebook.navigate_str(path) {
             Ok(index) => self.set_current_page(index),
             Err(error) => Err(error),
@@ -185,7 +194,7 @@ impl<'a> Reader<'a> {
     ///
     /// # Errors
     /// Possible errors are described in [ReaderError](ReaderError).
-    pub fn fetch_page(&self, page_index: usize) -> Result<String, ReaderError> {
+    pub fn fetch_page(&self, page_index: usize) -> ReaderResult<Content<'b>> {
         self.ebook.navigate(page_index)
     }
 
@@ -194,7 +203,7 @@ impl<'a> Reader<'a> {
     ///
     /// # Errors
     /// Possible errors are described in [ReaderError](ReaderError).
-    pub fn fetch_page_str(&self, path: &str) -> Result<String, ReaderError> {
+    pub fn fetch_page_str(&self, path: &str) -> ReaderResult<Content<'b>> {
         match self.ebook.navigate_str(path) {
             Ok(index) => self.fetch_page(index),
             Err(error) => Err(error),

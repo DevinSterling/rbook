@@ -1,4 +1,5 @@
-use rbook::errors::ReaderError;
+use rbook::read::ContentType;
+use rbook::result::ReaderError;
 use rbook::Ebook;
 
 #[test]
@@ -30,6 +31,29 @@ fn reader_test() -> Result<(), ReaderError> {
     assert_eq!(142, reader.current_index());
 
     Ok(())
+}
+
+#[test]
+fn access_content_test() {
+    let epub = rbook::Epub::new("tests/ebooks/moby-dick.epub").unwrap();
+
+    let mut reader = epub.reader();
+
+    let content = reader.next_page().unwrap();
+
+    println!("{content}");
+
+    assert!(content.as_str().ends_with("</html>"));
+
+    assert_eq!(
+        "OPS/titlepage.xhtml",
+        content.get(ContentType::Path).unwrap()
+    );
+    assert_eq!(
+        "application/xhtml+xml",
+        content.get(ContentType::Type).unwrap()
+    );
+    assert_eq!("titlepage", content.get(ContentType::Id).unwrap());
 }
 
 #[test]

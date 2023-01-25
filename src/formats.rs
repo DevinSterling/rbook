@@ -9,6 +9,9 @@ use thiserror::Error;
 
 use crate::archive::ArchiveError;
 
+/// Result type with [EbookError](EbookError) as the error.
+pub type EbookResult<T> = Result<T, EbookError>;
+
 /// Trait that represents an ebook object supported by rbook.
 ///
 /// Provides an associated function, `new(path: &str)` that returns
@@ -39,7 +42,7 @@ pub trait Ebook {
     /// // View contents
     /// println!("{epub:?}");
     /// ```
-    fn new<P: AsRef<Path>>(path: P) -> Result<Self::Format, EbookError>;
+    fn new<P: AsRef<Path>>(path: P) -> EbookResult<Self::Format>;
 
     /// Creates a new ebook object with its associated content using
     /// a reader instance.
@@ -59,20 +62,24 @@ pub trait Ebook {
     /// // View contents
     /// println!("{epub:?}");
     /// ```
-    fn read_from<R: Seek + Read + 'static>(reader: R) -> Result<Self::Format, EbookError>;
+    fn read_from<R: Seek + Read + 'static>(reader: R) -> EbookResult<Self::Format>;
 }
 
-/// Possible errors for [Ebook](Ebook)
-/// - **IO**: When a given ebook path is not valid
-/// - **Parse**: When parsing, essential files are missing, e.g., the
-/// manifest. In addition, malformed file contents can cause a parse error.
-/// - **Archive**: When access to files in an ebook archive fails
+/// Possible errors for [Ebook](Ebook):
+/// - **[IO](Self::IO)**
+/// - **[Parse](Self::Parse)**
+/// - **[Archive](Self::Archive)**
 #[derive(Error, Debug)]
 pub enum EbookError {
+    /// When a given ebook path is not valid
     #[error("[IO Error][{cause}]: {description}")]
     IO { cause: String, description: String },
+    /// When parsing, essential files are missing, e.g., the
+    /// manifest. In addition, malformed file contents can
+    /// cause a parse error.
     #[error("[Parse Error][{cause}]: {description}")]
     Parse { cause: String, description: String },
+    /// When access to files in an ebook archive fails.
     #[error("[Archive Error]{0}")]
     Archive(ArchiveError),
 }
