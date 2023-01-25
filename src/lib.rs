@@ -64,12 +64,12 @@ pub use self::reader::Reader;
 pub use self::statistics::Stats;
 
 pub mod epub {
-    //! Access to the contents that make up an epub:
+    //! Access to the contents that make up an epub.
     pub use super::formats::epub::{Guide, Manifest, Metadata, Spine, Toc};
 }
 
 pub mod result {
-    //! Possible errors that can be encountered using rbook.
+    //! Possible results and errors that can be encountered using rbook.
     pub use super::archive::ArchiveError;
     pub use super::formats::{EbookError, EbookResult};
     #[cfg(feature = "reader")]
@@ -78,5 +78,6 @@ pub mod result {
 
 #[cfg(feature = "reader")]
 pub mod read {
+    //! Access to reader contents.
     pub use super::reader::content::{Content, ContentType};
 }
