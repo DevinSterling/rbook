@@ -9,7 +9,7 @@ use thiserror::Error;
 
 use crate::archive::ArchiveError;
 
-/// Result type with [EbookError](EbookError) as the error.
+/// Result type with [EbookError] as the error.
 pub type EbookResult<T> = Result<T, EbookError>;
 
 /// Trait that represents an ebook object supported by rbook.
@@ -29,7 +29,7 @@ pub trait Ebook {
     ///
     /// # Errors
     /// If the given path does not support the ebook format, an
-    /// [EbookError](EbookError) from a result will be returned.
+    /// [EbookError] from a result will be returned.
     ///
     /// # Examples
     /// Basic usage:
@@ -49,7 +49,7 @@ pub trait Ebook {
     ///
     /// # Errors
     /// If the given instance does not support the ebook format, an
-    /// [EbookError](EbookError) from a result will be returned.
+    /// [EbookError] from a result will be returned.
     ///
     /// # Examples
     /// Basic usage:
@@ -65,13 +65,13 @@ pub trait Ebook {
     fn read_from<R: Seek + Read + 'static>(reader: R) -> EbookResult<Self::Format>;
 }
 
-/// Possible errors for [Ebook](Ebook):
-/// - **[IO](Self::IO)**
-/// - **[Parse](Self::Parse)**
-/// - **[Archive](Self::Archive)**
+/// Possible errors for [Ebook]
+/// - [IO](Self::IO)
+/// - [Parse](Self::Parse)
+/// - [Archive](Self::Archive)
 #[derive(Error, Debug)]
 pub enum EbookError {
-    /// When a given ebook path is not valid
+    /// When a given ebook path is not valid.
     #[error("[IO Error][{cause}]: {description}")]
     IO { cause: String, description: String },
     /// When parsing, essential files are missing, e.g., the

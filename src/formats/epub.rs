@@ -36,10 +36,10 @@ pub use self::{
 /// Electronic Publication (epub) format
 ///
 /// Provides access to the following contents of an epub:
-/// - [Metadata](Metadata)
-/// - [Manifest](Manifest)
-/// - [Spine](Spine)
-/// - [Guide](Guide)
+/// - [Metadata]
+/// - [Manifest]
+/// - [Spine]
+/// - [Guide]
 /// - [Table of Contents (toc)](Toc)
 ///
 /// # Examples:
@@ -903,13 +903,12 @@ fn parse_xhtml_data(
     );
 
     // Convert data to utf-8 if necessary and start parsing
-    match reader.write(&utility::to_utf8(data)) {
-        Ok(_) => Ok(()),
-        Err(error) => Err(EbookError::Parse {
+    reader
+        .write(&utility::to_utf8(data))
+        .map_err(|error| EbookError::Parse {
             cause: "Parse Error".to_string(),
             description: format!("An error occurred while parsing: {error}"),
-        }),
-    }
+        })
 }
 
 fn get_toc(manifest: &Manifest) -> EbookResult<&Element> {

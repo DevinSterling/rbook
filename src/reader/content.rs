@@ -2,7 +2,7 @@ use std::borrow::Cow;
 use std::fmt::{Display, Formatter};
 
 /// Used to retrieve specific information about retrieved
-/// [Content](Content) from a [Reader](super::Reader).
+/// [Content] from a [Reader](super::Reader).
 #[derive(Debug)]
 pub enum ContentType {
     /// The path where the content originates from, i.e.,
@@ -81,12 +81,12 @@ impl Content<'_> {
 
     /// Retrieve specific information about the content.
     ///
-    /// See [ContentType](ContentType) for available options.
+    /// See [ContentType] for available options.
     pub fn get(&self, content_type: ContentType) -> Option<&str> {
         self.fields
             .iter()
             .find(|(key, _)| *key == content_type.as_str())
-            .map(|value| value.1.as_ref())
+            .map(|(_, value)| value.as_ref())
     }
 }
 

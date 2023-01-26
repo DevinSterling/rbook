@@ -211,14 +211,11 @@ impl Metadata {
     }
 
     fn get_element(&self, meta_name: &str) -> Option<&Element> {
-        match self.map.get(meta_name) {
-            Some(elements) => Some(
-                elements
-                    .first()
-                    .expect("Category should not be empty; missing child elements"),
-            ),
-            None => None,
-        }
+        self.map.get(meta_name).map(|elements| {
+            elements
+                .first()
+                .expect("Category should not be empty; missing child elements")
+        })
     }
 
     fn get_elements(&self, meta_name: &str) -> Option<&Vec<Element>> {

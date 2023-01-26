@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::fs;
 use std::io::{Read, Seek};
 use std::path::{Path, PathBuf};
 use thiserror::Error;
@@ -12,10 +13,10 @@ pub trait Archive {
     fn read_bytes_file(&mut self, path: &Path) -> Result<Vec<u8>, ArchiveError>;
 }
 
-/// Possible errors for an Archive:
-/// - **[InvalidPath](Self::InvalidPath)**
-/// - **[CannotRead](Self::CannotRead)**
-/// - **[InvalidEncoding](Self::InvalidEncoding)**
+/// Possible errors for an Archive
+/// - [InvalidPath](Self::InvalidPath)
+/// - [CannotRead](Self::CannotRead)
+/// - [InvalidEncoding](Self::InvalidEncoding)
 #[derive(Error, Debug)]
 pub enum ArchiveError {
     /// When a given path does not point to a valid location.
@@ -34,13 +35,12 @@ pub struct ZipArchive<T>(zip::ZipArchive<T>);
 
 impl<T: Read + Seek> ZipArchive<T> {
     pub fn new(zip: T) -> Result<Self, EbookError> {
-        match zip::ZipArchive::new(zip) {
-            Ok(zip) => Ok(Self(zip)),
-            Err(error) => Err(EbookError::IO {
+        zip::ZipArchive::new(zip)
+            .map(|zip| Self(zip))
+            .map_err(|error| EbookError::IO {
                 cause: "Unable to access zip archive".to_string(),
                 description: error.to_string(),
-            }),
-        }
+            })
     }
 
     fn get_file<P: AsRef<Path>>(&mut self, path: P) -> Result<ZipFile, ArchiveError> {
@@ -63,15 +63,15 @@ impl<T: Read + Seek> ZipArchive<T> {
             path_str = path_str.replace('\\', "/");
         }
 
-        match self.0.by_name(&path_str) {
-            Ok(zip_file) => Ok(ZipFile(zip_file)),
-            Err(error) => Err(ArchiveError::InvalidPath {
+        self.0
+            .by_name(&path_str)
+            .map(|zip_file| ZipFile(zip_file))
+            .map_err(|error| ArchiveError::InvalidPath {
                 cause: "Unable to access zip file".to_string(),
                 description: format!(
                     "Unable to retrieve file '{path_str}' from zip archive: {error}"
                 ),
-            }),
-        }
+            })
     }
 }
 
@@ -96,33 +96,30 @@ pub struct ZipFile<'a>(read::ZipFile<'a>);
 
 impl ZipFile<'_> {
     pub fn read(&mut self) -> Result<String, ArchiveError> {
-        let bytes = self.read_bytes()?;
+        let mut bytes = self.read_bytes()?;
         let data = utility::to_utf8(&bytes);
 
-        let bytes = match data {
-            Cow::Owned(_) => data.into_owned(), // Return new byte data
-            _ => bytes,                         // Return original byte data
-        };
-
-        match String::from_utf8(bytes) {
-            Ok(string) => Ok(string),
-            Err(err) => Err(ArchiveError::CannotRead {
-                cause: "Cannot read zip file contents to string".to_string(),
-                description: err.to_string(),
-            }),
+        // Retrieve converted bytes
+        if let Cow::Owned(_) = data {
+            bytes = data.into_owned();
         }
+
+        String::from_utf8(bytes).map_err(|error| ArchiveError::CannotRead {
+            cause: "Cannot read zip file contents to string".to_string(),
+            description: error.to_string(),
+        })
     }
 
     pub fn read_bytes(&mut self) -> Result<Vec<u8>, ArchiveError> {
         let mut buf = Vec::new();
 
-        match &self.0.read_to_end(&mut buf) {
-            Ok(_) => Ok(buf),
-            Err(err) => Err(ArchiveError::CannotRead {
+        self.0
+            .read_to_end(&mut buf)
+            .map(|_| buf)
+            .map_err(|error| ArchiveError::CannotRead {
                 cause: "Cannot read zip file contents to bytes vector".to_string(),
-                description: err.to_string(),
-            }),
-        }
+                description: error.to_string(),
+            })
     }
 }
 
@@ -132,13 +129,13 @@ impl DirArchive {
     pub fn new<P: AsRef<Path>>(path: P) -> Result<Self, EbookError> {
         let path_buf = path.as_ref().to_path_buf();
 
-        match path_buf.try_exists() {
-            Ok(_) => Ok(Self(path_buf)),
-            Err(error) => Err(EbookError::IO {
+        path_buf
+            .try_exists()
+            .map(|_| Self(path_buf))
+            .map_err(|error| EbookError::IO {
                 cause: "Provided path is inaccessible".to_string(),
                 description: format!("Path '{:?}': {error}", path.as_ref()),
-            }),
-        }
+            })
     }
 
     pub fn get_path<P: AsRef<Path>>(&self, path: P) -> Result<PathBuf, ArchiveError> {
@@ -159,32 +156,26 @@ impl DirArchive {
 
 impl Archive for DirArchive {
     fn read_file(&mut self, path: &Path) -> Result<String, ArchiveError> {
-        let bytes = self.read_bytes_file(path)?;
+        let mut bytes = self.read_bytes_file(path)?;
         let data = utility::to_utf8(&bytes);
 
-        let bytes = match data {
-            Cow::Owned(_) => data.into_owned(), // Return new byte data
-            _ => bytes,                         // Return original byte data
-        };
-
-        match String::from_utf8(bytes) {
-            Ok(content) => Ok(content),
-            Err(error) => Err(ArchiveError::CannotRead {
-                cause: "Cannot read file contents to string".to_string(),
-                description: format!("Path: '{path:?}': {error}"),
-            }),
+        // Retrieve converted bytes
+        if let Cow::Owned(_) = data {
+            bytes = data.into_owned();
         }
+
+        String::from_utf8(bytes).map_err(|error| ArchiveError::CannotRead {
+            cause: "Cannot read file contents to string".to_string(),
+            description: format!("Path: '{path:?}': {error}"),
+        })
     }
 
     fn read_bytes_file(&mut self, path: &Path) -> Result<Vec<u8>, ArchiveError> {
         let path = self.get_path(path)?;
 
-        match std::fs::read(&path) {
-            Ok(content) => Ok(content),
-            Err(error) => Err(ArchiveError::CannotRead {
-                cause: "Cannot read file contents to bytes vector".to_string(),
-                description: format!("Path: '{path:?}': {error}"),
-            }),
-        }
+        fs::read(&path).map_err(|error| ArchiveError::CannotRead {
+            cause: "Cannot read file contents to bytes vector".to_string(),
+            description: format!("Path: '{path:?}': {error}"),
+        })
     }
 }

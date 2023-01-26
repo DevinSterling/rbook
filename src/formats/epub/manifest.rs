@@ -29,7 +29,7 @@ use crate::formats::xml::{self, Element};
 pub struct Manifest(pub(crate) HashMap<String, Element>);
 
 impl Manifest {
-    /// Retrieve all manifest `item` elements
+    /// Retrieve all manifest `item` elements.
     pub fn elements(&self) -> Vec<&Element> {
         let mut sorted_elements: Vec<_> = self.0.values().collect();
         sorted_elements.sort_by_key(|e| &e.name);
@@ -71,12 +71,11 @@ impl Manifest {
         let vec: Vec<_> = self
             .0
             .values()
-            .filter(
-                |element| match element.get_attribute(constants::MEDIA_TYPE) {
-                    Some(attribute) => attribute.value().starts_with("image"),
-                    None => false,
-                },
-            )
+            .filter(|element| {
+                element
+                    .get_attribute(constants::MEDIA_TYPE)
+                    .map_or(false, |attribute| attribute.value.starts_with("image"))
+            })
             .collect();
 
         if vec.is_empty() {
