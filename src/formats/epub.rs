@@ -164,9 +164,9 @@ impl Epub {
     /// Retrieve the file contents.
     ///
     /// The given path is normalized and appended to the root file directory
-    /// if it does not contain it. However, retrieving "META-INF/container.xml"
-    /// is an exception. Please note that the root file directory
-    /// varies between ebooks.
+    /// if it does not contain it. However, retrieving content within `META-INF`
+    /// is an exception. Please note that the root file directory varies
+    /// between ebooks.
     ///
     /// # Examples:
     /// Basic usage:
@@ -179,10 +179,10 @@ impl Epub {
     /// let content2 = epub.read_file("OPS/package.opf").unwrap();
     ///
     /// assert_eq!(content1, content2);
-    ///
-    /// // Accessing container.xml
+    /// // Retrieving container.xml
     /// let content3 = epub.read_file("META-INF/container.xml").unwrap();
-    /// let content4 = epub.read_file("OPS/../META-INF//./container.xml").unwrap();
+    /// // Providing a path that needs to be normalized
+    /// let content4 = epub.read_file("../META-INF//./container.xml").unwrap();
     ///
     /// assert_eq!(content3, content4);
     /// ```
@@ -197,9 +197,9 @@ impl Epub {
     /// Retrieve the file contents in bytes.
     ///
     /// The given path is normalized and appended to the root file directory
-    /// if it does not contain it. However, retrieving "META-INF/container.xml"
-    /// is an exception. Please note that the root file directory
-    /// varies between ebooks.
+    /// if it does not contain it. However, retrieving content within `META-INF`
+    /// is an exception. Please note that the root file directory varies
+    /// between ebooks.
     ///
     /// # Examples:
     /// Basic usage:
@@ -229,7 +229,7 @@ impl Epub {
 
         // If the path is the container or contains the root file dir, return the
         // original. If not, concat the user supplied path to the root file dir.
-        if Path::new(constants::CONTAINER) == path || path.starts_with(&root_file_dir) {
+        if path.starts_with(constants::META_INF) || path.starts_with(&root_file_dir) {
             Cow::Borrowed(path)
         } else {
             Cow::Owned(root_file_dir.join(path))
@@ -375,7 +375,7 @@ impl Readable for Epub {
             (
                 ContentType::Path.as_str(),
                 Cow::Owned(
-                    self.parse_path(&manifest_element.value())
+                    utility::normalize_path(&self.parse_path(&manifest_element.value()))
                         .to_string_lossy()
                         .replace('\\', "/"),
                 ),

@@ -36,7 +36,7 @@ pub struct ZipArchive<T>(zip::ZipArchive<T>);
 impl<T: Read + Seek> ZipArchive<T> {
     pub fn new(zip: T) -> Result<Self, EbookError> {
         zip::ZipArchive::new(zip)
-            .map(|zip| Self(zip))
+            .map(Self)
             .map_err(|error| EbookError::IO {
                 cause: "Unable to access zip archive".to_string(),
                 description: error.to_string(),
@@ -65,7 +65,7 @@ impl<T: Read + Seek> ZipArchive<T> {
 
         self.0
             .by_name(&path_str)
-            .map(|zip_file| ZipFile(zip_file))
+            .map(ZipFile)
             .map_err(|error| ArchiveError::InvalidPath {
                 cause: "Unable to access zip file".to_string(),
                 description: format!(
@@ -129,22 +129,31 @@ impl DirArchive {
     pub fn new<P: AsRef<Path>>(path: P) -> Result<Self, EbookError> {
         let path_buf = path.as_ref().to_path_buf();
 
-        path_buf
-            .try_exists()
-            .map(|_| Self(path_buf))
-            .map_err(|error| EbookError::IO {
+        match path_buf.try_exists() {
+            Ok(exists) if exists => Ok(Self(path_buf)),
+            Ok(_) => Err(EbookError::IO {
+                cause: "Broken symbolic link".to_string(),
+                description: format!("Path `{:?}` is a broken symbolic link", path.as_ref()),
+            }),
+            Err(error) => Err(EbookError::IO {
                 cause: "Provided path is inaccessible".to_string(),
-                description: format!("Path '{:?}': {error}", path.as_ref()),
-            })
+                description: format!("Path `{:?}`: {error}", path.as_ref()),
+            }),
+        }
     }
 
     pub fn get_path<P: AsRef<Path>>(&self, path: P) -> Result<PathBuf, ArchiveError> {
-        let join_path = self.0.join(&path);
-        let normalized_path = utility::normalize_path(join_path);
+        let mut joined_path = self.0.join(&path);
+        let normalized_path = utility::normalize_path(&joined_path);
+
+        // Retrieve converted path
+        if let Cow::Owned(_) = normalized_path {
+            joined_path = normalized_path.into_owned();
+        }
 
         // Path traversal mitigation
-        if normalized_path.starts_with(&self.0) && normalized_path.is_file() {
-            Ok(normalized_path)
+        if joined_path.starts_with(&self.0) && joined_path.is_file() {
+            Ok(joined_path)
         } else {
             Err(ArchiveError::InvalidPath {
                 cause: "Provided path is inaccessible or not a file".to_string(),

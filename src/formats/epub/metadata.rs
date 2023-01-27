@@ -51,8 +51,8 @@ use crate::utility;
 /// ```
 #[derive(Debug)]
 pub struct Metadata {
-    pub(crate) package: Element,
-    pub(crate) map: HashMap<String, Vec<Element>>,
+    package: Element,
+    map: HashMap<String, Vec<Element>>,
 }
 
 impl Metadata {

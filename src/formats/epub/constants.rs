@@ -1,5 +1,6 @@
 // Paths
-pub(crate) const CONTAINER: &str = "META-INF/container.xml"; // Used to identify the root `.opf` file
+pub(crate) const META_INF: &str = "META-INF"; // Used to identify the root `.opf` file
+pub(crate) const CONTAINER: &str = "META-INF/container.xml"; // Used to identify container
 
 // Elements
 pub(crate) const PACKAGE: &str = "package";

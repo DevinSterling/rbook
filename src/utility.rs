@@ -37,25 +37,32 @@ pub(crate) fn get_parent_path<P: AsRef<Path>>(path: &P) -> Cow<Path> {
 }
 
 // Function to normalize paths. ex: `EPUB//.//OPS/../../toc.ncx` -> `toc.ncx`
-pub(crate) fn normalize_path<P: AsRef<Path>>(path: P) -> PathBuf {
-    let mut normalized_path = PathBuf::new();
+pub(crate) fn normalize_path<P: AsRef<Path>>(path: &P) -> Cow<Path> {
     let mut stack = Vec::new();
+    let mut is_normalized = true;
 
     for component in path.as_ref().components() {
-        let temp_str = component.as_os_str().to_string_lossy();
+        let slice = component.as_os_str();
 
-        if temp_str == ".." {
+        if slice == ".." {
+            is_normalized = false;
             stack.pop();
         } else {
-            stack.push(PathBuf::from(&*temp_str));
+            stack.push(slice);
         }
     }
 
-    for component in stack {
-        normalized_path.push(component);
-    }
+    if is_normalized {
+        Cow::Borrowed(path.as_ref())
+    } else {
+        let mut normalized_path = PathBuf::new();
 
-    normalized_path
+        for component in stack {
+            normalized_path.push(component);
+        }
+
+        Cow::Owned(normalized_path)
+    }
 }
 
 // Support for UTF-16 by converting it to UTF-8
