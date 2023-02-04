@@ -9,12 +9,12 @@ An ebook library that supports parsing and reading the epub format.
 Including default features:
 ```toml
 [dependencies]
-rbook = "0.1.5"
+rbook = "0.2.0"
 ```
 Excluding default features:
 ```toml
 [dependencies]
-rbook = { version = "0.1.5", default-features = false }
+rbook = { version = "0.2.0", default-features = false }
 ```
 Default features are the following:
 - `reader`: Enables reading of the ebook file by file
@@ -54,18 +54,18 @@ fn main() {
 
     // Retrieving the first creator metadata element
     let creator = epub.metadata().creators().unwrap().first().unwrap();
+    assert_eq!("John Doe", creator.value());
 
     // Retrieving an attribute
     let id = creator.get_attribute("id").unwrap();
+    assert_eq!("creator01", id);
 
     // Retrieving a child element
     let role = creator.get_child("role").unwrap();
-    let scheme = role.get_attribute("scheme").unwrap();
-
-    assert_eq!("id", id.name());
-    assert_eq!("creator01", id.value());
     assert_eq!("aut", role.value());
-    assert_eq!("marc:relators", scheme.value());
+
+    let scheme = role.get_attribute("scheme").unwrap();
+    assert_eq!("marc:relators", scheme);
 }
 ```
 

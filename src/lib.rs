@@ -33,20 +33,18 @@
 //! # use rbook::Ebook;
 //! # let epub = rbook::Epub::new("tests/ebooks/moby-dick.epub").unwrap();
 //! let creator = epub.metadata().creators().unwrap().first().unwrap();
+//! assert_eq!("Herman Melville", creator.value());
 //!
 //! // Retrieving an attribute
 //! let id = creator.get_attribute("id").unwrap();
-//!
-//! assert_eq!("Herman Melville", creator.value());
+//! assert_eq!("creator", id);
 //!
 //! // Refining (children) metadata and attributes
 //! let role = creator.get_child("role").unwrap(); // Child metadata element
-//! let scheme = role.get_attribute("scheme").unwrap(); // Attribute of an element
-//!
-//! assert_eq!("id", id.name());
-//! assert_eq!("creator", id.value());
 //! assert_eq!("aut", role.value());
-//! assert_eq!("marc:relators", scheme.value())
+//!
+//! let scheme = role.get_attribute("scheme").unwrap(); // Attribute of an element
+//! assert_eq!("marc:relators", scheme)
 //! ```
 
 mod archive;

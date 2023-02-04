@@ -74,7 +74,7 @@ impl Manifest {
             .filter(|element| {
                 element
                     .get_attribute(constants::MEDIA_TYPE)
-                    .map_or(false, |attribute| attribute.value.starts_with("image"))
+                    .map_or(false, |attribute| attribute.starts_with("image"))
             })
             .collect();
 

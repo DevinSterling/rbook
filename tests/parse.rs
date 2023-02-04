@@ -39,7 +39,7 @@ fn metadata_test2() {
     let scheme = role.get_attribute("scheme").unwrap(); // Attribute of an element
 
     assert_eq!("aut", role.value());
-    assert_eq!("marc:relators", scheme.value())
+    assert_eq!("marc:relators", scheme)
 }
 
 #[test]
@@ -52,7 +52,7 @@ fn manifest_test() {
 
     assert_eq!("s04", element.name()); // id attribute value
     assert_eq!("s04.xhtml", element.value()); // href attribute value
-    assert_eq!("application/xhtml+xml", media_type.value());
+    assert_eq!("application/xhtml+xml", media_type);
 
     // Retrieve file content using href
     let content = epub.read_file(element.value()).unwrap();
@@ -99,7 +99,7 @@ fn spine_test() {
     // Access spine attributes
     let direction = epub.spine().get_attribute("toc").unwrap();
 
-    assert_eq!("ncx", direction.value())
+    assert_eq!("ncx", direction)
 }
 
 // #[test]
@@ -143,7 +143,7 @@ fn toc_test() {
     let attribute = landmark_element.get_attribute("type").unwrap();
 
     assert_eq!("Begin Reading", landmark_element.name());
-    assert_eq!("bodymatter", attribute.value());
+    assert_eq!("bodymatter", attribute);
 }
 
 #[test]

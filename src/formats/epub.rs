@@ -383,10 +383,7 @@ impl Readable for Epub {
         ];
 
         if let Some(media_type) = manifest_element.get_attribute(constants::MEDIA_TYPE) {
-            fields.push((
-                ContentType::Type.as_str(),
-                Cow::Borrowed(media_type.value()),
-            ));
+            fields.push((ContentType::Type.as_str(), Cow::Borrowed(media_type)));
         }
 
         Ok(Content { content, fields })
@@ -521,61 +518,54 @@ fn parse_package(data: &[u8]) -> EbookResult<(Metadata, Manifest, Spine, Guide)>
         root.replace(Element {
             name,
             attributes: xmlutil::copy_attributes(element.attributes()),
-            value: String::new(),
-            children: None,
+            ..Element::default()
         });
 
         Ok(())
     });
 
     let metadata_entry_handler = element!("metadata > *", |element| {
-        let mut attributes = xmlutil::copy_attributes(element.attributes());
-        let mut value = String::new();
-        let mut name = element.tag_name();
+        let mut meta = Element {
+            attributes: xmlutil::copy_attributes(element.attributes()),
+            ..Element::default()
+        };
 
         // Change name to the value of the name or
         // property attribute of a meta element
-        match (
-            xmlutil::take_attribute(&mut attributes, constants::PROPERTY),
-            xmlutil::take_attribute(&mut attributes, constants::NAME),
-            xmlutil::take_attribute(&mut attributes, constants::CONTENT),
+        // Newer meta element condition
+        if let Some(property) = element.get_attribute(constants::PROPERTY) {
+            meta.name = property;
+        }
+        // Legacy OPF2.0 meta element condition
+        else if let (Some(name), Some(content)) = (
+            element.get_attribute(constants::NAME),
+            element.get_attribute(constants::CONTENT),
         ) {
-            // Newer meta element
-            (Some(property), _, _) => name = property.value,
-            // Legacy OPF2.0 meta element
-            (_, Some(meta_name), Some(content)) => {
-                name = meta_name.value;
-                value = content.value;
-
-                attributes.push(Attribute {
-                    name: constants::LEGACY_FEATURE.to_string(),
-                    value: constants::LEGACY_META.to_string(),
-                });
-            }
-            _ => (),
+            meta.name = name;
+            meta.value = content;
+            meta.attributes.push(Attribute {
+                name: constants::LEGACY_FEATURE.to_string(),
+                value: constants::LEGACY_META.to_string(),
+            });
+        }
+        // Use tag name instead
+        else {
+            meta.name = element.tag_name();
         }
 
         // Remove namespace
-        if let Some((_, right)) = utility::split_where(&name, ':') {
-            name = right.to_string();
+        if let Some(index) = meta.name.find(':') {
+            meta.name.drain(..=index);
         }
 
-        // Add and retrieve metadata group (for categorization) to map
-        let meta_group = metadata_map.entry(name.to_string()).or_default();
-
-        // Add element to metadata
-        let meta = Element {
-            name,
-            attributes,
-            value,
-            children: None,
-        };
+        // Add and retrieve metadata group (vectors used for categorization) to map
+        let meta_group = metadata_map.entry(meta.name.to_string()).or_default();
 
         // Add child metadata to parent metadata
-        if let Some(refines) = element.get_attribute(constants::REFINES) {
+        if let Some(refines) = meta.get_attribute(constants::REFINES) {
             let id = refines.replace('#', "");
 
-            if let Some(parent) = id_map.get_mut(&id) {
+            if let Some(parent) = id_map.get_mut(id.as_str()) {
                 // This should be guaranteed to have a valid address
                 unsafe {
                     let children = (*(*parent))
@@ -594,11 +584,13 @@ fn parse_package(data: &[u8]) -> EbookResult<(Metadata, Manifest, Spine, Guide)>
             // Add new metadata entry
             meta_group.push(meta);
 
+            // Get just inserted entry
             let entry = meta_group
                 .last_mut()
                 .expect("Group should have at least one element");
             current_meta.borrow_mut().replace(entry as *mut Element);
 
+            // Add to id map if it has an id
             if let Some(id) = element.get_attribute(xml::ID) {
                 entry.children.replace(Vec::new());
                 id_map.insert(id, entry as *mut Element);
@@ -629,67 +621,54 @@ fn parse_package(data: &[u8]) -> EbookResult<(Metadata, Manifest, Spine, Guide)>
     });
 
     let manifest_handler = element!("item", |element| {
-        let mut attributes = xmlutil::copy_attributes(element.attributes());
-
         // the name of manifest items will be the value of its id attribute
-        let (name, value) = match (
-            xmlutil::take_attribute(&mut attributes, xml::ID),
-            xmlutil::take_attribute(&mut attributes, xml::HREF),
+        // the value of manifest items will be the value of its href attribute
+        if let (Some(id), Some(href)) = (
+            element.get_attribute(xml::ID),
+            element.get_attribute(xml::HREF),
         ) {
-            (Some(id), Some(href)) => (id.value, href.value),
-            _ => return Ok(()),
+            item_map.insert(
+                id.to_string(),
+                Element {
+                    name: id,
+                    value: href,
+                    attributes: xmlutil::copy_attributes(element.attributes()),
+                    ..Element::default()
+                },
+            );
         };
-
-        item_map.insert(
-            name.to_string(),
-            Element {
-                name,
-                attributes,
-                value,
-                children: None,
-            },
-        );
 
         Ok(())
     });
 
     let spine_handler = element!("itemref", |element| {
-        let mut attributes = xmlutil::copy_attributes(element.attributes());
-
         // the name of spine items will be the value of its idref attribute
-        let name = match xmlutil::take_attribute(&mut attributes, constants::IDREF) {
-            Some(idref) => idref.value,
-            _ => return Ok(()),
-        };
-
-        itemref_vec.push(Element {
-            name,
-            attributes,
-            value: String::new(),
-            children: None,
-        });
+        if let Some(name) = element.get_attribute(constants::IDREF) {
+            itemref_vec.push(Element {
+                name,
+                attributes: xmlutil::copy_attributes(element.attributes()),
+                ..Element::default()
+            });
+        }
 
         Ok(())
     });
 
     // Epub 2 feature
     let guide_handler = element!("reference", |element| {
-        let mut attributes = xmlutil::copy_attributes(element.attributes());
-
-        let (name, value) = match (
-            xmlutil::take_attribute(&mut attributes, constants::TITLE),
-            xmlutil::take_attribute(&mut attributes, xml::HREF),
+        // the name of guide items will be the value of its title attribute
+        // the value of guide items will be the value of its href attribute
+        if let (Some(title), Some(href)) = (
+            element.get_attribute(constants::TITLE),
+            element.get_attribute(xml::HREF),
         ) {
-            (Some(title), Some(href)) => (title.value, href.value),
-            _ => return Ok(()),
+            guide_vec.push(Element {
+                name: title,
+                value: href,
+                attributes: xmlutil::copy_attributes(element.attributes()),
+                ..Element::default()
+            });
         };
-
-        guide_vec.push(Element {
-            name,
-            attributes,
-            value,
-            children: None,
-        });
 
         Ok(())
     });
@@ -762,15 +741,15 @@ fn parse_toc(mut data: &str) -> EbookResult<Toc> {
     // nav group entry
     let nav_group_handler = element!("nav, navMap, pageList", |element| {
         let element_name = element.tag_name();
-        let mut attributes = xmlutil::copy_attributes(element.attributes());
+        let toc_type = element.get_attribute(constants::TOC_TYPE);
+        let attributes = xmlutil::copy_attributes(element.attributes());
 
         let parent_stack = Rc::clone(&parent_stack);
         let current_nav_group = Rc::clone(&current_nav_group);
         let groups = Rc::clone(&nav_groups);
         element.on_end_tag(move |_| {
-            let nav_group_name = match xmlutil::take_attribute(&mut attributes, constants::TOC_TYPE)
-            {
-                Some(nav_type) => nav_type.value,
+            let nav_group_name = match toc_type {
+                Some(nav_type) => nav_type,
                 // If the element is pageList
                 None if element_name == constants::PAGE_LIST2 => constants::PAGE_LIST3.to_string(),
                 // Default the group name to "table of contents" (toc)
@@ -785,9 +764,9 @@ fn parse_toc(mut data: &str) -> EbookResult<Toc> {
                 nav_group_name.to_string(),
                 Element {
                     name: nav_group_name,
-                    attributes,
-                    value: String::new(),
                     children: Some(current_nav_group.replace(Vec::new())),
+                    attributes,
+                    ..Element::default()
                 },
             );
 
@@ -800,10 +779,8 @@ fn parse_toc(mut data: &str) -> EbookResult<Toc> {
     // create new entry nav element
     let nav_entry_handler = element!("li, navPoint, pageTarget", |element| {
         parent_stack.borrow_mut().push(Element {
-            name: String::new(),
             attributes: xmlutil::copy_attributes(element.attributes()),
-            value: String::new(),
-            children: None,
+            ..Element::default()
         });
 
         // Handle end tag event
@@ -829,15 +806,16 @@ fn parse_toc(mut data: &str) -> EbookResult<Toc> {
         Ok(())
     });
 
-    // Set the value of the entry nav element to the href
+    // Set the value of the entry nav element to the href/src
     let nav_content_handler = element!("a, span, content", |element| {
-        // Transfer attributes and obtain href
+        // Get attributes and obtain href/src
         if let Some(nav_entry) = parent_stack.borrow_mut().last_mut() {
             for attribute in xmlutil::copy_attributes(element.attributes()) {
-                match attribute.name() {
-                    xml::HREF | xml::SRC => nav_entry.value = attribute.value,
-                    _ => nav_entry.attributes.push(attribute),
+                if attribute.name() == xml::HREF || attribute.name() == xml::SRC {
+                    nav_entry.value = attribute.value().to_string()
                 }
+
+                nav_entry.attributes.push(attribute)
             }
         }
 

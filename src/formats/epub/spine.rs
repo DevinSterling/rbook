@@ -34,8 +34,8 @@ impl Spine {
         self.0.attributes()
     }
 
-    /// Retrieve a certain attribute from the root spine element
-    pub fn get_attribute(&self, name: &str) -> Option<&Attribute> {
+    /// Retrieve the value from a certain attribute from the root spine element
+    pub fn get_attribute(&self, name: &str) -> Option<&str> {
         self.0.get_attribute(name)
     }
 

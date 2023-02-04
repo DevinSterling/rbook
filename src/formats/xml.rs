@@ -1,3 +1,5 @@
+pub(crate) mod utility;
+
 pub(super) const ID: &str = "id";
 pub(super) const HREF: &str = "href";
 pub(super) const SRC: &str = "src";
@@ -14,19 +16,18 @@ pub(super) const SRC: &str = "src";
 /// let element = epub.metadata().creators().unwrap().first().unwrap();
 ///
 /// // Retrieving an attribute
-/// let attribute = element.get_attribute("id").unwrap();
+/// let id = element.get_attribute("id").unwrap();
+/// assert_eq!("creator", id);
 ///
 /// // Retrieving a child element
 /// let child_element = element.get_child("role").unwrap();
-///
-/// assert_eq!("creator", attribute.value());
 /// assert_eq!("aut", child_element.value());
 /// ```
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Default)]
 pub struct Element {
     pub(super) name: String,
-    pub(super) attributes: Vec<Attribute>,
     pub(super) value: String,
+    pub(super) attributes: Vec<Attribute>,
     pub(super) children: Option<Vec<Element>>,
 }
 
@@ -44,12 +45,13 @@ impl Element {
         &self.attributes
     }
 
-    /// Retrieve the specified attribute. Namespace/prefix
+    /// Retrieve the value from a specified attribute. Namespace/prefix
     /// may be omitted from the argument.
-    pub fn get_attribute(&self, name: &str) -> Option<&Attribute> {
+    pub fn get_attribute(&self, name: &str) -> Option<&str> {
         self.attributes
             .iter()
             .find(|attribute| attribute.name().ends_with(&name.to_lowercase()))
+            .map(|attribute| attribute.value.as_str())
     }
 
     /// Check if the element contains the specified attribute.
@@ -71,7 +73,7 @@ impl Element {
         self.children().and_then(|children| {
             children
                 .iter()
-                .find(|child| child.name().ends_with(&name.to_lowercase()))
+                .find(|child| child.name().ends_with(&name.trim().to_lowercase()))
         })
     }
 
@@ -81,7 +83,7 @@ impl Element {
         self.children().map_or(false, |children| {
             children
                 .iter()
-                .any(|child| child.name().ends_with(&name.to_lowercase()))
+                .any(|child| child.name().ends_with(&name.trim().to_lowercase()))
         })
     }
 }
@@ -98,10 +100,9 @@ impl Element {
 /// let element = epub.manifest().by_id("xchapter_009").unwrap();
 ///
 /// // Retrieving attributes
-/// let attribute = element.get_attribute("media-type").unwrap();
+/// let value = element.get_attribute("media-type").unwrap();
 ///
-/// assert_eq!("media-type", attribute.name());
-/// assert_eq!("application/xhtml+xml", attribute.value());
+/// assert_eq!("application/xhtml+xml", value);
 /// ```
 #[derive(Debug, PartialEq, Eq)]
 pub struct Attribute {
@@ -116,40 +117,5 @@ impl Attribute {
 
     pub fn value(&self) -> &str {
         &self.value
-    }
-}
-
-// Utility functions module
-pub(crate) mod utility {
-    use super::{Attribute, Element};
-    use lol_html::html_content::Attribute as LolAttribute;
-
-    pub(crate) fn equals_attribute_by_value(element: &Element, field: &str, value: &str) -> bool {
-        element.get_attribute(field).map_or(false, |attribute| {
-            attribute
-                .value()
-                .split_whitespace()
-                .any(|slice| slice == value)
-        })
-    }
-
-    pub(crate) fn copy_attributes(old_attributes: &[LolAttribute]) -> Vec<Attribute> {
-        old_attributes
-            .iter()
-            .map(|attr| Attribute {
-                name: attr.name(),
-                value: attr.value(),
-            })
-            .collect()
-    }
-
-    pub(crate) fn take_attribute(
-        attributes: &mut Vec<Attribute>,
-        field: &str,
-    ) -> Option<Attribute> {
-        attributes
-            .iter()
-            .position(|attribute| attribute.name() == field)
-            .map(|index| attributes.remove(index))
     }
 }

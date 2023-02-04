@@ -98,26 +98,11 @@ impl Toc {
     }
 
     fn get_elements(&self, name: &str) -> Option<&[Element]> {
-        if let Some(elements) = self.0.get(name) {
-            Some(
-                elements
-                    .children()
-                    .expect("Should have nav children elements"),
-            )
-        } else {
-            None
-        }
+        self.0.get(name).and_then(|element| element.children())
     }
 
     fn get_elements_flat(&self, name: &str) -> Option<Vec<&Element>> {
-        if let Some(elements) = self.get_elements(name) {
-            let mut output = Vec::new();
-            recursive_flatten(elements, &mut output);
-
-            Some(output)
-        } else {
-            None
-        }
+        self.get_elements(name).map(flatten)
     }
 }
 
@@ -127,7 +112,7 @@ fn sort_nav_points(nav_points: Vec<&Element>) -> Vec<&Element> {
     for nav_point in nav_points {
         let value: usize = nav_point
             .get_attribute(constants::PLAY_ORDER)
-            .and_then(|play_order| play_order.value().parse().ok())
+            .and_then(|play_order| play_order.parse().ok())
             .unwrap_or(0);
 
         ordered_element.push((value, nav_point))
@@ -141,12 +126,17 @@ fn sort_nav_points(nav_points: Vec<&Element>) -> Vec<&Element> {
         .collect()
 }
 
-fn recursive_flatten<'a>(elements: &'a [Element], output: &mut Vec<&'a Element>) {
-    for element in elements {
+fn flatten(elements: &[Element]) -> Vec<&Element> {
+    let mut output = Vec::new();
+    let mut stack: Vec<_> = elements.iter().rev().collect();
+
+    while let Some(element) = stack.pop() {
         output.push(element);
 
         if let Some(children) = element.children() {
-            recursive_flatten(children, output);
+            stack.extend(children.iter().rev());
         }
     }
+
+    output
 }
