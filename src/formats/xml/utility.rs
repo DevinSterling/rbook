@@ -17,6 +17,13 @@ pub(crate) fn equals_attribute_by_value(element: &Element, field: &str, value: &
     })
 }
 
+pub(crate) fn get_attribute<'a>(attributes: &'a [Attribute], field: &str) -> Option<&'a str> {
+    attributes
+        .iter()
+        .find(|attribute| attribute.name() == field)
+        .map(|attribute| attribute.value())
+}
+
 pub(crate) fn find_helper<'a, F>(mut input: &str, fallback: F) -> Option<Vec<&'a Element>>
 where
     F: Fn(&str, bool) -> Option<Vec<&'a Element>>,

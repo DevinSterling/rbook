@@ -21,16 +21,16 @@ fn metadata_find_test() {
     let creators2 = epub.metadata().find_all("creator").unwrap();
     assert_eq!(creators, creators2);
 
-    // Find the first `creator` element that has a child `role` element
-    let creator = epub.metadata().find("contributor > role").unwrap();
-    // Find any first element that has a child `role` element
-    let creator_alt = epub.metadata().find("* > role").unwrap();
+    // Find the first `creator` element that has a child `file-as` element
+    let creator = epub.metadata().find("creator > file-as").unwrap();
+    // Find any first element that has a child `file-as` element
+    let creator_alt = epub.metadata().find("* > file-as").unwrap();
     assert_eq!(creator, creator_alt);
 
     // Find any element with any child element that has a `refines` attribute that equals `#contrib1`
     let creator_alt2 = epub
         .metadata()
-        .find_value("* > *[refines=#contrib1]")
+        .find_value("* > *[refines=#creator]")
         .unwrap();
     assert_eq!(creator_alt.value(), creator_alt2);
 }

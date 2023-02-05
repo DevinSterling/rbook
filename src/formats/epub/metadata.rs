@@ -1,5 +1,4 @@
 use std::borrow::Borrow;
-use std::collections::HashMap;
 use std::rc::Rc;
 
 use crate::formats::epub::constants;
@@ -56,29 +55,24 @@ use crate::xml::Find;
 #[derive(Debug)]
 pub struct Metadata {
     package: Element,
-    element_map: HashMap<String, Vec<Rc<Element>>>,
+    element_groups: Vec<(String, Vec<Rc<Element>>)>,
 }
 
 impl Metadata {
-    pub(crate) fn new(package: Element, element_map: HashMap<String, Vec<Rc<Element>>>) -> Self {
+    pub(crate) fn new(package: Element, element_groups: Vec<(String, Vec<Rc<Element>>)>) -> Self {
         Self {
             package,
-            element_map,
+            element_groups,
         }
     }
 
     /// Retrieve all metadata elements
     pub fn elements(&self) -> Vec<&Element> {
-        let mut elements: Vec<_> = self
-            .element_map
-            .values()
+        self.element_groups
+            .iter()
+            .map(|(_, elements)| elements)
             .flat_map(|elements| elements.iter().map(Rc::borrow))
-            .collect();
-
-        // Sort elements so order when retrieving is consistent
-        elements.sort_by(|a: &&Element, b: &&Element| a.name().cmp(b.name()));
-
-        elements
+            .collect()
     }
 
     /// Retrieve the epub version associated with the ebook
@@ -226,18 +220,22 @@ impl Metadata {
     }
 
     fn get_element(&self, meta_name: &str) -> Option<&Element> {
-        self.element_map.get(meta_name.trim()).map(|elements| {
-            elements
-                .first()
-                .map(Rc::borrow)
-                .expect("Category should not be empty; missing child elements")
-        })
+        self.element_groups
+            .iter()
+            .find(|(group, _)| group == meta_name.trim())
+            .map(|(_, elements)| {
+                elements
+                    .first()
+                    .map(Rc::borrow)
+                    .expect("Category should not be empty; missing child elements")
+            })
     }
 
     fn get_elements(&self, meta_name: &str) -> Option<Vec<&Element>> {
-        self.element_map
-            .get(meta_name.trim())
-            .map(|elements| elements.iter().map(Rc::borrow).collect())
+        self.element_groups
+            .iter()
+            .find(|(group, _)| group == meta_name.trim())
+            .map(|(_, elements)| elements.iter().map(Rc::borrow).collect())
     }
 }
 

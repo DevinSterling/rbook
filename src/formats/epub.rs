@@ -500,8 +500,7 @@ fn parse_package(data: &[u8]) -> EbookResult<(Metadata, Manifest, Spine, Guide)>
     // Keep track of latest metadata entry
     let current_meta = RefCell::new(None);
     // Track contents
-    let mut metadata_map: HashMap<String, Vec<TempElement>> = HashMap::new(); // Metadata contents
-    let mut id_map: HashMap<String, *mut TempElement> = HashMap::new(); // Track metadata relationships
+    let mut meta_vec = Vec::new(); // Metadata contents
     let mut item_map = HashMap::new(); // Manifest contents
     let mut itemref_vec = Vec::new(); // Spine contents
     let mut guide_vec = Vec::new(); // Guide contents (Epub 2 Only)
@@ -568,50 +567,16 @@ fn parse_package(data: &[u8]) -> EbookResult<(Metadata, Manifest, Spine, Guide)>
             meta.name.drain(..=index);
         }
 
-        // Add and retrieve metadata group (vectors used for categorization) to map
-        let meta_group = metadata_map.entry(meta.name.to_string()).or_default();
+        let meta = Rc::new(RefCell::new(meta));
 
-        // Add child metadata to parent metadata
-        if let Some(refines) = element.get_attribute(constants::REFINES) {
-            let id = refines.replace('#', "");
-
-            if let Some(parent) = id_map.get_mut(id.as_str()) {
-                // This should be guaranteed to have a valid address
-                unsafe {
-                    let children = (*(*parent))
-                        .children
-                        .as_mut()
-                        .expect("Should have children");
-                    children.push(meta);
-
-                    let entry = children
-                        .last_mut()
-                        .expect("Should have at least one child element");
-                    current_meta.borrow_mut().replace(entry as *mut TempElement);
-                }
-            }
-        } else {
-            // Add new metadata entry
-            meta_group.push(meta);
-
-            // Get just inserted entry
-            let entry = meta_group
-                .last_mut()
-                .expect("Group should have at least one element");
-            current_meta.borrow_mut().replace(entry as *mut TempElement);
-
-            // Add to id map if it has an id
-            if let Some(id) = element.get_attribute(xml::ID) {
-                entry.children.replace(Vec::new());
-                id_map.insert(id, entry as *mut TempElement);
-            }
-        }
+        current_meta.borrow_mut().replace(Rc::clone(&meta));
+        meta_vec.push(meta);
 
         Ok(())
     });
 
-    // Capture text from "dc:*" and "meta" elements. Used instead
-    // of text!(...) to obtain text values encased between "meta" tags
+    // Capture text from "dc:*" and "meta" elements. Used instead of
+    // text! because doc_text! captures values encased between "meta" tags.
     let metadata_text_value_handler = doc_text!(|text| {
         let value = text.as_str().trim().to_string();
 
@@ -621,10 +586,8 @@ fn parse_package(data: &[u8]) -> EbookResult<(Metadata, Manifest, Spine, Guide)>
         }
 
         // Add missing metadata value to current metadata entry
-        // TODO: ensure function only runs when text is encased in "metadata" tags
         if let Some(meta_entry) = current_meta.borrow_mut().take() {
-            // This should be guaranteed to have a valid address
-            unsafe { (*meta_entry).value = value }
+            meta_entry.borrow_mut().value = value;
         }
 
         Ok(())
@@ -704,10 +667,10 @@ fn parse_package(data: &[u8]) -> EbookResult<(Metadata, Manifest, Spine, Guide)>
 
     // Finalize metadata:
     // Create parent references for each element
-    let metadata_map = to_rc_metadata_map(metadata_map);
+    let meta_vec = to_rc_meta_vec(meta_vec);
 
     Ok((
-        Metadata::new(package_root, metadata_map),
+        Metadata::new(package_root, meta_vec),
         Manifest::new(item_map), // Add properties
         Spine::new(spine_root),
         Guide::new(guide_vec),
@@ -741,18 +704,61 @@ fn is_valid_spine(
         })
 }
 
-fn to_rc_metadata_map(map: HashMap<String, Vec<TempElement>>) -> HashMap<String, Vec<Rc<Element>>> {
-    map.into_iter()
-        .map(|(category, elements)| {
-            (
-                category,
-                elements
-                    .into_iter()
-                    .map(|element| element.convert_to_rc(Weak::new()))
-                    .collect(),
-            )
-        })
-        .collect()
+// Using vec here instead of hashmap as it better maintains the
+// order of metadata from the original file. Performance loss
+// is miniscule as there are generally very little elements.
+fn to_rc_meta_vec(elements: Vec<Rc<RefCell<TempElement>>>) -> Vec<(String, Vec<Rc<Element>>)> {
+    let mut new_vec: Vec<(String, Vec<Rc<Element>>)> = Vec::new();
+    let mut parent_vec: Vec<TempElement> = Vec::new(); // temp vec to help with construction
+
+    // Loop to form parent-child relationship between metadata
+    for element_cell in elements {
+        let mut element = element_cell.take();
+
+        // Add child metadata to parent metadata
+        if let Some(refines) = xmlutil::get_attribute(&element.attributes, constants::REFINES) {
+            let id = refines.replace('#', "");
+
+            if let Some(children) = parent_vec
+                .iter_mut()
+                .find(|parent| {
+                    xmlutil::get_attribute(&parent.attributes, xml::ID)
+                        .filter(|value| value == &id)
+                        .is_some()
+                })
+                .and_then(|parent| parent.children.as_mut())
+            {
+                // Add child metadata entry
+                children.push(element);
+            }
+        } else {
+            // If the element has an id attribute, it most likely has children
+            // further refining it
+            if xmlutil::get_attribute(&element.attributes, xml::ID).is_some() {
+                element.children.replace(Vec::new());
+            }
+            parent_vec.push(element);
+        }
+    }
+
+    // Loop to divide metadata into categories
+    for element in parent_vec {
+        // The name of each element is a meta category,
+        // such as "dc:identifier", there can be one or more
+        let rc_element = element.convert_to_rc(Weak::new());
+        let category = rc_element.name();
+
+        if let Some((_, group)) = new_vec.iter_mut().find(|(name, _)| name == category) {
+            group.push(rc_element);
+        }
+        // If `new_vec` does not contain the category, add it
+        // and push the current element into its category
+        else {
+            new_vec.push((category.to_string(), vec![rc_element]));
+        }
+    }
+
+    new_vec
 }
 
 fn parse_toc(mut data: &str) -> EbookResult<Toc> {

@@ -294,6 +294,16 @@ impl PartialEq for Element {
     }
 }
 
+impl Find for Element {
+    fn find_fallback(&self, name: &str, is_wild: bool) -> Option<Vec<&Element>> {
+        if is_wild {
+            self.children()
+        } else {
+            Some(vec![self.get_child(name)?])
+        }
+    }
+}
+
 // Wrapper struct for abstraction. Hides Rc<T>
 #[derive(Debug, PartialEq)]
 /// Parent element that is retrieved from a child element.
