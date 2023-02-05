@@ -9,12 +9,12 @@ An ebook library that supports parsing and reading the epub format.
 Including default features:
 ```toml
 [dependencies]
-rbook = "0.2.0"
+rbook = "0.3.0"
 ```
 Excluding default features:
 ```toml
 [dependencies]
-rbook = { version = "0.2.0", default-features = false }
+rbook = { version = "0.3.0", default-features = false }
 ```
 Default features are the following:
 - `reader`: Enables reading of the ebook file by file
@@ -31,7 +31,7 @@ fn main() {
     let epub = rbook::Epub::new("example.epub").unwrap();
 
     // Retrieving the title
-    println!("Title = {}", epub.metadata().title().unwrap().value());
+    assert_eq!("Jane and John", epub.metadata().title().unwrap().value());
 
     // Creating a reader instance
     let mut reader = epub.reader();
@@ -66,6 +66,32 @@ fn main() {
 
     let scheme = role.get_attribute("scheme").unwrap();
     assert_eq!("marc:relators", scheme);
+}
+```
+
+Alternative way of accessing elements:
+```rust
+use rbook::Ebook;
+use rbook::xml::Find;
+
+fn main() {
+    let epub = rbook::Epub::new("example.epub").unwrap();
+
+    // Retrieving the title
+    let title = epub.metadata().find_value("title").unwrap();
+    assert_eq!("Jane and John", title);
+    
+    // Retrieving creator
+    let creator = epub.metadata().find_value("creator").unwrap();
+    assert_eq!("John Doe", creator);
+
+    // Retrieving role
+    let role = creator.metadata().find_value("creator > role").unwrap();
+    assert_eq!("aut", role);
+
+    // Retrieving file-as
+    let file_as = role.metadata().find_value("creator > file-as").unwrap();
+    assert_eq!("Doe, John", file_as);
 }
 ```
 
