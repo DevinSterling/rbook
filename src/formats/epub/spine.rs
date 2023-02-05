@@ -1,4 +1,8 @@
+use std::borrow::Borrow;
+use std::rc::Rc;
+
 use crate::formats::xml::{Attribute, Element};
+use crate::xml::Find;
 
 /// Access the order of resources for the ebook.
 ///
@@ -12,8 +16,9 @@ use crate::formats::xml::{Attribute, Element};
 ///
 /// let epub = rbook::Epub::new("tests/ebooks/moby-dick.epub").unwrap();
 ///
-/// // get element in the manifest
-/// let element = epub.spine().elements().get(31).unwrap();
+/// // Get element in the spine
+/// let spine_elements = epub.spine().elements();
+/// let element = spine_elements.get(31).unwrap();
 ///
 /// // Get idref from the element
 /// let idref = element.name();
@@ -21,12 +26,20 @@ use crate::formats::xml::{Attribute, Element};
 /// assert_eq!("xchapter_026", idref);
 /// ```
 #[derive(Debug)]
-pub struct Spine(pub(crate) Element);
+pub struct Spine(Rc<Element>);
 
 impl Spine {
+    pub(crate) fn new(spine_element: Rc<Element>) -> Self {
+        Self(spine_element)
+    }
+
     /// Retrieve all spine `itemref` elements
-    pub fn elements(&self) -> &[Element] {
-        self.0.children.as_deref().unwrap_or_default()
+    pub fn elements(&self) -> Vec<&Element> {
+        self.0
+            .children
+            .as_ref()
+            .map(|elements| elements.iter().map(Rc::borrow).collect())
+            .unwrap_or_default()
     }
 
     /// Retrieve all the attributes of the root spine element
@@ -42,5 +55,11 @@ impl Spine {
     /// Check if an attribute in the root spine element exists
     pub fn contains_attribute(&self, name: &str) -> bool {
         self.0.contains_attribute(name)
+    }
+}
+
+impl Find for Spine {
+    fn find_fallback(&self, _name: &str, _is_wild: bool) -> Option<Vec<&Element>> {
+        Some(self.elements())
     }
 }

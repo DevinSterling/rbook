@@ -87,3 +87,10 @@ pub(crate) fn to_utf8(data: &[u8]) -> Cow<[u8]> {
         Cow::Borrowed(data)
     }
 }
+
+pub(crate) fn split_exclude<'a>(input: &'a str, excluded: &[char]) -> Vec<&'a str> {
+    input
+        .split(|c| excluded.iter().any(|exclude| c == *exclude))
+        .filter(|s| excluded.iter().any(|exclude| s != &exclude.to_string()))
+        .collect()
+}

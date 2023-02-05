@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use crate::formats::epub::constants;
 use crate::formats::xml::{self, Element};
+use crate::xml::Find;
 
 /// Access all resources for the ebook, such as images, files, etc.
 ///
@@ -15,7 +16,7 @@ use crate::formats::xml::{self, Element};
 ///
 /// let epub = rbook::Epub::new("tests/ebooks/moby-dick.epub").unwrap();
 ///
-/// // get element in the manifest
+/// // Get element in the manifest
 /// let element = epub.manifest().by_id("xchapter_009").unwrap();
 ///
 /// // Get id and href from the element
@@ -26,9 +27,13 @@ use crate::formats::xml::{self, Element};
 /// assert_eq!("chapter_009.xhtml", href);
 /// ```
 #[derive(Debug)]
-pub struct Manifest(pub(crate) HashMap<String, Element>);
+pub struct Manifest(HashMap<String, Element>);
 
 impl Manifest {
+    pub(crate) fn new(element_map: HashMap<String, Element>) -> Self {
+        Self(element_map)
+    }
+
     /// Retrieve all manifest `item` elements.
     pub fn elements(&self) -> Vec<&Element> {
         let mut sorted_elements: Vec<_> = self.0.values().collect();
@@ -144,5 +149,17 @@ impl Manifest {
         } else {
             Some(vec)
         }
+    }
+}
+
+impl Find for Manifest {
+    fn find_fallback(&self, field: &str, is_wild: bool) -> Option<Vec<&Element>> {
+        let elements = if is_wild {
+            self.elements()
+        } else {
+            vec![self.by_id(field)?]
+        };
+
+        Some(elements)
     }
 }

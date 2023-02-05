@@ -1,8 +1,11 @@
+use std::borrow::Borrow;
 use std::collections::HashMap;
+use std::rc::Rc;
 
 use crate::formats::epub::constants;
 use crate::formats::xml::{self, Element};
 use crate::utility;
+use crate::xml::Find;
 
 /// Retrieve associated metadata information about the epub.
 ///
@@ -36,14 +39,15 @@ use crate::utility;
 /// # use rbook::Ebook;
 /// # let epub = rbook::Epub::new("tests/ebooks/moby-dick.epub").unwrap();
 /// // Retrieving the first creator metadata element
-/// let creator = epub.metadata().creators().unwrap().first().unwrap();
+/// let creators = epub.metadata().creators().unwrap();
+/// let creator1 = creators.first().unwrap();
 ///
 /// // Retrieving an attribute
-/// let id = creator.get_attribute("id").unwrap();
+/// let id = creator1.get_attribute("id").unwrap();
 /// assert_eq!("creator", id);
 ///
 /// // Retrieving a child element
-/// let role = creator.get_child("role").unwrap();
+/// let role = creator1.get_child("role").unwrap();
 /// assert_eq!("aut", role.value());
 ///
 /// let scheme = role.get_attribute("scheme").unwrap();
@@ -52,17 +56,29 @@ use crate::utility;
 #[derive(Debug)]
 pub struct Metadata {
     package: Element,
-    map: HashMap<String, Vec<Element>>,
+    element_map: HashMap<String, Vec<Rc<Element>>>,
 }
 
 impl Metadata {
-    pub(crate) fn new(package: Element, map: HashMap<String, Vec<Element>>) -> Self {
-        Self { package, map }
+    pub(crate) fn new(package: Element, element_map: HashMap<String, Vec<Rc<Element>>>) -> Self {
+        Self {
+            package,
+            element_map,
+        }
     }
 
     /// Retrieve all metadata elements
     pub fn elements(&self) -> Vec<&Element> {
-        self.map.values().flatten().collect()
+        let mut elements: Vec<_> = self
+            .element_map
+            .values()
+            .flat_map(|elements| elements.iter().map(Rc::borrow))
+            .collect();
+
+        // Sort elements so order when retrieving is consistent
+        elements.sort_by(|a: &&Element, b: &&Element| a.name().cmp(b.name()));
+
+        elements
     }
 
     /// Retrieve the epub version associated with the ebook
@@ -111,7 +127,7 @@ impl Metadata {
             // Find identifier metadata element that matches
             .and_then(|id| {
                 self.get_elements(constants::IDENTIFIER)
-                    .and_then(|elements| find_unique_identifier(elements, id))
+                    .and_then(|elements| find_unique_identifier(&elements, id))
             })
     }
 
@@ -146,12 +162,12 @@ impl Metadata {
 
     // Convenient DCMES Optional Metadata methods
     /// Contributors of the ebook, such as editors
-    pub fn contributors(&self) -> Option<&[Element]> {
+    pub fn contributors(&self) -> Option<Vec<&Element>> {
         self.get_elements(constants::CONTRIBUTOR)
     }
 
     /// Creators of the ebook, such as authors
-    pub fn creators(&self) -> Option<&[Element]> {
+    pub fn creators(&self) -> Option<Vec<&Element>> {
         self.get_elements(constants::CREATOR)
     }
 
@@ -168,20 +184,20 @@ impl Metadata {
         self.get_element(constants::DESCRIPTION)
     }
 
-    pub fn publisher(&self) -> Option<&[Element]> {
+    pub fn publisher(&self) -> Option<Vec<&Element>> {
         self.get_elements(constants::PUBLISHER)
     }
 
     /// Indicates the subject of the ebook, such as genre.
     /// May contain **BISAC** codes to specify genres.
-    pub fn subject(&self) -> Option<&[Element]> {
+    pub fn subject(&self) -> Option<Vec<&Element>> {
         self.get_elements(constants::SUBJECT)
     }
 
     /// Indicates whether the ebook is a specialized type. Types
     /// can be used to specify if the ebook is in the form of a
     /// dictionary, annotations, etc.
-    pub fn r#type(&self) -> Option<&[Element]> {
+    pub fn r#type(&self) -> Option<Vec<&Element>> {
         self.get_elements(constants::TYPE)
     }
 
@@ -200,7 +216,7 @@ impl Metadata {
     ///
     /// The given string will retrieve all metadata whose
     /// `name` or `property` field matches it.
-    pub fn get(&self, mut input: &str) -> Option<&[Element]> {
+    pub fn get(&self, mut input: &str) -> Option<Vec<&Element>> {
         // Ignore namespace if provided
         if let Some((_, right)) = utility::split_where(input, ':') {
             input = right
@@ -210,25 +226,39 @@ impl Metadata {
     }
 
     fn get_element(&self, meta_name: &str) -> Option<&Element> {
-        self.map.get(meta_name.trim()).map(|elements| {
+        self.element_map.get(meta_name.trim()).map(|elements| {
             elements
                 .first()
+                .map(Rc::borrow)
                 .expect("Category should not be empty; missing child elements")
         })
     }
 
-    fn get_elements(&self, meta_name: &str) -> Option<&[Element]> {
-        self.map
+    fn get_elements(&self, meta_name: &str) -> Option<Vec<&Element>> {
+        self.element_map
             .get(meta_name.trim())
-            .map(|elements| elements.as_slice())
+            .map(|elements| elements.iter().map(Rc::borrow).collect())
+    }
+}
+
+impl Find for Metadata {
+    fn find_fallback(&self, field: &str, is_wild: bool) -> Option<Vec<&Element>> {
+        if is_wild {
+            Some(self.elements())
+        } else {
+            self.get_elements(field)
+        }
     }
 }
 
 fn find_unique_identifier<'a>(
-    elements: &'a [Element],
+    elements: &[&'a Element],
     unique_identifier: &str,
 ) -> Option<&'a Element> {
-    elements.iter().find(|element| {
-        xml::utility::equals_attribute_by_value(element, xml::ID, unique_identifier)
-    })
+    elements
+        .iter()
+        .find(|element| {
+            xml::utility::equals_attribute_by_value(element, xml::ID, unique_identifier)
+        })
+        .copied()
 }

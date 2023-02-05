@@ -1,7 +1,9 @@
 use std::collections::HashMap;
+use std::rc::Rc;
 
 use crate::formats::epub::constants;
 use crate::formats::xml::Element;
+use crate::xml::Find;
 
 /// Table of contents (toc) for the ebook.
 ///
@@ -29,13 +31,15 @@ use crate::formats::xml::Element;
 /// assert_eq!("s04.xhtml#pgepubid00492", element.value());
 ///
 /// // Get nested child element
-/// let nested_element1 = element.children().unwrap().get(10).unwrap();
+/// let nested_children1 = element.children().unwrap();
+/// let nested_element1 = nested_children1.get(10).unwrap();
 ///
 /// assert_eq!("John Ruskin", nested_element1.name());
 /// assert_eq!("", nested_element1.value());
 ///
 /// // Get further nested child element
-/// let nested_element2 = nested_element1.children().unwrap().first().unwrap();
+/// let nested_children2 = nested_element1.children().unwrap();
+/// let nested_element2 = nested_children2.first().unwrap();
 ///
 /// assert_eq!("204 THE KING OF THE GOLDEN RIVER OR THE BLACK BROTHERS", nested_element2.name());
 /// assert_eq!("s04.xhtml#pgepubid00602", nested_element2.value());
@@ -54,9 +58,13 @@ use crate::formats::xml::Element;
 /// assert_eq!("s04.xhtml#pgepubid00602", element.value());
 /// ```
 #[derive(Debug)]
-pub struct Toc(pub(crate) HashMap<String, Element>);
+pub struct Toc(HashMap<String, Rc<Element>>);
 
 impl Toc {
+    pub(crate) fn new(element_map: HashMap<String, Rc<Element>>) -> Self {
+        Self(element_map)
+    }
+
     /// Retrieve toc elements in its nested form.
     ///
     /// # Epub2 navPoint
@@ -66,7 +74,7 @@ impl Toc {
     ///
     /// To ensure `playOrder` for `navPoint` elements, use
     /// [elements_flat()](Self::elements_flat) instead.
-    pub fn elements(&self) -> &[Element] {
+    pub fn elements(&self) -> Vec<&Element> {
         self.get_elements(constants::TOC)
             .expect("Should have a toc element")
     }
@@ -97,12 +105,25 @@ impl Toc {
         self.get_elements_flat(constants::PAGE_LIST3)
     }
 
-    fn get_elements(&self, name: &str) -> Option<&[Element]> {
+    fn get_elements(&self, name: &str) -> Option<Vec<&Element>> {
         self.0.get(name).and_then(|element| element.children())
     }
 
     fn get_elements_flat(&self, name: &str) -> Option<Vec<&Element>> {
-        self.get_elements(name).map(flatten)
+        self.get_elements(name).map(|elements| flatten(&elements))
+    }
+}
+
+impl Find for Toc {
+    fn find_fallback(&self, _name: &str, _is_wild: bool) -> Option<Vec<&Element>> {
+        let elements = self
+            .0
+            .values()
+            .filter_map(|element| element.children())
+            .flat_map(|vec| flatten(&vec))
+            .collect();
+
+        Some(elements)
     }
 }
 
@@ -126,9 +147,9 @@ fn sort_nav_points(nav_points: Vec<&Element>) -> Vec<&Element> {
         .collect()
 }
 
-fn flatten(elements: &[Element]) -> Vec<&Element> {
+fn flatten<'a>(elements: &[&'a Element]) -> Vec<&'a Element> {
     let mut output = Vec::new();
-    let mut stack: Vec<_> = elements.iter().rev().collect();
+    let mut stack: Vec<_> = elements.iter().copied().rev().collect();
 
     while let Some(element) = stack.pop() {
         output.push(element);

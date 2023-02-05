@@ -1,5 +1,6 @@
 use crate::formats::epub::constants;
 use crate::formats::xml::{self, Element};
+use crate::xml::Find;
 
 /// Access important structural portions of the ebook.
 ///
@@ -25,12 +26,16 @@ use crate::formats::xml::{self, Element};
 /// }
 /// ```
 #[derive(Debug)]
-pub struct Guide(pub(crate) Vec<Element>);
+pub struct Guide(Vec<Element>);
 
 impl Guide {
+    pub(crate) fn new(elements: Vec<Element>) -> Self {
+        Self(elements)
+    }
+
     /// Retrieve all `guide` elements
-    pub fn elements(&self) -> &[Element] {
-        &self.0
+    pub fn elements(&self) -> Vec<&Element> {
+        self.0.iter().collect()
     }
 
     /// Retrieve a certain element by the value of its `type`
@@ -48,14 +53,14 @@ impl Guide {
 
     fn find_attribute_by_value(&self, field: &str, value: &str) -> Option<&Element> {
         self.elements()
-            .iter()
+            .into_iter()
             .find(|element| xml::utility::equals_attribute_by_value(element, field, value))
     }
 
     fn find_attributes_by_value(&self, field: &str, value: &str) -> Option<Vec<&Element>> {
         let vec: Vec<_> = self
             .elements()
-            .iter()
+            .into_iter()
             .filter(|element| xml::utility::equals_attribute_by_value(element, field, value))
             .collect();
 
@@ -64,5 +69,11 @@ impl Guide {
         } else {
             Some(vec)
         }
+    }
+}
+
+impl Find for Guide {
+    fn find_fallback(&self, _name: &str, _is_wild: bool) -> Option<Vec<&Element>> {
+        Some(self.elements())
     }
 }

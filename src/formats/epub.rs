@@ -15,7 +15,7 @@ use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::io::{BufReader, Read, Seek};
 use std::path::{Path, PathBuf};
-use std::rc::Rc;
+use std::rc::{Rc, Weak};
 
 use crate::archive::{Archive, DirArchive, ZipArchive};
 use crate::formats::xml::utility as xmlutil;
@@ -28,6 +28,7 @@ use crate::reader::{Readable, Reader, ReaderError, ReaderResult};
 #[cfg(feature = "statistics")]
 use crate::statistics::Stats;
 use crate::utility;
+use crate::xml::TempElement;
 
 pub use self::{
     guide::Guide, manifest::Manifest, metadata::Metadata, spine::Spine, table_of_contents::Toc,
@@ -345,14 +346,14 @@ impl Readable for Epub {
     }
 
     fn navigate(&self, index: usize) -> ReaderResult<Content> {
-        let spine_element =
-            self.spine
-                .elements()
-                .get(index)
-                .ok_or_else(|| ReaderError::OutOfBounds {
-                    cause: format!("Provided index '{index}' is out of bounds"),
-                    description: "Please ensure the index is in bounds".to_string(),
-                })?;
+        let spine_elements = self.spine.elements();
+
+        let spine_element = spine_elements
+            .get(index)
+            .ok_or_else(|| ReaderError::OutOfBounds {
+                cause: format!("Provided index '{index}' is out of bounds"),
+                description: "Please ensure the index is in bounds".to_string(),
+            })?;
 
         let manifest_element = self.manifest.by_id(spine_element.name()).ok_or_else(|| {
             ReaderError::InvalidReference {
@@ -499,8 +500,8 @@ fn parse_package(data: &[u8]) -> EbookResult<(Metadata, Manifest, Spine, Guide)>
     // Keep track of latest metadata entry
     let current_meta = RefCell::new(None);
     // Track contents
-    let mut metadata_map: HashMap<String, Vec<Element>> = HashMap::new(); // Metadata contents
-    let mut id_map: HashMap<String, *mut Element> = HashMap::new(); // Track metadata relationships
+    let mut metadata_map: HashMap<String, Vec<TempElement>> = HashMap::new(); // Metadata contents
+    let mut id_map: HashMap<String, *mut TempElement> = HashMap::new(); // Track metadata relationships
     let mut item_map = HashMap::new(); // Manifest contents
     let mut itemref_vec = Vec::new(); // Spine contents
     let mut guide_vec = Vec::new(); // Guide contents (Epub 2 Only)
@@ -510,24 +511,33 @@ fn parse_package(data: &[u8]) -> EbookResult<(Metadata, Manifest, Spine, Guide)>
     // Stores the package and spine elements
     let parent_element_handler = element!("package, spine", |element| {
         let name = element.tag_name();
-        let root = match name.as_str() {
-            constants::PACKAGE => &mut package_root,
-            _ => &mut spine_root,
-        };
+        let attributes = xmlutil::copy_attributes(element.attributes());
 
-        root.replace(Element {
-            name,
-            attributes: xmlutil::copy_attributes(element.attributes()),
-            ..Element::default()
-        });
+        match name.as_str() {
+            constants::PACKAGE => {
+                package_root.replace(Element {
+                    name,
+                    attributes,
+                    ..Element::default()
+                });
+            }
+            constants::SPINE => {
+                spine_root.replace(TempElement {
+                    name,
+                    attributes,
+                    ..TempElement::default()
+                });
+            }
+            _ => (),
+        };
 
         Ok(())
     });
 
     let metadata_entry_handler = element!("metadata > *", |element| {
-        let mut meta = Element {
+        let mut meta = TempElement {
             attributes: xmlutil::copy_attributes(element.attributes()),
-            ..Element::default()
+            ..TempElement::default()
         };
 
         // Change name to the value of the name or
@@ -543,10 +553,10 @@ fn parse_package(data: &[u8]) -> EbookResult<(Metadata, Manifest, Spine, Guide)>
         ) {
             meta.name = name;
             meta.value = content;
-            meta.attributes.push(Attribute {
-                name: constants::LEGACY_FEATURE.to_string(),
-                value: constants::LEGACY_META.to_string(),
-            });
+            meta.attributes.push(Attribute::new(
+                constants::LEGACY_FEATURE.to_string(),
+                constants::LEGACY_META.to_string(),
+            ));
         }
         // Use tag name instead
         else {
@@ -562,7 +572,7 @@ fn parse_package(data: &[u8]) -> EbookResult<(Metadata, Manifest, Spine, Guide)>
         let meta_group = metadata_map.entry(meta.name.to_string()).or_default();
 
         // Add child metadata to parent metadata
-        if let Some(refines) = meta.get_attribute(constants::REFINES) {
+        if let Some(refines) = element.get_attribute(constants::REFINES) {
             let id = refines.replace('#', "");
 
             if let Some(parent) = id_map.get_mut(id.as_str()) {
@@ -577,7 +587,7 @@ fn parse_package(data: &[u8]) -> EbookResult<(Metadata, Manifest, Spine, Guide)>
                     let entry = children
                         .last_mut()
                         .expect("Should have at least one child element");
-                    current_meta.borrow_mut().replace(entry as *mut Element);
+                    current_meta.borrow_mut().replace(entry as *mut TempElement);
                 }
             }
         } else {
@@ -588,12 +598,12 @@ fn parse_package(data: &[u8]) -> EbookResult<(Metadata, Manifest, Spine, Guide)>
             let entry = meta_group
                 .last_mut()
                 .expect("Group should have at least one element");
-            current_meta.borrow_mut().replace(entry as *mut Element);
+            current_meta.borrow_mut().replace(entry as *mut TempElement);
 
             // Add to id map if it has an id
             if let Some(id) = element.get_attribute(xml::ID) {
                 entry.children.replace(Vec::new());
-                id_map.insert(id, entry as *mut Element);
+                id_map.insert(id, entry as *mut TempElement);
             }
         }
 
@@ -644,10 +654,10 @@ fn parse_package(data: &[u8]) -> EbookResult<(Metadata, Manifest, Spine, Guide)>
     let spine_handler = element!("itemref", |element| {
         // the name of spine items will be the value of its idref attribute
         if let Some(name) = element.get_attribute(constants::IDREF) {
-            itemref_vec.push(Element {
+            itemref_vec.push(TempElement {
                 name,
                 attributes: xmlutil::copy_attributes(element.attributes()),
-                ..Element::default()
+                ..TempElement::default()
             });
         }
 
@@ -686,17 +696,21 @@ fn parse_package(data: &[u8]) -> EbookResult<(Metadata, Manifest, Spine, Guide)>
     )?;
 
     // Finalize package:
-    // Check if the package references a valid unique identifier and contains the epub version
+    // Check if the package contains the epub version
     let package_root = is_valid_package(package_root)?;
 
     // Finalize spine:
     let spine_root = is_valid_spine(spine_root, itemref_vec)?;
 
+    // Finalize metadata:
+    // Create parent references for each element
+    let metadata_map = to_rc_metadata_map(metadata_map);
+
     Ok((
         Metadata::new(package_root, metadata_map),
-        Manifest(item_map), // Add properties
-        Spine(spine_root),
-        Guide(guide_vec),
+        Manifest::new(item_map), // Add properties
+        Spine::new(spine_root),
+        Guide::new(guide_vec),
     ))
 }
 
@@ -712,16 +726,33 @@ fn is_valid_package(package: Option<Element>) -> EbookResult<Element> {
         })
 }
 
-fn is_valid_spine(spine: Option<Element>, children: Vec<Element>) -> EbookResult<Element> {
+fn is_valid_spine(
+    spine: Option<TempElement>,
+    children: Vec<TempElement>,
+) -> EbookResult<Rc<Element>> {
     spine
         .map(|mut spine| {
             spine.children.replace(children);
-            spine
+            spine.convert_to_rc(Weak::new())
         })
         .ok_or(EbookError::Parse {
             cause: "Required element is missing".to_string(),
             description: "Please ensure the 'spine' element exists in the .opf file".to_string(),
         })
+}
+
+fn to_rc_metadata_map(map: HashMap<String, Vec<TempElement>>) -> HashMap<String, Vec<Rc<Element>>> {
+    map.into_iter()
+        .map(|(category, elements)| {
+            (
+                category,
+                elements
+                    .into_iter()
+                    .map(|element| element.convert_to_rc(Weak::new()))
+                    .collect(),
+            )
+        })
+        .collect()
 }
 
 fn parse_toc(mut data: &str) -> EbookResult<Toc> {
@@ -762,11 +793,11 @@ fn parse_toc(mut data: &str) -> EbookResult<Toc> {
             // Add elements to parent nav element
             groups.borrow_mut().insert(
                 nav_group_name.to_string(),
-                Element {
+                TempElement {
                     name: nav_group_name,
                     children: Some(current_nav_group.replace(Vec::new())),
                     attributes,
-                    ..Element::default()
+                    ..TempElement::default()
                 },
             );
 
@@ -778,9 +809,9 @@ fn parse_toc(mut data: &str) -> EbookResult<Toc> {
 
     // create new entry nav element
     let nav_entry_handler = element!("li, navPoint, pageTarget", |element| {
-        parent_stack.borrow_mut().push(Element {
+        parent_stack.borrow_mut().push(TempElement {
             attributes: xmlutil::copy_attributes(element.attributes()),
-            ..Element::default()
+            ..TempElement::default()
         });
 
         // Handle end tag event
@@ -849,10 +880,12 @@ fn parse_toc(mut data: &str) -> EbookResult<Toc> {
 
     is_valid_toc(&nav_groups.borrow())?;
 
-    Ok(Toc(nav_groups.take()))
+    let nav_groups = to_rc_nav_groups(nav_groups.take());
+
+    Ok(Toc::new(nav_groups))
 }
 
-fn is_valid_toc(toc: &HashMap<String, Element>) -> EbookResult<()> {
+fn is_valid_toc(toc: &HashMap<String, TempElement>) -> EbookResult<()> {
     if toc.contains_key(constants::TOC) {
         Ok(())
     } else {
@@ -863,6 +896,12 @@ fn is_valid_toc(toc: &HashMap<String, Element>) -> EbookResult<()> {
                 .to_string(),
         })
     }
+}
+
+fn to_rc_nav_groups(map: HashMap<String, TempElement>) -> HashMap<String, Rc<Element>> {
+    map.into_iter()
+        .map(|(group, root_element)| (group, root_element.convert_to_rc(Weak::new())))
+        .collect()
 }
 
 // Helper functions

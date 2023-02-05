@@ -4,6 +4,7 @@ pub(crate) const CONTAINER: &str = "META-INF/container.xml"; // Used to identify
 
 // Elements
 pub(crate) const PACKAGE: &str = "package";
+pub(crate) const SPINE: &str = "spine";
 
 // Metadata elements
 pub(crate) const TITLE: &str = "title"; // Also used for Guide title attribute
