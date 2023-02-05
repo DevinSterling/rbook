@@ -1,3 +1,4 @@
+use rbook::xml::Find;
 use rbook::Ebook;
 
 #[test]
@@ -27,15 +28,59 @@ fn metadata_test() {
 }
 
 #[test]
+fn metadat_test_alt() {
+    let epub = rbook::Epub::new("tests/ebooks/childrens-literature.epub").unwrap();
+
+    // epub specification required metadata
+    let title = epub.metadata().find_value("title").unwrap();
+    let identifier = epub.metadata().find_value("identifier").unwrap();
+
+    assert_eq!("Children's Literature", title);
+    assert_eq!("http://www.gutenberg.org/ebooks/25545", identifier);
+
+    // `get_value()` finds the first match
+    // Find first `creator` element and return its value
+    let creator1 = epub.metadata().find_value("creator").unwrap();
+    // Find first `creator` element that contains an `id` attribute
+    let creator1_alt = epub.metadata().find_value("creator[id]").unwrap();
+    // Find first `creator` element that contains an `id` equal to a `curry`
+    let creator1_alt2 = epub.metadata().find_value("creator[id=curry]").unwrap();
+
+    assert_eq!(creator1, creator1_alt);
+    assert_eq!(creator1_alt, creator1_alt2);
+
+    let creator2 = epub
+        .metadata()
+        .find_value("creator[id=clippinger]")
+        .unwrap();
+
+    assert_eq!("Charles Madison Curry", creator1);
+    assert_eq!("Erle Elsworth Clippinger", creator2);
+
+    let creator1_role = epub
+        .metadata()
+        .find_value("creator[id=curry] > file-as")
+        .unwrap();
+    let creator2_role = epub
+        .metadata()
+        .find_value("creator[id=clippinger] > file-as[refines=#clippinger]")
+        .unwrap();
+
+    assert_eq!("Curry, Charles Madison", creator1_role);
+    assert_eq!("Clippinger, Erle Elsworth", creator2_role);
+}
+
+#[test]
 fn metadata_test2() {
     let epub = rbook::Epub::new("tests/ebooks/moby-dick.epub").unwrap();
 
-    let creator = epub.metadata().creators().unwrap().first().unwrap();
+    let creators = epub.metadata().creators().unwrap();
+    let creator1 = creators.first().unwrap();
 
-    assert_eq!("Herman Melville", creator.value());
+    assert_eq!("Herman Melville", creator1.value());
 
     // Refining (children) metadata and attributes
-    let role = creator.get_child("role").unwrap(); // Child metadata element
+    let role = creator1.get_child("role").unwrap(); // Child metadata element
     let scheme = role.get_attribute("scheme").unwrap(); // Attribute of an element
 
     assert_eq!("aut", role.value());
@@ -87,14 +132,16 @@ fn manifest_test() {
 fn spine_test() {
     let epub = rbook::Epub::new("tests/ebooks/childrens-literature.epub").unwrap();
 
+    let spine_elements = epub.spine().elements();
+
     // Get twelfth element in the spine
-    let spine_element = epub.spine().elements().get(1).unwrap();
+    let spine_element12 = spine_elements.get(1).unwrap();
 
     // Get associated manifest element (name of a spine element is the value of the idref attribute)
-    let manifest_element = epub.manifest().by_id(spine_element.name()).unwrap();
+    let manifest_element = epub.manifest().by_id(spine_element12.name()).unwrap();
 
     // Compared value of "idref" and "id"
-    assert_eq!(spine_element.name(), manifest_element.name());
+    assert_eq!(spine_element12.name(), manifest_element.name());
 
     // Access spine attributes
     let direction = epub.spine().get_attribute("toc").unwrap();
@@ -151,24 +198,28 @@ fn directory_test() {
     let epub = rbook::Epub::new("tests/ebooks/example_epub").unwrap();
 
     let title = epub.metadata().title().unwrap();
-    let creator = epub.metadata().creators().unwrap().first().unwrap();
-    let role = creator.get_child("role").unwrap();
-    let source = epub.metadata().get("source").unwrap().first().unwrap();
-
     assert_eq!("Directory Example", title.value());
+
+    let creators = epub.metadata().creators().unwrap();
+    let creator = creators.first().unwrap();
     assert_eq!("Devin Sterling", creator.value());
+
+    let role = creator.get_child("role").unwrap();
     assert_eq!("aut", role.value());
+
+    let sources = epub.metadata().get("source").unwrap();
+    let source = sources.first().unwrap();
     assert_eq!("rbook", source.value());
 
     let manifest_element = epub.manifest().by_id("c2").unwrap();
-
     assert_eq!("c2.xhtml", manifest_element.value());
     assert_eq!(4, epub.spine().elements().len());
 
-    let toc_element = epub.toc().elements().get(1).unwrap();
+    let toc_elements = epub.toc().elements();
+    let toc_element1 = toc_elements.get(1).unwrap();
 
-    assert_eq!("rbook c1", toc_element.name());
-    assert_eq!("EPUB/c1.xhtml", toc_element.value());
+    assert_eq!("rbook c1", toc_element1.name());
+    assert_eq!("EPUB/c1.xhtml", toc_element1.value());
 
     assert_eq!(None, epub.cover_image());
 }
