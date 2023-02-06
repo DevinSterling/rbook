@@ -128,19 +128,20 @@ impl Find for Toc {
 }
 
 fn sort_nav_points(nav_points: Vec<&Element>) -> Vec<&Element> {
-    let mut ordered_element = Vec::new();
+    let mut ordered_element: Vec<_> = nav_points
+        .into_iter()
+        .map(|nav_point| {
+            let value: usize = nav_point
+                .get_attribute(constants::PLAY_ORDER)
+                .and_then(|play_order| play_order.parse().ok())
+                .unwrap_or_default();
 
-    for nav_point in nav_points {
-        let value: usize = nav_point
-            .get_attribute(constants::PLAY_ORDER)
-            .and_then(|play_order| play_order.parse().ok())
-            .unwrap_or(0);
-
-        ordered_element.push((value, nav_point))
-    }
+            (value, nav_point)
+        })
+        .collect();
 
     // Sort by nav point play order
-    ordered_element.sort_by(|(play_order1, _), (play_order2, _)| play_order1.cmp(play_order2));
+    ordered_element.sort_by(|(order1, _), (order2, _)| order1.cmp(order2));
     ordered_element
         .into_iter()
         .map(|(_, nav_point)| nav_point)

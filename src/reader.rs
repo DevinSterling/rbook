@@ -1,13 +1,16 @@
 pub mod content;
 
+use std::fmt::Debug;
+use thiserror::Error;
+
 use crate::formats::EbookError;
 use crate::reader::content::Content;
-use thiserror::Error;
 
 /// Result type with [ReaderError] as the error.
 pub type ReaderResult<T> = Result<T, ReaderError>;
 
-pub(crate) trait Readable {
+pub(crate) trait Readable: Debug {
+    fn page_count(&self) -> usize;
     // Reader navigation using a string
     fn navigate_str(&self, path: &str) -> ReaderResult<usize>;
     // Reader navigation using an index
@@ -27,7 +30,7 @@ pub enum ReaderError {
     /// proper references. Usually caused by malformed files.
     #[error("[InvalidReference Error][{cause}]: {description}")]
     InvalidReference { cause: String, description: String },
-    /// When retrieval of content to display fails.
+    /// When retrieval of content fails, such as invalid utf-8.
     #[error("[NoContent Error]{0}")]
     NoContent(EbookError),
 }
@@ -72,18 +75,16 @@ pub enum ReaderError {
 /// assert_eq!(56, reader.current_index());
 /// assert_eq!(content1, content2);
 /// ```
+#[derive(Debug)]
 pub struct Reader<'a> {
     ebook: &'a dyn Readable,
-    page_count: usize,
     current_index: usize,
 }
 
 impl<'a: 'b, 'b> Reader<'a> {
-    // TODO: Potentially remove the page count argument here...
-    pub(crate) fn new(ebook: &'a dyn Readable, page_count: usize) -> Self {
+    pub(crate) fn new(ebook: &'a dyn Readable) -> Self {
         Self {
             ebook,
-            page_count,
             current_index: 0,
         }
     }
@@ -98,7 +99,7 @@ impl<'a: 'b, 'b> Reader<'a> {
     /// The maximum value of the reader index is `page_count - 1`,
     /// similar to an array.
     pub fn page_count(&self) -> usize {
-        self.page_count
+        self.ebook.page_count()
     }
 
     /// Retrieve the page content of where the reader's
@@ -117,7 +118,7 @@ impl<'a: 'b, 'b> Reader<'a> {
     /// To view and handle errors, [try_previous_page()](Self::try_next_page) can be used
     /// instead.
     pub fn next_page(&mut self) -> Option<Content> {
-        while self.current_index < self.page_count - 1 {
+        while self.current_index < self.page_count() - 1 {
             match self.try_next_page() {
                 Ok(page_content) => return Some(page_content),
                 _ => self.current_index += 1,

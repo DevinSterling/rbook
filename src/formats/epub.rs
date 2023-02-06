@@ -77,7 +77,7 @@ pub struct Epub {
 impl Epub {
     #[cfg(feature = "reader")]
     pub fn reader(&self) -> Reader {
-        Reader::new(self, self.spine.elements().len())
+        Reader::new(self)
     }
 
     /// Access ebook metadata such as author, title, date, etc.
@@ -312,6 +312,10 @@ impl Ebook for Epub {
 
 #[cfg(feature = "reader")]
 impl Readable for Epub {
+    fn page_count(&self) -> usize {
+        self.spine.elements().len()
+    }
+
     fn navigate_str(&self, path: &str) -> ReaderResult<usize> {
         // Avoid freeing reference to elements while still in use
         let manifest_elements = self.manifest.elements();
@@ -364,7 +368,7 @@ impl Readable for Epub {
             }
         })?;
 
-        let content = self
+        let data = self
             .read_file(manifest_element.value())
             .map_err(ReaderError::NoContent)?;
 
@@ -387,7 +391,7 @@ impl Readable for Epub {
             fields.push((ContentType::Type.as_str(), Cow::Borrowed(media_type)));
         }
 
-        Ok(Content { content, fields })
+        Ok(Content::new(data, fields))
     }
 }
 

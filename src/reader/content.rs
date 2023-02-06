@@ -27,7 +27,7 @@ impl ContentType {
 }
 
 /// Retrieved content from a [Reader](super::Reader)
-/// to access string data, media type, etc.
+/// to access string data, bytes, media type, etc.
 ///
 /// # Example
 /// Displaying content:
@@ -64,12 +64,16 @@ impl ContentType {
 /// ```
 #[derive(Debug, PartialEq, Eq)]
 pub struct Content<'a> {
-    pub(crate) content: String,
+    content: String,
     // Used instead of hashmap as the size is always small. ~3 items
-    pub(crate) fields: Vec<(&'static str, Cow<'a, str>)>,
+    fields: Vec<(&'static str, Cow<'a, str>)>,
 }
 
-impl Content<'_> {
+impl<'a> Content<'a> {
+    pub(crate) fn new(content: String, fields: Vec<(&'static str, Cow<'a, str>)>) -> Self {
+        Self { content, fields }
+    }
+
     /// Retrieve the content data in the form of a string.
     #[deprecated]
     pub fn as_str(&self) -> &str {
