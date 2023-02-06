@@ -43,7 +43,7 @@ fn access_content_test() {
 
     println!("{content}");
 
-    assert!(content.as_str().ends_with("</html>"));
+    assert!(content.ends_with("</html>"));
 
     assert_eq!(
         "OPS/titlepage.xhtml",

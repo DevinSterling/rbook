@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 use std::fmt::{Display, Formatter};
+use std::ops::Deref;
 
 /// Used to retrieve specific information about retrieved
 /// [Content] from a [Reader](super::Reader).
@@ -49,10 +50,10 @@ impl ContentType {
 /// # let content = reader.next_page().unwrap();
 /// use rbook::read::ContentType;
 ///
-/// // Retrieve data in string form
-/// assert!(content.as_str().starts_with("<?xml"));
+/// // Data in string form
+/// assert!(content.starts_with("<?xml"));
 ///
-/// // Retrieve data in byte form
+/// // Data in byte form
 /// assert!(content.as_bytes().starts_with(b"\x3C\x3F\x78\x6D\x6C"));
 ///
 /// // Retrieve the media type
@@ -70,13 +71,9 @@ pub struct Content<'a> {
 
 impl Content<'_> {
     /// Retrieve the content data in the form of a string.
+    #[deprecated]
     pub fn as_str(&self) -> &str {
         &self.content
-    }
-
-    /// Retrieve the content data in the form of bytes.
-    pub fn as_bytes(&self) -> &[u8] {
-        self.content.as_bytes()
     }
 
     /// Retrieve specific information about the content.
@@ -87,6 +84,14 @@ impl Content<'_> {
             .iter()
             .find(|(key, _)| *key == content_type.as_str())
             .map(|(_, value)| value.as_ref())
+    }
+}
+
+impl Deref for Content<'_> {
+    type Target = str;
+
+    fn deref(&self) -> &str {
+        &self.content
     }
 }
 

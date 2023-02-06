@@ -305,7 +305,6 @@ impl Find for Element {
 }
 
 // Wrapper struct for abstraction. Hides Rc<T>
-#[derive(Debug, PartialEq)]
 /// Parent element that is retrieved from a child element.
 ///
 /// Basic Usage:
@@ -324,6 +323,7 @@ impl Find for Element {
 /// let element2 = epub.metadata().find("creator").unwrap();
 /// assert_eq!(&*parent, element2);
 /// ```
+#[derive(Debug, PartialEq)]
 pub struct Parent(Rc<Element>);
 
 impl Deref for Parent {
