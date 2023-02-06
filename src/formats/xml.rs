@@ -311,19 +311,18 @@ impl Find for Element {
 /// Basic Usage:
 /// ```
 /// # use rbook::Ebook;
+/// # use rbook::xml::Find;
 /// # let epub = rbook::Epub::new("tests/ebooks/moby-dick.epub").unwrap();
 /// // Retrieving an element from the metadata of an epub
-/// let mut creators = epub.metadata().creators().unwrap();
-/// let element = creators.pop().unwrap();
-/// assert_eq!("Herman Melville", element.value());
-///
-/// // Retrieving a child element
-/// let child_element = element.get_child("role").unwrap();
-/// assert_eq!("aut", child_element.value());
+/// let element = epub.metadata().find("creator > file-as").unwrap();
+/// assert_eq!("MELVILLE, HERMAN", element.value());
 ///
 /// // Retrieving the parent element
-/// let parent = child_element.parent().unwrap();
-/// assert_eq!(element.value(), parent.value());
+/// let parent = element.parent().unwrap();
+/// assert_eq!("Herman Melville", parent.value());
+///
+/// let element2 = epub.metadata().find("creator").unwrap();
+/// assert_eq!(&*parent, element2);
 /// ```
 pub struct Parent(Rc<Element>);
 

@@ -32,7 +32,6 @@
 //! ```rust
 //! # use rbook::Ebook;
 //! # let epub = rbook::Epub::new("tests/ebooks/moby-dick.epub").unwrap();
-//!
 //! let creators = epub.metadata().creators().unwrap();
 //! let creator = creators.first().unwrap();
 //! assert_eq!("Herman Melville", creator.value());
