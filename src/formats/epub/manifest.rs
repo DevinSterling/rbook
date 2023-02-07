@@ -97,7 +97,7 @@ impl Manifest {
 
     /// Retrieve a certain element by the value of its `href` from the manifest
     pub fn by_href(&self, href: &str) -> Option<&Element> {
-        self.find_attribute_by_value(xml::HREF, href)
+        xml::utility::find_attribute_by_value(&self.elements(), xml::HREF, href)
     }
 
     /// Check if an element with a certain `id` exists in the manifest
@@ -108,47 +108,27 @@ impl Manifest {
     /// Retrieve a certain element by the value of its
     /// `media type` from the manifest
     pub fn by_media_type(&self, media_type: &str) -> Option<&Element> {
-        self.find_attribute_by_value(constants::MEDIA_TYPE, media_type)
+        xml::utility::find_attribute_by_value(&self.elements(), constants::MEDIA_TYPE, media_type)
     }
 
     /// Retrieve all elements that match a given `media type`
     /// from the manifest. The returned vector contains at
     /// least one element.
     pub fn all_by_media_type(&self, media_type: &str) -> Option<Vec<&Element>> {
-        self.find_attributes_by_value(constants::MEDIA_TYPE, media_type)
+        xml::utility::find_attributes_by_value(&self.elements(), constants::MEDIA_TYPE, media_type)
     }
 
     /// Retrieve a certain element by the value of its `property`
     /// from the manifest
     pub fn by_property(&self, property: &str) -> Option<&Element> {
-        self.find_attribute_by_value(constants::PROPERTIES, property)
+        xml::utility::find_attribute_by_value(&self.elements(), constants::PROPERTIES, property)
     }
 
     /// Retrieve all elements that match a given `property` value
     /// from the manifest. The returned vector contains at least
     /// one element.
     pub fn all_by_property(&self, property: &str) -> Option<Vec<&Element>> {
-        self.find_attributes_by_value(constants::PROPERTIES, property)
-    }
-
-    fn find_attribute_by_value(&self, field: &str, value: &str) -> Option<&Element> {
-        self.0
-            .values()
-            .find(|element| xml::utility::equals_attribute_by_value(element, field, value))
-    }
-
-    fn find_attributes_by_value(&self, field: &str, value: &str) -> Option<Vec<&Element>> {
-        let vec: Vec<_> = self
-            .0
-            .values()
-            .filter(|element| xml::utility::equals_attribute_by_value(element, field, value))
-            .collect();
-
-        if vec.is_empty() {
-            None
-        } else {
-            Some(vec)
-        }
+        xml::utility::find_attributes_by_value(&self.elements(), constants::PROPERTIES, property)
     }
 }
 

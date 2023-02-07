@@ -27,7 +27,7 @@ fn metadata_find_test() {
     let creator_alt = epub.metadata().find("* > file-as").unwrap();
     assert_eq!(creator, creator_alt);
 
-    // Find any element with any child element that has a `refines` attribute that equals `#contrib1`
+    // Find any first element with any child element that has a `refines` attribute that equals `#creator`
     let creator_alt2 = epub
         .metadata()
         .find_value("* > *[refines=#creator]")

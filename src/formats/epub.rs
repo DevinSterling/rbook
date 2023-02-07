@@ -254,7 +254,7 @@ impl Epub {
         let (metadata, manifest, spine, guide) = parse_package(&content_pkg_opf)?;
 
         // Get toc.xhtml/ncx href value
-        let toc_href = get_toc(&manifest)?.value();
+        let toc_href = get_toc_href(&manifest)?;
 
         // Parse "toc.xhtml/ncx"
         let content_toc = archive
@@ -720,25 +720,27 @@ fn to_rc_meta_vec(elements: Vec<Rc<RefCell<TempElement>>>) -> Vec<(String, Vec<R
         let mut element = element_cell.take();
 
         // Add child metadata to parent metadata
-        if let Some(refines) = xmlutil::get_attribute(&element.attributes, constants::REFINES) {
+        if let Some(refines) = element.get_attribute(constants::REFINES) {
             let id = refines.replace('#', "");
 
             if let Some(children) = parent_vec
                 .iter_mut()
+                // Find the parent metadata element
                 .find(|parent| {
-                    xmlutil::get_attribute(&parent.attributes, xml::ID)
+                    parent
+                        .get_attribute(xml::ID)
                         .filter(|value| value == &id)
                         .is_some()
                 })
                 .and_then(|parent| parent.children.as_mut())
             {
-                // Add child metadata entry
+                // Add child metadata entry to parent
                 children.push(element);
             }
         } else {
             // If the element has an id attribute, it most likely has children
             // further refining it
-            if xmlutil::get_attribute(&element.attributes, xml::ID).is_some() {
+            if element.contains_attribute(xml::ID) {
                 element.children.replace(Vec::new());
             }
             parent_vec.push(element);
@@ -938,12 +940,13 @@ fn parse_xhtml_data(
         })
 }
 
-fn get_toc(manifest: &Manifest) -> EbookResult<&Element> {
+fn get_toc_href(manifest: &Manifest) -> EbookResult<&str> {
     // Attempt to retrieve newer toc format first
     manifest
         .by_property(constants::NAV_PROPERTY)
         // Fallback to older toc format
         .or_else(|| manifest.by_media_type(constants::NCX_TYPE))
+        .map(|element| element.value())
         .ok_or(EbookError::Parse {
             cause: "Missing table of contents (toc)".to_string(),
             description: "The toc element cannot be found within \

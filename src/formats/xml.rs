@@ -169,6 +169,14 @@ pub(crate) struct TempElement {
 }
 
 impl TempElement {
+    pub(crate) fn get_attribute(&self, name: &str) -> Option<&str> {
+        utility::get_attribute(&self.attributes, name)
+    }
+
+    pub(crate) fn contains_attribute(&self, name: &str) -> bool {
+        utility::contains_attribute(&self.attributes, name)
+    }
+
     pub(crate) fn convert_to_rc(self, parent: Weak<Element>) -> Rc<Element> {
         Rc::new_cyclic(|weak| {
             let children = self.children.map(|vec| {
@@ -234,18 +242,13 @@ impl Element {
     /// Retrieve the value from a specified attribute. Namespace/prefix
     /// may be omitted from the argument.
     pub fn get_attribute(&self, name: &str) -> Option<&str> {
-        self.attributes
-            .iter()
-            .find(|attribute| attribute.name().ends_with(&name.to_lowercase()))
-            .map(|attribute| attribute.value.as_str())
+        utility::get_attribute(self.attributes(), &name.to_lowercase())
     }
 
     /// Check if the element contains the specified attribute.
     /// Namespace/prefix may be omitted from the argument.
     pub fn contains_attribute(&self, name: &str) -> bool {
-        self.attributes
-            .iter()
-            .any(|attribute| attribute.name().ends_with(&name.to_lowercase()))
+        utility::contains_attribute(self.attributes(), &name.to_lowercase())
     }
 
     /// Retrieve the parent element

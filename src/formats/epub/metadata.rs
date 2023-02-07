@@ -116,13 +116,14 @@ impl Metadata {
     /// - URL
     pub fn unique_identifier(&self) -> Option<&Element> {
         // Retrieve uid from root package element
-        self.package
-            .get_attribute(constants::UNIQUE_ID)
-            // Find identifier metadata element that matches
-            .and_then(|id| {
-                self.get_elements(constants::IDENTIFIER)
-                    .and_then(|elements| find_unique_identifier(&elements, id))
-            })
+        let target_id = self.package.get_attribute(constants::UNIQUE_ID)?;
+        let identifiers = self.get_elements(constants::IDENTIFIER)?;
+
+        // Find identifier metadata element that matches
+        identifiers
+            .iter()
+            .find(|element| xml::utility::equals_attribute_by_value(element, xml::ID, target_id))
+            .copied()
     }
 
     /// Retrieve the concatenation of the unique identifier and
@@ -143,10 +144,10 @@ impl Metadata {
     /// );
     /// ```
     pub fn release_identifier(&self) -> Option<String> {
-        self.unique_identifier().and_then(|unique_identifier| {
-            let u_id = unique_identifier.value().to_string() + "@";
-            self.modified().map(|modified| u_id + modified.value())
-        })
+        let identifier = self.unique_identifier()?;
+        let modified = self.modified()?;
+
+        Some(identifier.value().to_string() + "@" + modified.value())
     }
 
     /// The date of when the ebook rendition was last modified
@@ -227,7 +228,7 @@ impl Metadata {
                 elements
                     .first()
                     .map(Rc::borrow)
-                    .expect("Category should not be empty; missing child elements")
+                    .expect("Vector should not be empty; missing child elements")
             })
     }
 
@@ -247,16 +248,4 @@ impl Find for Metadata {
             self.get_elements(field)
         }
     }
-}
-
-fn find_unique_identifier<'a>(
-    elements: &[&'a Element],
-    unique_identifier: &str,
-) -> Option<&'a Element> {
-    elements
-        .iter()
-        .find(|element| {
-            xml::utility::equals_attribute_by_value(element, xml::ID, unique_identifier)
-        })
-        .copied()
 }

@@ -41,34 +41,14 @@ impl Guide {
     /// Retrieve a certain element by the value of its `type`
     /// from the guide
     pub fn by_type(&self, property: &str) -> Option<&Element> {
-        self.find_attribute_by_value(constants::TYPE, property)
+        xml::utility::find_attribute_by_value(&self.elements(), constants::TYPE, property)
     }
 
     /// Retrieve all elements that match a given `type` value
     /// from the guide. The returned vector contains at least
     /// one element.
     pub fn all_by_type(&self, property: &str) -> Option<Vec<&Element>> {
-        self.find_attributes_by_value(constants::TYPE, property)
-    }
-
-    fn find_attribute_by_value(&self, field: &str, value: &str) -> Option<&Element> {
-        self.elements()
-            .into_iter()
-            .find(|element| xml::utility::equals_attribute_by_value(element, field, value))
-    }
-
-    fn find_attributes_by_value(&self, field: &str, value: &str) -> Option<Vec<&Element>> {
-        let vec: Vec<_> = self
-            .elements()
-            .into_iter()
-            .filter(|element| xml::utility::equals_attribute_by_value(element, field, value))
-            .collect();
-
-        if vec.is_empty() {
-            None
-        } else {
-            Some(vec)
-        }
+        xml::utility::find_attributes_by_value(&self.elements(), constants::TYPE, property)
     }
 }
 

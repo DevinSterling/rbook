@@ -11,17 +11,62 @@ pub(crate) fn copy_attributes(old_attributes: &[LolAttribute]) -> Vec<Attribute>
         .collect()
 }
 
+pub(crate) fn get_attribute<'a>(attributes: &'a [Attribute], field: &str) -> Option<&'a str> {
+    attributes
+        .iter()
+        .find(|attribute| attribute.name().ends_with(field))
+        .map(|attribute| attribute.value())
+}
+
+pub(crate) fn contains_attribute(attributes: &[Attribute], field: &str) -> bool {
+    attributes
+        .iter()
+        .any(|attribute| attribute.name().ends_with(field))
+}
+
+// Find a specific attribute that equals a certain value for an element
 pub(crate) fn equals_attribute_by_value(element: &Element, field: &str, value: &str) -> bool {
     element.get_attribute(field).map_or(false, |attribute| {
         attribute.split_whitespace().any(|slice| slice == value)
     })
 }
 
-pub(crate) fn get_attribute<'a>(attributes: &'a [Attribute], field: &str) -> Option<&'a str> {
-    attributes
+// Find the first element that possesses a specific attribute
+// that equals a certain value from a collection of elements
+pub(crate) fn find_attribute_by_value<'a>(
+    elements: &[&'a Element],
+    field: &str,
+    value: &str,
+) -> Option<&'a Element> {
+    elements
         .iter()
-        .find(|attribute| attribute.name() == field)
-        .map(|attribute| attribute.value())
+        .find(|element| equals_attribute_by_value(element, field, value))
+        .copied()
+}
+
+// Find all elements that have a specific attribute that equals
+// a certain value from a collection of elements
+pub(crate) fn find_attributes_by_value<'a>(
+    elements: &[&'a Element],
+    field: &str,
+    value: &str,
+) -> Option<Vec<&'a Element>> {
+    let vec: Vec<_> = elements
+        .iter()
+        .filter_map(|element| {
+            if equals_attribute_by_value(element, field, value) {
+                Some(*element)
+            } else {
+                None
+            }
+        })
+        .collect();
+
+    if vec.is_empty() {
+        None
+    } else {
+        Some(vec)
+    }
 }
 
 pub(crate) fn find_helper<'a, F>(mut input: &str, fallback: F) -> Option<Vec<&'a Element>>
@@ -43,7 +88,7 @@ where
         // Whether to check field names of elements
         let is_wildcard = element_name == WILDCARD;
         let elements = match result.take() {
-            // Find using existing elements
+            // Find using existing elements from `result`
             Some(results) => Some(if is_wildcard {
                 results
                     .into_iter()
@@ -74,8 +119,13 @@ pub(crate) fn find_elements<'a>(
 
     let result: Vec<_> = elements
         .iter()
-        .filter(|&element| filter_element(element, name, &has_attribute, &equals_attribute))
-        .copied()
+        .filter_map(|element| {
+            if filter_element(element, name, &has_attribute, &equals_attribute) {
+                Some(*element)
+            } else {
+                None
+            }
+        })
         .collect();
 
     if result.is_empty() {

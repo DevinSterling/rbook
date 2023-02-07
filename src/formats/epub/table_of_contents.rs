@@ -105,6 +105,7 @@ impl Toc {
         self.get_elements_flat(constants::PAGE_LIST3)
     }
 
+    // Gets the children elements from toc, page-list, landmarks, etc. elements.
     fn get_elements(&self, name: &str) -> Option<Vec<&Element>> {
         self.0.get(name).and_then(|element| element.children())
     }
