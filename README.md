@@ -9,12 +9,12 @@ An ebook library that supports parsing and reading the epub format.
 Including default features:
 ```toml
 [dependencies]
-rbook = "0.3.1"
+rbook = "0.3.2"
 ```
 Excluding default features:
 ```toml
 [dependencies]
-rbook = { version = "0.3.1", default-features = false }
+rbook = { version = "0.3.2", default-features = false }
 ```
 Default features are the following:
 - `reader`: Enables reading of the ebook file by file
@@ -98,6 +98,8 @@ fn main() {
 Extracting images:
 ```rust
 use rbook::Ebook;
+use std::fs::{self, File};
+use std::path::Path;
 
 fn main() {
     let epub = rbook::Epub::new("example.epub").unwrap();

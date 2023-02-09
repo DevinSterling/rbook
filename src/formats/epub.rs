@@ -729,8 +729,7 @@ fn to_rc_meta_vec(elements: Vec<Rc<RefCell<TempElement>>>) -> Vec<(String, Vec<R
                 .find(|parent| {
                     parent
                         .get_attribute(xml::ID)
-                        .filter(|value| value == &id)
-                        .is_some()
+                        .map_or(false, |value| value == id)
                 })
                 .and_then(|parent| parent.children.as_mut())
             {
