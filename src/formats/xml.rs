@@ -1,6 +1,7 @@
 use std::borrow::Borrow;
 use std::ops::Deref;
-use std::rc::{Rc, Weak};
+
+use crate::utility::{Shared, Weak};
 
 pub(crate) mod utility;
 
@@ -43,7 +44,7 @@ pub(super) const SRC: &str = "src";
 /// # let epub = rbook::Epub::new("tests/ebooks/childrens-literature.epub").unwrap();
 /// # use rbook::xml::Find;
 /// // Find all `creator` elements
-/// let _creator = epub.metadata().find_all("creator").unwrap();
+/// let _creator = epub.metadata().find_all("creator");
 ///
 /// // Find the first `creator` element that has a child `file-as` element
 /// let creator1 = epub.metadata().find("creator > file-as").unwrap();
@@ -89,8 +90,7 @@ pub trait Find {
     /// assert_eq!("aut", creator.value());
     /// ```
     fn find(&self, input: &str) -> Option<&Element> {
-        self.find_all(input)
-            .and_then(|elements| elements.first().copied())
+        self.find_all(input).into_iter().next()
     }
 
     /// Retrieve all [Element]s that match the given input.
@@ -102,8 +102,9 @@ pub trait Find {
     /// Alternatively, [find_all_value(...)](Self::final_all_value)
     /// can be used to retrieve the [values](Element::value) of all
     /// elements directly.
-    fn find_all(&self, input: &str) -> Option<Vec<&Element>> {
-        utility::find_helper(input, |name, is_wild| self.find_fallback(name, is_wild))
+    fn find_all(&self, input: &str) -> Vec<&Element> {
+        utility::find_helper(input, |name, is_wild| self.__find_fallback(name, is_wild))
+            .unwrap_or_default()
     }
 
     /// Retrieve the first [value](Element::value) of an [Element]
@@ -130,7 +131,7 @@ pub trait Find {
     /// assert_eq!("aut", role);
     /// ```
     fn find_value(&self, input: &str) -> Option<&str> {
-        utility::find_helper(input, |name, is_wild| self.find_fallback(name, is_wild))
+        utility::find_helper(input, |name, is_wild| self.__find_fallback(name, is_wild))
             .and_then(|vec| vec.first().map(|element| element.value()))
     }
 
@@ -143,19 +144,19 @@ pub trait Find {
     ///
     /// Alternatively, [find_all(...)](Self::find_all)
     /// can be used to retrieve all [Element]s.
-    fn final_all_value(&self, input: &str) -> Option<Vec<&str>> {
-        utility::find_helper(input, |name, is_wild| self.find_fallback(name, is_wild)).and_then(
-            |vec| {
+    fn final_all_value(&self, input: &str) -> Vec<&str> {
+        utility::find_helper(input, |name, is_wild| self.__find_fallback(name, is_wild))
+            .and_then(|vec| {
                 vec.into_iter()
                     .map(|element| Some(element.value()))
                     .collect()
-            },
-        )
+            })
+            .unwrap_or_default()
     }
 
     // field: Name of element to search for
     // is_wild: Whether to check field names of elements
-    fn find_fallback(&self, name: &str, is_wild: bool) -> Option<Vec<&Element>>;
+    fn __find_fallback(&self, name: &str, is_wild: bool) -> Vec<&Element>;
 }
 
 // Temporary container for mutable elements during construction before
@@ -177,11 +178,11 @@ impl TempElement {
         utility::contains_attribute(&self.attributes, name)
     }
 
-    pub(crate) fn convert_to_rc(self, parent: Weak<Element>) -> Rc<Element> {
-        Rc::new_cyclic(|weak| {
+    pub(crate) fn convert_to_shared(self, parent: Weak<Element>) -> Shared<Element> {
+        Shared::new_cyclic(|weak| {
             let children = self.children.map(|vec| {
                 vec.into_iter()
-                    .map(|child| child.convert_to_rc(weak.clone()))
+                    .map(|child| child.convert_to_shared(weak.clone()))
                     .collect()
             });
 
@@ -205,7 +206,7 @@ impl TempElement {
 /// # use rbook::Ebook;
 /// # let epub = rbook::Epub::new("tests/ebooks/moby-dick.epub").unwrap();
 /// // Retrieving an element from the metadata of an epub
-/// let creators = epub.metadata().creators().unwrap();
+/// let creators = epub.metadata().creators();
 /// let element = creators.first().unwrap();
 ///
 /// // Retrieving an attribute
@@ -221,7 +222,7 @@ pub struct Element {
     pub(super) name: String,
     pub(super) value: String,
     pub(super) attributes: Vec<Attribute>,
-    pub(super) children: Option<Vec<Rc<Element>>>,
+    pub(super) children: Option<Vec<Shared<Element>>>,
     pub(super) parent: Weak<Element>,
 }
 
@@ -257,10 +258,11 @@ impl Element {
     }
 
     /// Retrieve all child elements
-    pub fn children(&self) -> Option<Vec<&Element>> {
+    pub fn children(&self) -> Vec<&Element> {
         self.children
             .as_ref()
-            .map(|elements| elements.iter().map(Rc::borrow).collect())
+            .map(|elements| elements.iter().map(Shared::borrow).collect())
+            .unwrap_or_default()
     }
 
     /// Retrieve the specified child element. Namespace/prefix
@@ -268,11 +270,9 @@ impl Element {
     pub fn get_child(&self, name: &str) -> Option<&Element> {
         let name = name.trim().to_lowercase();
 
-        self.children().and_then(|children| {
-            children
-                .into_iter()
-                .find(|child| child.name().to_lowercase().ends_with(&name))
-        })
+        self.children()
+            .into_iter()
+            .find(|child| child.name().to_lowercase().ends_with(&name))
     }
 
     /// Check if the element contains the specified child element.
@@ -280,11 +280,9 @@ impl Element {
     pub fn contains_child(&self, name: &str) -> bool {
         let name = name.trim().to_lowercase();
 
-        self.children().map_or(false, |children| {
-            children
-                .into_iter()
-                .any(|child| child.name().to_lowercase().ends_with(&name))
-        })
+        self.children()
+            .into_iter()
+            .any(|child| child.name().to_lowercase().ends_with(&name))
     }
 }
 
@@ -298,16 +296,18 @@ impl PartialEq for Element {
 }
 
 impl Find for Element {
-    fn find_fallback(&self, name: &str, is_wild: bool) -> Option<Vec<&Element>> {
-        if is_wild {
-            self.children()
-        } else {
-            Some(vec![self.get_child(name)?])
+    fn __find_fallback(&self, name: &str, is_wildcard: bool) -> Vec<&Element> {
+        match is_wildcard {
+            true => self.children(),
+            false => self
+                .get_child(name)
+                .map(|child| vec![child])
+                .unwrap_or_default(),
         }
     }
 }
 
-// Wrapper struct for abstraction. Hides Rc<T>
+// Wrapper struct for abstraction. Hides Shared<T>
 /// Parent element that is retrieved from a child element.
 ///
 /// Basic Usage:
@@ -327,7 +327,7 @@ impl Find for Element {
 /// assert_eq!(&*parent, element2);
 /// ```
 #[derive(Debug, PartialEq)]
-pub struct Parent(Rc<Element>);
+pub struct Parent(Shared<Element>);
 
 impl Deref for Parent {
     type Target = Element;

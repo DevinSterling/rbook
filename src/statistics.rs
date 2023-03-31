@@ -48,6 +48,10 @@ pub trait Stats {
     /// of bytes.
     fn count_words(&self, data: &[u8]) -> EbookResult<usize>;
 
+    /// Calculate the count of all characters and words from a given collection
+    /// of bytes.
+    fn count_both(&self, data: &[u8]) -> EbookResult<(usize, usize)>;
+
     /// Calculate the count of all characters in the ebook file.
     ///
     /// If retrieving a page fails, the next will be retrieved

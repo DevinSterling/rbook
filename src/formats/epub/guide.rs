@@ -47,13 +47,13 @@ impl Guide {
     /// Retrieve all elements that match a given `type` value
     /// from the guide. The returned vector contains at least
     /// one element.
-    pub fn all_by_type(&self, property: &str) -> Option<Vec<&Element>> {
+    pub fn all_by_type(&self, property: &str) -> Vec<&Element> {
         xml::utility::find_attributes_by_value(&self.elements(), constants::TYPE, property)
     }
 }
 
 impl Find for Guide {
-    fn find_fallback(&self, _name: &str, _is_wild: bool) -> Option<Vec<&Element>> {
-        Some(self.elements())
+    fn __find_fallback(&self, _name: &str, _is_wildcard: bool) -> Vec<&Element> {
+        self.elements()
     }
 }

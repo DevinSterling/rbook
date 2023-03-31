@@ -7,10 +7,17 @@ use zip::{self, read};
 
 use crate::formats::EbookError;
 use crate::utility;
+use crate::utility::Lock;
 
+#[cfg(feature = "multi-thread")]
+pub trait Archive: Send + Sync {
+    fn read_file(&self, path: &Path) -> Result<String, ArchiveError>;
+    fn read_bytes_file(&self, path: &Path) -> Result<Vec<u8>, ArchiveError>;
+}
+#[cfg(not(feature = "multi-thread"))]
 pub trait Archive {
-    fn read_file(&mut self, path: &Path) -> Result<String, ArchiveError>;
-    fn read_bytes_file(&mut self, path: &Path) -> Result<Vec<u8>, ArchiveError>;
+    fn read_file(&self, path: &Path) -> Result<String, ArchiveError>;
+    fn read_bytes_file(&self, path: &Path) -> Result<Vec<u8>, ArchiveError>;
 }
 
 /// Possible errors for an Archive
@@ -31,19 +38,26 @@ pub enum ArchiveError {
 }
 
 // Wrapper struct
-pub struct ZipArchive<T>(zip::ZipArchive<T>);
+pub struct ZipArchive<R>(Lock<zip::ZipArchive<R>>);
 
-impl<T: Read + Seek> ZipArchive<T> {
-    pub fn new(zip: T) -> Result<Self, EbookError> {
+impl<
+        #[cfg(feature = "multi-thread")] R: Read + Seek + Send + Sync,
+        #[cfg(not(feature = "multi-thread"))] R: Read + Seek,
+    > ZipArchive<R>
+{
+    pub fn new(zip: R) -> Result<Self, EbookError> {
         zip::ZipArchive::new(zip)
-            .map(Self)
+            .map(|archive| Self(Lock::new(archive)))
             .map_err(|error| EbookError::IO {
                 cause: "Unable to access zip archive".to_string(),
                 description: error.to_string(),
             })
     }
 
-    fn get_file<P: AsRef<Path>>(&mut self, path: P) -> Result<ZipFile, ArchiveError> {
+    fn get_file<P: AsRef<Path>>(
+        archive: &mut zip::ZipArchive<R>,
+        path: P,
+    ) -> Result<ZipFile, ArchiveError> {
         let normalized_path = utility::normalize_path(&path);
 
         let mut path_str = normalized_path
@@ -63,7 +77,7 @@ impl<T: Read + Seek> ZipArchive<T> {
             path_str = path_str.replace('\\', "/");
         }
 
-        self.0
+        archive
             .by_name(&path_str)
             .map(ZipFile)
             .map_err(|error| ArchiveError::InvalidPath {
@@ -75,19 +89,21 @@ impl<T: Read + Seek> ZipArchive<T> {
     }
 }
 
-impl<T: Read + Seek> Archive for ZipArchive<T> {
-    fn read_file(&mut self, path: &Path) -> Result<String, ArchiveError> {
-        let mut zip_file = self.get_file(path)?;
-        let content = zip_file.read()?;
-
-        Ok(content)
+impl<
+        #[cfg(feature = "multi-thread")] R: Read + Seek + Send + Sync,
+        #[cfg(not(feature = "multi-thread"))] R: Read + Seek,
+    > Archive for ZipArchive<R>
+{
+    fn read_file(&self, path: &Path) -> Result<String, ArchiveError> {
+        let mut lock = acquire_archive_lock(&self.0)?;
+        let mut zip_file = ZipArchive::get_file(&mut lock, path)?;
+        zip_file.read()
     }
 
-    fn read_bytes_file(&mut self, path: &Path) -> Result<Vec<u8>, ArchiveError> {
-        let mut zip_file = self.get_file(path)?;
-        let content = zip_file.read_bytes()?;
-
-        Ok(content)
+    fn read_bytes_file(&self, path: &Path) -> Result<Vec<u8>, ArchiveError> {
+        let mut lock = acquire_archive_lock(&self.0)?;
+        let mut zip_file = ZipArchive::get_file(&mut lock, path)?;
+        zip_file.read_bytes()
     }
 }
 
@@ -133,11 +149,11 @@ impl DirArchive {
             Ok(exists) if exists => Ok(Self(path_buf)),
             Ok(_) => Err(EbookError::IO {
                 cause: "Broken symbolic link".to_string(),
-                description: format!("Path `{:?}` is a broken symbolic link", path.as_ref()),
+                description: format!("Path `{:?}` is a broken symbolic link", path_buf.display()),
             }),
             Err(error) => Err(EbookError::IO {
                 cause: "Provided path is inaccessible".to_string(),
-                description: format!("Path `{:?}`: {error}", path.as_ref()),
+                description: format!("Path `{:?}`: {error}", path_buf.display()),
             }),
         }
     }
@@ -157,14 +173,17 @@ impl DirArchive {
         } else {
             Err(ArchiveError::InvalidPath {
                 cause: "Provided path is inaccessible or not a file".to_string(),
-                description: format!("Please ensure the file exists: '{:?}'", path.as_ref()),
+                description: format!(
+                    "Please ensure the file exists: '{:?}'",
+                    path.as_ref().display()
+                ),
             })
         }
     }
 }
 
 impl Archive for DirArchive {
-    fn read_file(&mut self, path: &Path) -> Result<String, ArchiveError> {
+    fn read_file(&self, path: &Path) -> Result<String, ArchiveError> {
         let mut bytes = self.read_bytes_file(path)?;
         let data = utility::to_utf8(&bytes);
 
@@ -175,16 +194,32 @@ impl Archive for DirArchive {
 
         String::from_utf8(bytes).map_err(|error| ArchiveError::CannotRead {
             cause: "Cannot read file contents to string".to_string(),
-            description: format!("Path: '{path:?}': {error}"),
+            description: format!("Path: '{:?}': {error}", path.display()),
         })
     }
 
-    fn read_bytes_file(&mut self, path: &Path) -> Result<Vec<u8>, ArchiveError> {
+    fn read_bytes_file(&self, path: &Path) -> Result<Vec<u8>, ArchiveError> {
         let path = self.get_path(path)?;
 
         fs::read(&path).map_err(|error| ArchiveError::CannotRead {
             cause: "Cannot read file contents to bytes vector".to_string(),
-            description: format!("Path: '{path:?}': {error}"),
+            description: format!("Path: '{:?}': {error}", path.display()),
         })
     }
+}
+
+#[cfg(feature = "multi-thread")]
+pub(crate) fn acquire_archive_lock<T>(
+    lock: &Lock<T>,
+) -> Result<std::sync::MutexGuard<T>, ArchiveError> {
+    lock.lock().map_err(|error| ArchiveError::CannotRead {
+        cause: "Unable to acquire lock for archive".to_string(),
+        description: format!("Failed to lock zip archive: {error}"),
+    })
+}
+#[cfg(not(feature = "multi-thread"))]
+pub(crate) fn acquire_archive_lock<T>(
+    lock: &Lock<T>,
+) -> Result<std::cell::RefMut<T>, ArchiveError> {
+    Ok(lock.borrow_mut())
 }

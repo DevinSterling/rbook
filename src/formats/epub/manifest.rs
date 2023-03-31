@@ -55,7 +55,7 @@ impl Manifest {
     /// # use rbook::Ebook;
     /// # let epub = rbook::Epub::new("tests/ebooks/moby-dick.epub").unwrap();
     /// // Retrieving elements
-    /// let images = epub.manifest().images().unwrap();
+    /// let images = epub.manifest().images();
     /// let cover_image = epub.cover_image().unwrap();
     ///
     /// assert!(images.contains(&cover_image));
@@ -65,29 +65,22 @@ impl Manifest {
     /// ```
     /// # use rbook::Ebook;
     /// # let epub = rbook::Epub::new("tests/ebooks/childrens-literature.epub").unwrap();
-    /// let images = epub.manifest().images().unwrap();
+    /// let images = epub.manifest().images();
     ///
     /// for image_element in images {
     ///     let image_href = image_element.value();
     ///     let image_data = epub.read_bytes_file(image_href).unwrap();
     /// }
     /// ```
-    pub fn images(&self) -> Option<Vec<&Element>> {
-        let vec: Vec<_> = self
-            .0
+    pub fn images(&self) -> Vec<&Element> {
+        self.0
             .values()
             .filter(|element| {
                 element
                     .get_attribute(constants::MEDIA_TYPE)
                     .map_or(false, |attribute| attribute.starts_with("image"))
             })
-            .collect();
-
-        if vec.is_empty() {
-            None
-        } else {
-            Some(vec)
-        }
+            .collect()
     }
 
     /// Retrieve a certain element by the value of its `id` from the manifest
@@ -114,7 +107,7 @@ impl Manifest {
     /// Retrieve all elements that match a given `media type`
     /// from the manifest. The returned vector contains at
     /// least one element.
-    pub fn all_by_media_type(&self, media_type: &str) -> Option<Vec<&Element>> {
+    pub fn all_by_media_type(&self, media_type: &str) -> Vec<&Element> {
         xml::utility::find_attributes_by_value(&self.elements(), constants::MEDIA_TYPE, media_type)
     }
 
@@ -127,19 +120,19 @@ impl Manifest {
     /// Retrieve all elements that match a given `property` value
     /// from the manifest. The returned vector contains at least
     /// one element.
-    pub fn all_by_property(&self, property: &str) -> Option<Vec<&Element>> {
+    pub fn all_by_property(&self, property: &str) -> Vec<&Element> {
         xml::utility::find_attributes_by_value(&self.elements(), constants::PROPERTIES, property)
     }
 }
 
 impl Find for Manifest {
-    fn find_fallback(&self, field: &str, is_wild: bool) -> Option<Vec<&Element>> {
-        let elements = if is_wild {
-            self.elements()
-        } else {
-            vec![self.by_id(field)?]
-        };
-
-        Some(elements)
+    fn __find_fallback(&self, field: &str, is_wildcard: bool) -> Vec<&Element> {
+        match is_wildcard {
+            true => self.elements(),
+            false => self
+                .by_id(field)
+                .map(|field| vec![field])
+                .unwrap_or_default(),
+        }
     }
 }

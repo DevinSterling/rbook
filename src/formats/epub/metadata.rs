@@ -1,10 +1,8 @@
 use std::borrow::Borrow;
-use std::rc::Rc;
 
 use crate::formats::epub::constants;
-use crate::formats::xml::{self, Element};
-use crate::utility;
-use crate::xml::Find;
+use crate::formats::xml::{self, Element, Find};
+use crate::utility::{self, Shared};
 
 /// Retrieve associated metadata information about the epub.
 ///
@@ -38,7 +36,7 @@ use crate::xml::Find;
 /// # use rbook::Ebook;
 /// # let epub = rbook::Epub::new("tests/ebooks/moby-dick.epub").unwrap();
 /// // Retrieving the first creator metadata element
-/// let creators = epub.metadata().creators().unwrap();
+/// let creators = epub.metadata().creators();
 /// let creator1 = creators.first().unwrap();
 ///
 /// // Retrieving an attribute
@@ -55,11 +53,14 @@ use crate::xml::Find;
 #[derive(Debug)]
 pub struct Metadata {
     package: Element,
-    element_groups: Vec<(String, Vec<Rc<Element>>)>,
+    element_groups: Vec<(String, Vec<Shared<Element>>)>,
 }
 
 impl Metadata {
-    pub(crate) fn new(package: Element, element_groups: Vec<(String, Vec<Rc<Element>>)>) -> Self {
+    pub(crate) fn new(
+        package: Element,
+        element_groups: Vec<(String, Vec<Shared<Element>>)>,
+    ) -> Self {
         Self {
             package,
             element_groups,
@@ -71,7 +72,7 @@ impl Metadata {
         self.element_groups
             .iter()
             .map(|(_, elements)| elements)
-            .flat_map(|elements| elements.iter().map(Rc::borrow))
+            .flat_map(|elements| elements.iter().map(Shared::borrow))
             .collect()
     }
 
@@ -117,7 +118,7 @@ impl Metadata {
     pub fn unique_identifier(&self) -> Option<&Element> {
         // Retrieve uid from root package element
         let target_id = self.package.get_attribute(constants::UNIQUE_ID)?;
-        let identifiers = self.get_elements(constants::IDENTIFIER)?;
+        let identifiers = self.get_elements(constants::IDENTIFIER);
 
         // Find identifier metadata element that matches
         identifiers
@@ -146,7 +147,6 @@ impl Metadata {
     pub fn release_identifier(&self) -> Option<String> {
         let identifier = self.unique_identifier()?;
         let modified = self.modified()?;
-
         Some(identifier.value().to_string() + "@" + modified.value())
     }
 
@@ -157,12 +157,12 @@ impl Metadata {
 
     // Convenient DCMES Optional Metadata methods
     /// Contributors of the ebook, such as editors
-    pub fn contributors(&self) -> Option<Vec<&Element>> {
+    pub fn contributors(&self) -> Vec<&Element> {
         self.get_elements(constants::CONTRIBUTOR)
     }
 
     /// Creators of the ebook, such as authors
-    pub fn creators(&self) -> Option<Vec<&Element>> {
+    pub fn creators(&self) -> Vec<&Element> {
         self.get_elements(constants::CREATOR)
     }
 
@@ -179,20 +179,20 @@ impl Metadata {
         self.get_element(constants::DESCRIPTION)
     }
 
-    pub fn publisher(&self) -> Option<Vec<&Element>> {
+    pub fn publisher(&self) -> Vec<&Element> {
         self.get_elements(constants::PUBLISHER)
     }
 
     /// Indicates the subject of the ebook, such as genre.
     /// May contain **BISAC** codes to specify genres.
-    pub fn subject(&self) -> Option<Vec<&Element>> {
+    pub fn subject(&self) -> Vec<&Element> {
         self.get_elements(constants::SUBJECT)
     }
 
     /// Indicates whether the ebook is a specialized type. Types
     /// can be used to specify if the ebook is in the form of a
     /// dictionary, annotations, etc.
-    pub fn r#type(&self) -> Option<Vec<&Element>> {
+    pub fn r#type(&self) -> Vec<&Element> {
         self.get_elements(constants::TYPE)
     }
 
@@ -211,7 +211,7 @@ impl Metadata {
     ///
     /// The given string will retrieve all metadata whose
     /// `name` or `property` field matches it.
-    pub fn get(&self, mut input: &str) -> Option<Vec<&Element>> {
+    pub fn get(&self, mut input: &str) -> Vec<&Element> {
         // Ignore namespace if provided
         if let Some((_, right)) = utility::split_where(input, ':') {
             input = right
@@ -227,25 +227,25 @@ impl Metadata {
             .map(|(_, elements)| {
                 elements
                     .first()
-                    .map(Rc::borrow)
+                    .map(Shared::borrow)
                     .expect("Vector should not be empty; missing child elements")
             })
     }
 
-    fn get_elements(&self, meta_name: &str) -> Option<Vec<&Element>> {
+    fn get_elements(&self, meta_name: &str) -> Vec<&Element> {
         self.element_groups
             .iter()
             .find(|(group, _)| group == meta_name.trim())
-            .map(|(_, elements)| elements.iter().map(Rc::borrow).collect())
+            .map(|(_, elements)| elements.iter().map(Shared::borrow).collect())
+            .unwrap_or_default()
     }
 }
 
 impl Find for Metadata {
-    fn find_fallback(&self, field: &str, is_wild: bool) -> Option<Vec<&Element>> {
-        if is_wild {
-            Some(self.elements())
-        } else {
-            self.get_elements(field)
+    fn __find_fallback(&self, field: &str, is_wildcard: bool) -> Vec<&Element> {
+        match is_wildcard {
+            true => self.elements(),
+            false => self.get_elements(field),
         }
     }
 }

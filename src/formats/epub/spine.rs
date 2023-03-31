@@ -1,7 +1,7 @@
 use std::borrow::Borrow;
-use std::rc::Rc;
 
 use crate::formats::xml::{Attribute, Element};
+use crate::utility::Shared;
 use crate::xml::Find;
 
 /// Access the order of resources for the ebook.
@@ -26,10 +26,10 @@ use crate::xml::Find;
 /// assert_eq!("xchapter_026", idref);
 /// ```
 #[derive(Debug)]
-pub struct Spine(Rc<Element>);
+pub struct Spine(Shared<Element>);
 
 impl Spine {
-    pub(crate) fn new(spine_element: Rc<Element>) -> Self {
+    pub(crate) fn new(spine_element: Shared<Element>) -> Self {
         Self(spine_element)
     }
 
@@ -38,7 +38,7 @@ impl Spine {
         self.0
             .children
             .as_ref()
-            .map(|elements| elements.iter().map(Rc::borrow).collect())
+            .map(|elements| elements.iter().map(Shared::borrow).collect())
             .unwrap_or_default()
     }
 
@@ -59,7 +59,7 @@ impl Spine {
 }
 
 impl Find for Spine {
-    fn find_fallback(&self, _name: &str, _is_wild: bool) -> Option<Vec<&Element>> {
-        Some(self.elements())
+    fn __find_fallback(&self, _name: &str, _is_wildcard: bool) -> Vec<&Element> {
+        self.elements()
     }
 }

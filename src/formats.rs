@@ -62,7 +62,12 @@ pub trait Ebook {
     /// // View contents
     /// println!("{epub:?}");
     /// ```
-    fn read_from<R: Seek + Read + 'static>(reader: R) -> EbookResult<Self::Format>;
+    fn read_from<
+        #[cfg(feature = "multi-thread")] R: Seek + Read + Send + Sync + 'static,
+        #[cfg(not(feature = "multi-thread"))] R: Seek + Read + 'static,
+    >(
+        reader: R,
+    ) -> EbookResult<Self::Format>;
 }
 
 /// Possible errors for [Ebook]

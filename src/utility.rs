@@ -3,6 +3,15 @@ use std::fs::{File, Metadata};
 use std::path::{Path, PathBuf};
 
 use crate::formats::EbookError;
+use crate::result::EbookResult;
+
+#[cfg(feature = "multi-thread")]
+pub use std::sync::{Arc as Shared, Mutex as Lock, Weak};
+#[cfg(not(feature = "multi-thread"))]
+pub use std::{
+    cell::RefCell as Lock,
+    rc::{Rc as Shared, Weak},
+};
 
 // Splits a string into two separate strings and excludes
 // the split character
@@ -13,14 +22,14 @@ pub(crate) fn split_where(string: &str, character: char) -> Option<(&str, &str)>
         .map(|(left, right)| (left, &right[1..]))
 }
 
-pub(crate) fn get_file<P: AsRef<Path>>(path: P) -> Result<File, EbookError> {
+pub(crate) fn get_file<P: AsRef<Path>>(path: P) -> EbookResult<File> {
     File::open(&path).map_err(|error| EbookError::IO {
         cause: "Unable to open file".to_string(),
         description: format!("File path: '{:?}': {error}", path.as_ref()),
     })
 }
 
-pub(crate) fn get_path_metadata<P: AsRef<Path>>(path: P) -> Result<Metadata, EbookError> {
+pub(crate) fn get_path_metadata<P: AsRef<Path>>(path: P) -> EbookResult<Metadata> {
     path.as_ref().metadata().map_err(|error| EbookError::IO {
         cause: "Unable to access path metadata".to_string(),
         description: format!("Path: '{:?}': {error}", path.as_ref()),

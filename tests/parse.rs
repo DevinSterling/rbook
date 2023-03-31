@@ -14,9 +14,9 @@ fn metadata_test() {
     assert_eq!("http://www.gutenberg.org/ebooks/25545", identifier.value());
 
     // Not epub specification required metadata
-    let creators1 = epub.metadata().creators().unwrap();
+    let creators1 = epub.metadata().creators();
     // Alternate way of retrieval
-    let creators2 = epub.metadata().get("creator").unwrap(); // Namespace/prefix is not required
+    let creators2 = epub.metadata().get("creator"); // Namespace/prefix is not required
 
     assert_eq!(creators1, creators2);
 
@@ -74,7 +74,7 @@ fn metadat_test_alt() {
 fn metadata_test2() {
     let epub = rbook::Epub::new("tests/ebooks/moby-dick.epub").unwrap();
 
-    let creators = epub.metadata().creators().unwrap();
+    let creators = epub.metadata().creators();
     let creator1 = creators.first().unwrap();
 
     assert_eq!("Herman Melville", creator1.value());
@@ -182,7 +182,7 @@ fn toc_test() {
     assert_eq!("Copyright Page", toc_element2.name());
     assert_eq!("copyright.xhtml", toc_element2.value());
 
-    let landmarks = epub.toc().landmarks().unwrap();
+    let landmarks = epub.toc().landmarks();
 
     assert_eq!(3, landmarks.len());
 
@@ -200,14 +200,14 @@ fn directory_test() {
     let title = epub.metadata().title().unwrap();
     assert_eq!("Directory Example", title.value());
 
-    let creators = epub.metadata().creators().unwrap();
+    let creators = epub.metadata().creators();
     let creator = creators.first().unwrap();
     assert_eq!("Devin Sterling", creator.value());
 
     let role = creator.get_child("role").unwrap();
     assert_eq!("aut", role.value());
 
-    let sources = epub.metadata().get("source").unwrap();
+    let sources = epub.metadata().get("source");
     let source = sources.first().unwrap();
     assert_eq!("rbook", source.value());
 

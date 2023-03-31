@@ -21,7 +21,7 @@
 //!
 //! // Printing the contents of each page
 //! while let Some(content) = reader.next_page() {
-//!     let media_type = content.get(ContentType::Type).unwrap();
+//!     let media_type = content.get_content(ContentType::Type).unwrap();
 //!     assert_eq!("application/xhtml+xml", media_type);
 //!     println!("{content}");
 //! }
@@ -32,7 +32,7 @@
 //! ```rust
 //! # use rbook::Ebook;
 //! # let epub = rbook::Epub::new("tests/ebooks/moby-dick.epub").unwrap();
-//! let creators = epub.metadata().creators().unwrap();
+//! let creators = epub.metadata().creators();
 //! let creator = creators.first().unwrap();
 //! assert_eq!("Herman Melville", creator.value());
 //!
@@ -50,11 +50,12 @@
 
 mod archive;
 mod formats;
+mod utility;
+
 #[cfg(feature = "reader")]
 mod reader;
 #[cfg(feature = "statistics")]
 mod statistics;
-mod utility;
 
 pub use self::formats::{epub::Epub, xml, Ebook};
 #[cfg(feature = "reader")]

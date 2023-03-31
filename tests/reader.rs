@@ -43,17 +43,17 @@ fn access_content_test() {
 
     println!("{content}");
 
-    assert!(content.ends_with("</html>"));
+    assert!(content.ends_with(b"</html>"));
 
     assert_eq!(
         "OPS/titlepage.xhtml",
-        content.get(ContentType::Path).unwrap()
+        content.get_content(ContentType::Path).unwrap()
     );
     assert_eq!(
         "application/xhtml+xml",
-        content.get(ContentType::Type).unwrap()
+        content.get_content(ContentType::Type).unwrap()
     );
-    assert_eq!("titlepage", content.get(ContentType::Id).unwrap());
+    assert_eq!("titlepage", content.get_content(ContentType::Id).unwrap());
 }
 
 #[test]

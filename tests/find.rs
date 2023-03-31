@@ -17,8 +17,8 @@ fn metadata_find_test() {
     assert_eq!(creator.value(), creator_alt);
 
     // Retrieve all creators of an epub
-    let creators = epub.metadata().creators().unwrap();
-    let creators2 = epub.metadata().find_all("creator").unwrap();
+    let creators = epub.metadata().creators();
+    let creators2 = epub.metadata().find_all("creator");
     assert_eq!(creators, creators2);
 
     // Find the first `creator` element that has a child `file-as` element
@@ -51,8 +51,8 @@ fn manifest_find_test() {
     assert_eq!(chapter, chapter_alt1);
     assert_eq!(chapter_alt1, chapter_alt2);
 
-    let img_files = epub.manifest().all_by_media_type("image/png").unwrap();
-    let img_files2 = epub.manifest().find_all("*[media-type=image/png]").unwrap();
+    let img_files = epub.manifest().all_by_media_type("image/png");
+    let img_files2 = epub.manifest().find_all("*[media-type=image/png]");
     assert_eq!(img_files, img_files2);
 }
 

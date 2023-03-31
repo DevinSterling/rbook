@@ -50,8 +50,8 @@ pub(crate) fn find_attributes_by_value<'a>(
     elements: &[&'a Element],
     field: &str,
     value: &str,
-) -> Option<Vec<&'a Element>> {
-    let vec: Vec<_> = elements
+) -> Vec<&'a Element> {
+    elements
         .iter()
         .filter_map(|element| {
             if equals_attribute_by_value(element, field, value) {
@@ -60,18 +60,12 @@ pub(crate) fn find_attributes_by_value<'a>(
                 None
             }
         })
-        .collect();
-
-    if vec.is_empty() {
-        None
-    } else {
-        Some(vec)
-    }
+        .collect()
 }
 
 pub(crate) fn find_helper<'a, F>(mut input: &str, fallback: F) -> Option<Vec<&'a Element>>
 where
-    F: Fn(&str, bool) -> Option<Vec<&'a Element>>,
+    F: Fn(&str, bool) -> Vec<&'a Element>,
 {
     // Remove namespace
     if let Some((_, right)) = crate::utility::split_where(input, ':') {
@@ -89,19 +83,22 @@ where
         let is_wildcard = element_name == WILDCARD;
         let elements = match result.take() {
             // Find using existing elements from `result`
-            Some(results) => Some(if is_wildcard {
+            Some(results) if is_wildcard => Some(
                 results
                     .into_iter()
-                    .filter_map(|element| element.children())
-                    .flatten()
-                    .collect()
-            } else {
+                    .flat_map(|element| element.children())
+                    .collect(),
+            ),
+            Some(results) => Some(
                 results
                     .into_iter()
                     .filter_map(|element| element.get_child(element_name))
-                    .collect()
-            }),
-            None => fallback(element_name, is_wildcard),
+                    .collect(),
+            ),
+            None => match Some(fallback(element_name, is_wildcard)) {
+                Some(elements) if !elements.is_empty() => Some(elements),
+                _ => None,
+            },
         }?;
 
         result.replace(find_elements(&elements, element_name, attributes)?);

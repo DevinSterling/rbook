@@ -1,8 +1,7 @@
 use std::collections::HashMap;
-use std::rc::Rc;
 
-use crate::formats::epub::constants;
-use crate::formats::xml::Element;
+use crate::formats::{epub::constants, xml::Element};
+use crate::utility::Shared;
 use crate::xml::Find;
 
 /// Table of contents (toc) for the ebook.
@@ -31,14 +30,14 @@ use crate::xml::Find;
 /// assert_eq!("s04.xhtml#pgepubid00492", element.value());
 ///
 /// // Get nested child element
-/// let nested_children1 = element.children().unwrap();
+/// let nested_children1 = element.children();
 /// let nested_element1 = nested_children1.get(10).unwrap();
 ///
 /// assert_eq!("John Ruskin", nested_element1.name());
 /// assert_eq!("", nested_element1.value());
 ///
 /// // Get further nested child element
-/// let nested_children2 = nested_element1.children().unwrap();
+/// let nested_children2 = nested_element1.children();
 /// let nested_element2 = nested_children2.first().unwrap();
 ///
 /// assert_eq!("204 THE KING OF THE GOLDEN RIVER OR THE BLACK BROTHERS", nested_element2.name());
@@ -58,10 +57,10 @@ use crate::xml::Find;
 /// assert_eq!("s04.xhtml#pgepubid00602", element.value());
 /// ```
 #[derive(Debug)]
-pub struct Toc(HashMap<String, Rc<Element>>);
+pub struct Toc(HashMap<String, Shared<Element>>);
 
 impl Toc {
-    pub(crate) fn new(element_map: HashMap<String, Rc<Element>>) -> Self {
+    pub(crate) fn new(element_map: HashMap<String, Shared<Element>>) -> Self {
         Self(element_map)
     }
 
@@ -76,14 +75,11 @@ impl Toc {
     /// [elements_flat()](Self::elements_flat) instead.
     pub fn elements(&self) -> Vec<&Element> {
         self.get_elements(constants::TOC)
-            .expect("Should have a toc element")
     }
 
     /// Retrieve toc elements in flattened form.
     pub fn elements_flat(&self) -> Vec<&Element> {
-        let elements = self
-            .get_elements_flat(constants::TOC)
-            .expect("Should have a toc element");
+        let elements = self.get_elements_flat(constants::TOC);
 
         // Order navPoint elements
         if elements.first().map_or(false, |element| {
@@ -96,35 +92,34 @@ impl Toc {
     }
 
     /// Retrieve landmark toc elements.
-    pub fn landmarks(&self) -> Option<Vec<&Element>> {
+    pub fn landmarks(&self) -> Vec<&Element> {
         self.get_elements_flat(constants::LANDMARKS)
     }
 
     /// Retrieve page list toc elements that represent physical pages.
-    pub fn page_list(&self) -> Option<Vec<&Element>> {
+    pub fn page_list(&self) -> Vec<&Element> {
         self.get_elements_flat(constants::PAGE_LIST3)
     }
 
     // Gets the children elements from toc, page-list, landmarks, etc. elements.
-    fn get_elements(&self, name: &str) -> Option<Vec<&Element>> {
-        self.0.get(name).and_then(|element| element.children())
+    fn get_elements(&self, name: &str) -> Vec<&Element> {
+        self.0
+            .get(name)
+            .map(|element| element.children())
+            .unwrap_or_default()
     }
 
-    fn get_elements_flat(&self, name: &str) -> Option<Vec<&Element>> {
-        self.get_elements(name).map(|elements| flatten(&elements))
+    fn get_elements_flat(&self, name: &str) -> Vec<&Element> {
+        flatten(&self.get_elements(name))
     }
 }
 
 impl Find for Toc {
-    fn find_fallback(&self, _name: &str, _is_wild: bool) -> Option<Vec<&Element>> {
-        let elements = self
-            .0
+    fn __find_fallback(&self, _name: &str, _is_wild: bool) -> Vec<&Element> {
+        self.0
             .values()
-            .filter_map(|element| element.children())
-            .flat_map(|vec| flatten(&vec))
-            .collect();
-
-        Some(elements)
+            .flat_map(|element| flatten(&element.children()))
+            .collect()
     }
 }
 
@@ -155,10 +150,7 @@ fn flatten<'a>(elements: &[&'a Element]) -> Vec<&'a Element> {
 
     while let Some(element) = stack.pop() {
         output.push(element);
-
-        if let Some(children) = element.children() {
-            stack.extend(children.iter().rev());
-        }
+        stack.extend(element.children().into_iter().rev());
     }
 
     output

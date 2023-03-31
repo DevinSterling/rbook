@@ -15,20 +15,21 @@ use std::collections::HashMap;
 use std::fmt::{Debug, Formatter};
 use std::io::{BufReader, Read, Seek};
 use std::path::{Path, PathBuf};
-use std::rc::{Rc, Weak};
 
 use crate::archive::{Archive, DirArchive, ZipArchive};
 use crate::formats::xml::utility as xmlutil;
 use crate::formats::xml::{self, Attribute, Element};
 use crate::formats::{Ebook, EbookError, EbookResult};
+use crate::utility::{self, Shared, Weak};
+use crate::xml::TempElement;
+
 #[cfg(feature = "reader")]
-use crate::reader::content::{Content, ContentType};
-#[cfg(feature = "reader")]
-use crate::reader::{Readable, Reader, ReaderError, ReaderResult};
+use crate::reader::{
+    content::{Content, ContentType},
+    {Readable, Reader, ReaderError, ReaderResult},
+};
 #[cfg(feature = "statistics")]
 use crate::statistics::Stats;
-use crate::utility;
-use crate::xml::TempElement;
 
 pub use self::{
     guide::Guide, manifest::Manifest, metadata::Metadata, spine::Spine, table_of_contents::Toc,
@@ -65,7 +66,7 @@ pub use self::{
 /// assert_eq!(143, reader.current_index());
 /// ```
 pub struct Epub {
-    archive: RefCell<Box<dyn Archive>>,
+    archive: Box<dyn Archive>,
     root_file: PathBuf,
     metadata: Metadata,
     manifest: Manifest,
@@ -189,10 +190,7 @@ impl Epub {
     /// ```
     pub fn read_file<P: AsRef<Path>>(&self, path: P) -> EbookResult<String> {
         let path = self.parse_path(&path);
-        self.archive
-            .borrow_mut()
-            .read_file(&path)
-            .map_err(EbookError::Archive)
+        self.archive.read_file(&path).map_err(EbookError::Archive)
     }
 
     /// Retrieve the file contents in bytes.
@@ -217,7 +215,6 @@ impl Epub {
     pub fn read_bytes_file<P: AsRef<Path>>(&self, path: P) -> EbookResult<Vec<u8>> {
         let path = self.parse_path(&path);
         self.archive
-            .borrow_mut()
             .read_bytes_file(&path)
             .map_err(EbookError::Archive)
     }
@@ -237,7 +234,7 @@ impl Epub {
         }
     }
 
-    fn build(mut archive: Box<dyn Archive>) -> EbookResult<Self> {
+    fn build(archive: Box<dyn Archive>) -> EbookResult<Self> {
         // Parse "META-INF/container.xml"
         let content_meta_inf = archive
             .read_bytes_file(Path::new(constants::CONTAINER))
@@ -263,7 +260,7 @@ impl Epub {
         let toc = parse_toc(&content_toc)?;
 
         Ok(Self {
-            archive: RefCell::new(archive),
+            archive,
             root_file,
             metadata,
             manifest,
@@ -295,17 +292,18 @@ impl Ebook for Epub {
 
         // Unzip the file if it is not directory. If it is, the contents can
         // be accessed directly which makes using a zip file unnecessary.
-        let archive: Box<dyn Archive> = if metadata.is_file() {
-            let file = utility::get_file(&path)?;
-            Box::new(ZipArchive::new(BufReader::new(file))?)
-        } else {
-            Box::new(DirArchive::new(&path)?)
-        };
-
-        Epub::build(archive)
+        Epub::build(match metadata.is_file() {
+            true => Box::new(ZipArchive::new(BufReader::new(utility::get_file(&path)?))?),
+            false => Box::new(DirArchive::new(&path)?),
+        })
     }
 
-    fn read_from<R: Seek + Read + 'static>(reader: R) -> EbookResult<Self> {
+    fn read_from<
+        #[cfg(feature = "multi-thread")] R: Seek + Read + Send + Sync + 'static,
+        #[cfg(not(feature = "multi-thread"))] R: Seek + Read + 'static,
+    >(
+        reader: R,
+    ) -> EbookResult<Self> {
         Epub::build(Box::new(ZipArchive::new(reader)?))
     }
 }
@@ -369,7 +367,7 @@ impl Readable for Epub {
         })?;
 
         let data = self
-            .read_file(manifest_element.value())
+            .read_bytes_file(manifest_element.value())
             .map_err(ReaderError::NoContent)?;
 
         let mut fields = vec![
@@ -461,6 +459,27 @@ impl Stats for Epub {
         parse_xhtml_data(vec![text_handler], vec![], data)?;
 
         Ok(word_count)
+    }
+
+    fn count_both(&self, data: &[u8]) -> EbookResult<(usize, usize)> {
+        let mut word_count: usize = 0;
+        let mut char_count: usize = 0;
+
+        let text_handler = text!("body > *", |text| {
+            let text = text.as_str();
+
+            char_count += text.len();
+            word_count += text
+                .split(|character: char| !character.is_alphanumeric())
+                .filter(|capture| !capture.is_empty())
+                .count();
+
+            Ok(())
+        });
+
+        parse_xhtml_data(vec![text_handler], vec![], data)?;
+
+        Ok((char_count, word_count))
     }
 }
 
@@ -571,9 +590,9 @@ fn parse_package(data: &[u8]) -> EbookResult<(Metadata, Manifest, Spine, Guide)>
             meta.name.drain(..=index);
         }
 
-        let meta = Rc::new(RefCell::new(meta));
+        let meta = Shared::new(RefCell::new(meta));
 
-        current_meta.borrow_mut().replace(Rc::clone(&meta));
+        current_meta.borrow_mut().replace(Shared::clone(&meta));
         meta_vec.push(meta);
 
         Ok(())
@@ -696,11 +715,11 @@ fn is_valid_package(package: Option<Element>) -> EbookResult<Element> {
 fn is_valid_spine(
     spine: Option<TempElement>,
     children: Vec<TempElement>,
-) -> EbookResult<Rc<Element>> {
+) -> EbookResult<Shared<Element>> {
     spine
         .map(|mut spine| {
             spine.children.replace(children);
-            spine.convert_to_rc(Weak::new())
+            spine.convert_to_shared(Weak::new())
         })
         .ok_or(EbookError::Parse {
             cause: "Required element is missing".to_string(),
@@ -711,8 +730,10 @@ fn is_valid_spine(
 // Using vec here instead of hashmap as it better maintains the
 // order of metadata from the original file. Performance loss
 // is miniscule as there are generally very little elements.
-fn to_rc_meta_vec(elements: Vec<Rc<RefCell<TempElement>>>) -> Vec<(String, Vec<Rc<Element>>)> {
-    let mut new_vec: Vec<(String, Vec<Rc<Element>>)> = Vec::new();
+fn to_rc_meta_vec(
+    elements: Vec<Shared<RefCell<TempElement>>>,
+) -> Vec<(String, Vec<Shared<Element>>)> {
+    let mut new_vec: Vec<(String, Vec<Shared<Element>>)> = Vec::new();
     let mut parent_vec: Vec<TempElement> = Vec::new(); // temp vec to help with construction
 
     // Loop to form parent-child relationship between metadata
@@ -750,7 +771,7 @@ fn to_rc_meta_vec(elements: Vec<Rc<RefCell<TempElement>>>) -> Vec<(String, Vec<R
     for element in parent_vec {
         // The name of each element is a meta category,
         // such as "dc:identifier", there can be one or more
-        let rc_element = element.convert_to_rc(Weak::new());
+        let rc_element = element.convert_to_shared(Weak::new());
         let category = rc_element.name();
 
         if let Some((_, group)) = new_vec.iter_mut().find(|(name, _)| name == category) {
@@ -768,9 +789,9 @@ fn to_rc_meta_vec(elements: Vec<Rc<RefCell<TempElement>>>) -> Vec<(String, Vec<R
 
 fn parse_toc(mut data: &str) -> EbookResult<Toc> {
     // Keep track of latest nav element entry
-    let parent_stack = Rc::new(RefCell::new(Vec::new()));
-    let current_nav_group = Rc::new(RefCell::new(Vec::new()));
-    let nav_groups = Rc::new(RefCell::new(HashMap::new()));
+    let parent_stack = Shared::new(RefCell::new(Vec::new()));
+    let current_nav_group = Shared::new(RefCell::new(Vec::new()));
+    let nav_groups = Shared::new(RefCell::new(HashMap::new()));
 
     // TODO: Temporary work around for a dependency bug at the moment
     // Bug: If the parser encounters a script element in the head,
@@ -786,9 +807,9 @@ fn parse_toc(mut data: &str) -> EbookResult<Toc> {
         let toc_type = element.get_attribute(constants::TOC_TYPE);
         let attributes = xmlutil::copy_attributes(element.attributes());
 
-        let parent_stack = Rc::clone(&parent_stack);
-        let current_nav_group = Rc::clone(&current_nav_group);
-        let groups = Rc::clone(&nav_groups);
+        let parent_stack = Shared::clone(&parent_stack);
+        let current_nav_group = Shared::clone(&current_nav_group);
+        let groups = Shared::clone(&nav_groups);
         element.on_end_tag(move |_| {
             let nav_group_name = match toc_type {
                 Some(nav_type) => nav_type,
@@ -826,8 +847,8 @@ fn parse_toc(mut data: &str) -> EbookResult<Toc> {
         });
 
         // Handle end tag event
-        let parent_stack = Rc::clone(&parent_stack);
-        let toc = Rc::clone(&current_nav_group);
+        let parent_stack = Shared::clone(&parent_stack);
+        let toc = Shared::clone(&current_nav_group);
         element.on_end_tag(move |_| {
             let mut stack = parent_stack.borrow_mut();
 
@@ -909,9 +930,9 @@ fn is_valid_toc(toc: &HashMap<String, TempElement>) -> EbookResult<()> {
     }
 }
 
-fn to_rc_nav_groups(map: HashMap<String, TempElement>) -> HashMap<String, Rc<Element>> {
+fn to_rc_nav_groups(map: HashMap<String, TempElement>) -> HashMap<String, Shared<Element>> {
     map.into_iter()
-        .map(|(group, root_element)| (group, root_element.convert_to_rc(Weak::new())))
+        .map(|(group, root_element)| (group, root_element.convert_to_shared(Weak::new())))
         .collect()
 }
 

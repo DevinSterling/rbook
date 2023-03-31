@@ -50,40 +50,40 @@ impl ContentType {
 /// # let content = reader.next_page().unwrap();
 /// use rbook::read::ContentType;
 ///
-/// // Data in string form
-/// assert!(content.starts_with("<?xml"));
-///
 /// // Data in byte form
-/// assert!(content.as_bytes().starts_with(b"\x3C\x3F\x78\x6D\x6C"));
+/// assert!(content.starts_with(b"<?xml"));
+/// assert!(content.starts_with(b"\x3C\x3F\x78\x6D\x6C"));
+///
+/// // Data in string form
+/// assert!(content.as_lossy_str().starts_with("<?xml"));
 ///
 /// // Retrieve the media type
-/// assert_eq!("application/xhtml+xml", content.get(ContentType::Type).unwrap());
+/// assert_eq!("application/xhtml+xml", content.get_content(ContentType::Type).unwrap());
 ///
 /// // Retrieve the path
-/// assert_eq!("OPS/titlepage.xhtml", content.get(ContentType::Path).unwrap());
+/// assert_eq!("OPS/titlepage.xhtml", content.get_content(ContentType::Path).unwrap());
 /// ```
 #[derive(Debug, PartialEq, Eq)]
 pub struct Content<'a> {
-    content: String,
+    bytes: Vec<u8>,
     // Used instead of hashmap as the size is always small. ~3 items
     fields: Vec<(&'static str, Cow<'a, str>)>,
 }
 
 impl<'a> Content<'a> {
-    pub(crate) fn new(content: String, fields: Vec<(&'static str, Cow<'a, str>)>) -> Self {
-        Self { content, fields }
+    pub(crate) fn new(bytes: Vec<u8>, fields: Vec<(&'static str, Cow<'a, str>)>) -> Self {
+        Self { bytes, fields }
     }
 
     /// Retrieve the content data in the form of a string.
-    #[deprecated]
-    pub fn as_str(&self) -> &str {
-        &self.content
+    pub fn as_lossy_str(&self) -> Cow<str> {
+        String::from_utf8_lossy(&self.bytes)
     }
 
     /// Retrieve specific information about the content.
     ///
     /// See [ContentType] for available options.
-    pub fn get(&self, content_type: ContentType) -> Option<&str> {
+    pub fn get_content(&self, content_type: ContentType) -> Option<&str> {
         self.fields
             .iter()
             .find(|(key, _)| *key == content_type.as_str())
@@ -91,16 +91,16 @@ impl<'a> Content<'a> {
     }
 }
 
-impl Deref for Content<'_> {
-    type Target = str;
+impl<'a> Deref for Content<'a> {
+    type Target = [u8];
 
-    fn deref(&self) -> &str {
-        &self.content
+    fn deref(&self) -> &Self::Target {
+        &self.bytes
     }
 }
 
 impl Display for Content<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", &self.content)
+        write!(f, "{}", self.as_lossy_str())
     }
 }

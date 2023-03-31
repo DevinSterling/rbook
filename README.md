@@ -9,16 +9,19 @@ An ebook library that supports parsing and reading the epub format.
 Including default features:
 ```toml
 [dependencies]
-rbook = "0.3.2"
+rbook = "0.4.0"
 ```
-Excluding default features:
+Excluding default features and selection:
 ```toml
 [dependencies]
-rbook = { version = "0.3.2", default-features = false }
+rbook = { version = "0.4.0", default-features = false, features = ["multi-thread"] }
 ```
 Default features are the following:
-- `reader`: Enables reading of the ebook file by file
-- `statistics`: Enables word/character counting
+- `reader`: Enables reading of the ebook file by file.
+- `statistics`: Enables word/character counting.
+
+Non-default optional features:
+- `multi-thread`: Enables support for multithreaded environments.
 ## Examples
 Other examples can be found in the ['tests'](tests) directory.
 
@@ -53,7 +56,7 @@ fn main() {
     let epub = rbook::Epub::new("example.epub").unwrap();
 
     // Retrieving the first creator metadata element
-    let creator = epub.metadata().creators().unwrap().first().unwrap();
+    let creator = epub.metadata().creators().first().unwrap();
     assert_eq!("John Doe", creator.value());
 
     // Retrieving an attribute
@@ -104,7 +107,7 @@ use std::path::Path;
 fn main() {
     let epub = rbook::Epub::new("example.epub").unwrap();
 
-    let img_elements = epub.manifest().images().unwrap();
+    let img_elements = epub.manifest().images();
 
     // Create new directory to store extracted images
     let dir = Path::new("extracted_images");
