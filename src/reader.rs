@@ -12,20 +12,16 @@ pub type ReaderResult<T> = Result<T, ReaderError>;
 pub(crate) trait Readable: Debug {
     fn page_count(&self) -> usize;
     // Reader navigation using a string
-    fn navigate_str(&self, path: &str) -> ReaderResult<usize>;
+    fn navigate_str(&self, path: &str) -> Option<ReaderResult<usize>>;
     // Reader navigation using an index
-    fn navigate(&self, index: usize) -> ReaderResult<Content>;
+    fn navigate(&self, index: usize) -> Option<ReaderResult<Content>>;
 }
 
 /// Possible errors for [Reader]
-/// - [OutOfBounds](Self::OutOfBounds)
 /// - [InvalidReference](Self::InvalidReference)
 /// - [NoContent](Self::NoContent)
 #[derive(Error, Debug)]
 pub enum ReaderError {
-    /// When a given index exceeds the reader's bounds.
-    #[error("[OutOfBounds Error][{cause}]: {description}")]
-    OutOfBounds { cause: String, description: String },
     /// When the reader fails to retrieve content due to lack of
     /// proper references. Usually caused by malformed files.
     #[error("[InvalidReference Error][{cause}]: {description}")]
@@ -35,7 +31,14 @@ pub enum ReaderError {
     NoContent(EbookError),
 }
 
-/// Reader that allows traversal of an ebook file by file
+/// Reader that allows traversal of an ebook file by file.
+///
+/// The reader always starts at the first file of an ebook, which can be
+/// accessed using [current_page()](Reader::current_page). As such,
+/// calling [next_page()](Reader::next_page) is not required when a
+/// [Reader] instance is created.
+///
+/// To iterate over all files at once, [iter()](Reader::iter) can do so.
 ///
 /// # Examples
 /// Opening and reading an epub file:
@@ -47,14 +50,39 @@ pub enum ReaderError {
 /// // Creating a reader instance
 /// let mut reader = epub.reader();
 ///
+/// // Reader starts at first page by default
 /// assert_eq!(0, reader.current_index());
+/// println!("{}", reader.current_page().unwrap());
 ///
-/// // Printing the contents of each page
-/// while let Some(content) = reader.next_page() {
+/// // Printing the contents of the next pages
+/// while let Some(Ok(content)) = reader.next_page() {
 ///     println!("{content}")
 /// }
 ///
 /// assert_eq!(143, reader.current_index());
+/// ```
+/// Iterators can also be used to read the contents of an
+/// ebook. However, iterators will not update the internal
+/// index of a [Reader] instance.
+///
+/// Using a for loop to read an epub:
+/// ```
+/// use rbook::Ebook;
+///
+/// let epub = rbook::Epub::new("tests/ebooks/moby-dick.epub").unwrap();
+///
+/// // Creating a reader instance
+/// let mut reader = epub.reader();
+/// let mut count = 0;
+///
+/// for (i, content) in reader.iter().enumerate() {
+///     count = i;
+///     println!("{}", content.unwrap());
+/// }
+///
+/// assert_eq!(143, count);
+/// // Iterators do not update the internal index of a `Reader`
+/// assert_eq!(0, reader.current_index());
 /// ```
 /// Traversing and retrieving pages from a reader:
 /// ```
@@ -63,25 +91,31 @@ pub enum ReaderError {
 /// let mut reader = epub.reader();
 ///
 /// // Set reader position using an index or string
-/// let content1 = reader.set_current_page(56).unwrap();
-/// let content2 = reader.set_current_page_str("chapter_051.xhtml").unwrap();
+/// let content1 = reader
+///     .set_current_page(56)
+///     .expect("Index should be within bounds")
+///     .expect("Associated content should be valid");
+/// let content2 = reader
+///     .set_current_page_str("chapter_051.xhtml")
+///     .expect("Page should be within ebook")
+///     .expect("Associated content should be valid");
 ///
 /// assert_eq!(content1, content2);
 ///
 /// // Get a page without updating the reader index
-/// let content1 = reader.fetch_page(1).unwrap();
-/// let content2 = reader.fetch_page_str("titlepage.xhtml").unwrap();
+/// let content1 = reader.fetch_page(1).unwrap().unwrap();
+/// let content2 = reader.fetch_page_str("titlepage.xhtml").unwrap().unwrap();
 ///
 /// assert_eq!(56, reader.current_index());
 /// assert_eq!(content1, content2);
 /// ```
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct Reader<'a> {
     ebook: &'a dyn Readable,
     current_index: usize,
 }
 
-impl<'a: 'b, 'b> Reader<'a> {
+impl<'a> Reader<'a> {
     pub(crate) fn new(ebook: &'a dyn Readable) -> Self {
         Self {
             ebook,
@@ -102,65 +136,52 @@ impl<'a: 'b, 'b> Reader<'a> {
         self.ebook.page_count()
     }
 
+    /// Retrieve an iterator to iterate over all the pages of
+    /// an ebook.
+    ///
+    /// The retrieved iterator does not update the internal
+    /// index of the [Reader] instance.
+    pub fn iter(&self) -> ReaderIter {
+        ReaderIter {
+            reader: self,
+            index: 0,
+        }
+    }
+
     /// Retrieve the page content of where the reader's
     /// current index is at
     ///
     /// # Errors
     /// Possible errors are described in [ReaderError].
-    pub fn current_page(&self) -> ReaderResult<Content> {
+    pub fn current_page(&self) -> ReaderResult<Content<'a>> {
         self.fetch_page(self.current_index)
+            .expect("Should be within bounds")
     }
 
-    /// Retrieve the next page content. If retrieving the next page
-    /// results in an error. The next page after it will be
-    /// retrieved instead and so on.
-    ///
-    /// To view and handle errors, [try_previous_page()](Self::try_next_page) can be used
-    /// instead.
-    pub fn next_page(&mut self) -> Option<Content> {
-        while self.current_index < self.page_count() - 1 {
-            match self.try_next_page() {
-                Ok(page_content) => return Some(page_content),
-                _ => self.current_index += 1,
-            }
-        }
-
-        None
-    }
-
-    /// Retrieve the previous page content. If retrieving the previous page
-    /// results in an error. The previous page before it will be
-    /// retrieved instead and so on.
-    ///
-    /// To view and handle errors, [try_previous_page()](Self::try_previous_page) can be used
-    /// instead.
-    pub fn previous_page(&mut self) -> Option<Content> {
-        while self.current_index > 0 {
-            match self.try_previous_page() {
-                Ok(page_content) => return Some(page_content),
-                _ => self.current_index -= 1,
-            }
-        }
-
-        None
-    }
-
-    /// Retrieve the next page content. If an error is encountered,
-    /// the index is not updated.
+    /// Retrieve the next page content.
     ///
     /// # Errors
     /// Possible errors are described in [ReaderError].
-    pub fn try_next_page(&mut self) -> ReaderResult<Content<'b>> {
-        self.set_current_page(self.current_index + 1)
+    pub fn next_page(&mut self) -> Option<ReaderResult<Content<'a>>> {
+        if self.current_index < self.page_count() - 1 {
+            self.current_index += 1;
+            self.set_current_page(self.current_index)
+        } else {
+            None
+        }
     }
 
-    /// Retrieve the previous page content. If an error is encountered,
-    /// the index is not updated.
+    /// Retrieve the previous page content.
     ///
     /// # Errors
     /// Possible errors are described in [ReaderError].
-    pub fn try_previous_page(&mut self) -> ReaderResult<Content<'b>> {
-        self.set_current_page(self.current_index - 1)
+    pub fn previous_page(&mut self) -> Option<ReaderResult<Content<'a>>> {
+        if self.current_index > 0 {
+            self.current_index -= 1;
+            self.set_current_page(self.current_index)
+        } else {
+            None
+        }
     }
 
     /// Retrieve the content of a page and update the
@@ -168,11 +189,13 @@ impl<'a: 'b, 'b> Reader<'a> {
     ///
     /// # Errors
     /// Possible errors are described in [ReaderError].
-    pub fn set_current_page(&mut self, page_index: usize) -> ReaderResult<Content<'b>> {
-        self.fetch_page(page_index).map(|content| {
+    pub fn set_current_page(&mut self, page_index: usize) -> Option<ReaderResult<Content<'a>>> {
+        if page_index < self.page_count() {
             self.current_index = page_index;
-            content
-        })
+            self.fetch_page(page_index)
+        } else {
+            None
+        }
     }
 
     /// Retrieve the content of a page and update the
@@ -180,10 +203,12 @@ impl<'a: 'b, 'b> Reader<'a> {
     ///
     /// # Errors
     /// Possible errors are described in [ReaderError].
-    pub fn set_current_page_str(&mut self, path: &str) -> ReaderResult<Content> {
-        self.ebook
-            .navigate_str(path)
-            .and_then(|index| self.set_current_page(index))
+    pub fn set_current_page_str(&mut self, path: &str) -> Option<ReaderResult<Content<'a>>> {
+        match self.ebook.navigate_str(path) {
+            Some(Ok(index)) => self.set_current_page(index),
+            Some(Err(error)) => Some(Err(error)),
+            _ => None,
+        }
     }
 
     /// Retrieve the content of a page without updating the
@@ -191,7 +216,7 @@ impl<'a: 'b, 'b> Reader<'a> {
     ///
     /// # Errors
     /// Possible errors are described in [ReaderError].
-    pub fn fetch_page(&self, page_index: usize) -> ReaderResult<Content<'b>> {
+    pub fn fetch_page(&self, page_index: usize) -> Option<ReaderResult<Content<'a>>> {
         self.ebook.navigate(page_index)
     }
 
@@ -200,9 +225,44 @@ impl<'a: 'b, 'b> Reader<'a> {
     ///
     /// # Errors
     /// Possible errors are described in [ReaderError].
-    pub fn fetch_page_str(&self, path: &str) -> ReaderResult<Content<'b>> {
-        self.ebook
-            .navigate_str(path)
-            .and_then(|index| self.fetch_page(index))
+    pub fn fetch_page_str(&self, path: &str) -> Option<ReaderResult<Content<'a>>> {
+        match self.ebook.navigate_str(path) {
+            Some(Ok(index)) => self.fetch_page(index),
+            Some(Err(error)) => Some(Err(error)),
+            _ => None,
+        }
+    }
+}
+
+impl<'a> IntoIterator for &'a Reader<'_> {
+    type Item = ReaderResult<Content<'a>>;
+    type IntoIter = ReaderIter<'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        ReaderIter {
+            reader: self,
+            index: 0,
+        }
+    }
+}
+
+/// Iterator for a [Reader] instance.
+pub struct ReaderIter<'a> {
+    reader: &'a Reader<'a>,
+    index: usize,
+}
+
+impl<'a> Iterator for ReaderIter<'a> {
+    type Item = ReaderResult<Content<'a>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index >= self.reader.page_count() {
+            self.index -= 1;
+            None
+        } else {
+            let current = self.reader.fetch_page(self.index);
+            self.index += 1;
+            current
+        }
     }
 }

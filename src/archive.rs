@@ -6,8 +6,7 @@ use thiserror::Error;
 use zip::{self, read};
 
 use crate::formats::EbookError;
-use crate::utility;
-use crate::utility::Lock;
+use crate::utility::{self, Lock};
 
 #[cfg(feature = "multi-thread")]
 pub trait Archive: Send + Sync {

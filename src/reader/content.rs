@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
 use std::ops::Deref;
 
@@ -13,7 +14,7 @@ pub enum ContentType {
     Id,
     /// The media type of the content, i.e.,
     /// `application/xhtml+xml`.
-    Type,
+    MediaType,
 }
 
 impl ContentType {
@@ -21,7 +22,7 @@ impl ContentType {
         match self {
             ContentType::Path => "path",
             ContentType::Id => "id",
-            ContentType::Type => "type",
+            ContentType::MediaType => "type",
         }
     }
 }
@@ -37,7 +38,7 @@ impl ContentType {
 /// # let epub = rbook::Epub::new("tests/ebooks/moby-dick.epub").unwrap();
 /// let mut reader = epub.reader();
 ///
-/// let content = reader.next_page().unwrap();
+/// let content = reader.current_page().unwrap();
 ///
 /// // content implements display
 /// println!("{content}");
@@ -47,7 +48,7 @@ impl ContentType {
 /// # use rbook::Ebook;
 /// # let epub = rbook::Epub::new("tests/ebooks/moby-dick.epub").unwrap();
 /// # let mut reader = epub.reader();
-/// # let content = reader.next_page().unwrap();
+/// # let content = reader.current_page().unwrap();
 /// use rbook::read::ContentType;
 ///
 /// // Data in byte form
@@ -58,20 +59,19 @@ impl ContentType {
 /// assert!(content.as_lossy_str().starts_with("<?xml"));
 ///
 /// // Retrieve the media type
-/// assert_eq!("application/xhtml+xml", content.get_content(ContentType::Type).unwrap());
+/// assert_eq!("application/xhtml+xml", content.get_content(ContentType::MediaType).unwrap());
 ///
 /// // Retrieve the path
-/// assert_eq!("OPS/titlepage.xhtml", content.get_content(ContentType::Path).unwrap());
+/// assert_eq!("OPS/cover.xhtml", content.get_content(ContentType::Path).unwrap());
 /// ```
 #[derive(Debug, PartialEq, Eq)]
 pub struct Content<'a> {
     bytes: Vec<u8>,
-    // Used instead of hashmap as the size is always small. ~3 items
-    fields: Vec<(&'static str, Cow<'a, str>)>,
+    fields: HashMap<&'static str, Cow<'a, str>>,
 }
 
 impl<'a> Content<'a> {
-    pub(crate) fn new(bytes: Vec<u8>, fields: Vec<(&'static str, Cow<'a, str>)>) -> Self {
+    pub(crate) fn new(bytes: Vec<u8>, fields: HashMap<&'static str, Cow<'a, str>>) -> Self {
         Self { bytes, fields }
     }
 
@@ -85,9 +85,8 @@ impl<'a> Content<'a> {
     /// See [ContentType] for available options.
     pub fn get_content(&self, content_type: ContentType) -> Option<&str> {
         self.fields
-            .iter()
-            .find(|(key, _)| *key == content_type.as_str())
-            .map(|(_, value)| value.as_ref())
+            .get(content_type.as_str())
+            .map(|data| data.as_ref())
     }
 }
 

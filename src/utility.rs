@@ -36,13 +36,10 @@ pub(crate) fn get_path_metadata<P: AsRef<Path>>(path: P) -> EbookResult<Metadata
     })
 }
 
-pub(crate) fn get_parent_path<P: AsRef<Path>>(path: &P) -> Cow<Path> {
+pub(crate) fn get_parent_path<P: AsRef<Path>>(path: &P) -> &Path {
+    let path = path.as_ref();
     // Return `path` itself if there is no parent
-    path.as_ref()
-        .parent()
-        .map_or(Cow::Borrowed(path.as_ref()), |parent| {
-            Cow::Owned(parent.to_path_buf())
-        })
+    path.parent().unwrap_or(path)
 }
 
 // Function to normalize paths. ex: `EPUB//.//OPS/../../toc.ncx` -> `toc.ncx`
@@ -79,10 +76,9 @@ pub(crate) fn to_utf8(data: &[u8]) -> Cow<[u8]> {
     // Check if a utf-16 byte order mark (bom) exists
     if data.starts_with(b"\xFF\xFE") || data.starts_with(b"\xFE\xFF") {
         // Determine byte order for little endian (le) and big endian (be)
-        let endian = if data.starts_with(b"\xFF") {
-            u16::from_le_bytes
-        } else {
-            u16::from_be_bytes
+        let endian = match data.starts_with(b"\xFF") {
+            true => u16::from_le_bytes,
+            false => u16::from_be_bytes,
         };
 
         let utf16_data: Vec<_> = data[2..]

@@ -59,7 +59,7 @@ pub use self::{
 /// let mut reader = epub.reader();
 ///
 /// // Printing the contents of each page
-/// while let Some(content) = reader.next_page() {
+/// while let Some(Ok(content)) = reader.next_page() {
 ///     println!("{content}")
 /// }
 ///
@@ -140,8 +140,8 @@ impl Epub {
     ///
     /// assert_eq!(PathBuf::from("OPS/package.opf"), root_file);
     /// ```
-    pub fn root_file(&self) -> PathBuf {
-        self.root_file.to_path_buf()
+    pub fn root_file(&self) -> &Path {
+        &self.root_file
     }
 
     /// Retrieve the root file directory of the ebook where
@@ -159,8 +159,8 @@ impl Epub {
     /// let root_file = root_file_dir.join("package.opf");
     /// assert_eq!(PathBuf::from("OPS/package.opf"), root_file);
     /// ```
-    pub fn root_file_directory(&self) -> PathBuf {
-        utility::get_parent_path(&self.root_file).into_owned()
+    pub fn root_file_directory(&self) -> &Path {
+        utility::get_parent_path(&self.root_file)
     }
 
     /// Retrieve the file contents.
@@ -220,17 +220,16 @@ impl Epub {
     }
 
     // Transform a given path into a valid path if necessary
-    // to traverse the contents of the ebook
+    // to access the proper contents of the ebook
     fn parse_path<'a, P: AsRef<Path>>(&self, path: &'a P) -> Cow<'a, Path> {
-        let root_file_dir = utility::get_parent_path(&self.root_file);
+        let root_file_dir = self.root_file_directory();
         let path = path.as_ref();
 
         // If the path is the container or contains the root file dir, return the
         // original. If not, concat the user supplied path to the root file dir.
-        if path.starts_with(constants::META_INF) || path.starts_with(&root_file_dir) {
-            Cow::Borrowed(path)
-        } else {
-            Cow::Owned(root_file_dir.join(path))
+        match path.starts_with(constants::META_INF) || path.starts_with(root_file_dir) {
+            true => Cow::Borrowed(path),
+            false => Cow::Owned(root_file_dir.join(path)),
         }
     }
 
@@ -314,23 +313,16 @@ impl Readable for Epub {
         self.spine.elements().len()
     }
 
-    fn navigate_str(&self, path: &str) -> ReaderResult<usize> {
+    fn navigate_str(&self, path: &str) -> Option<ReaderResult<usize>> {
         // Avoid freeing reference to elements while still in use
         let manifest_elements = self.manifest.elements();
 
         let manifest_element = manifest_elements
             .iter()
-            .find(|element| element.value() == path)
-            .ok_or_else(|| ReaderError::InvalidReference {
-                cause: "Invalid path provided".to_string(),
-                description: format!(
-                    "Please ensure a manifest element's href \
-                     attribute references the path: `{path}`."
-                ),
-            })?;
+            .find(|element| element.value() == path)?;
 
         // Get index of the spine element
-        let spine_element_index = self
+        let index = self
             .spine
             .elements()
             .iter()
@@ -339,57 +331,55 @@ impl Readable for Epub {
                 cause: "Manifest element is not referenced".to_string(),
                 description: format!(
                     "Please ensure a spine element's idref attribute \
-                    references the manifest element with an id of: '{}'",
+                    references the manifest element with an id of: `{}`",
                     manifest_element.name()
                 ),
-            })?;
+            });
 
-        Ok(spine_element_index)
+        // Return index
+        Some(index)
     }
 
-    fn navigate(&self, index: usize) -> ReaderResult<Content> {
-        let spine_elements = self.spine.elements();
-
-        let spine_element = spine_elements
-            .get(index)
-            .ok_or_else(|| ReaderError::OutOfBounds {
-                cause: format!("Provided index '{index}' is out of bounds"),
-                description: "Please ensure the index is in bounds".to_string(),
+    fn navigate(&self, index: usize) -> Option<ReaderResult<Content>> {
+        fn get_content<'a>(ebook: &'a Epub, spine_element: &Element) -> ReaderResult<Content<'a>> {
+            let manifest_element = ebook.manifest.by_id(spine_element.name()).ok_or_else(|| {
+                ReaderError::InvalidReference {
+                    cause: "Invalid manifest reference".to_string(),
+                    description: "Please ensure all spine elements \
+                    reference a valid manifest element."
+                        .to_string(),
+                }
             })?;
 
-        let manifest_element = self.manifest.by_id(spine_element.name()).ok_or_else(|| {
-            ReaderError::InvalidReference {
-                cause: "Invalid manifest reference".to_string(),
-                description: "Please ensure all spine elements \
-                    reference a valid manifest element."
-                    .to_string(),
-            }
-        })?;
+            let data = ebook
+                .read_bytes_file(manifest_element.value())
+                .map_err(ReaderError::NoContent)?;
 
-        let data = self
-            .read_bytes_file(manifest_element.value())
-            .map_err(ReaderError::NoContent)?;
-
-        let mut fields = vec![
-            (
-                ContentType::Id.as_str(),
-                Cow::Borrowed(manifest_element.name()),
-            ),
-            (
-                ContentType::Path.as_str(),
-                Cow::Owned(
-                    utility::normalize_path(&self.parse_path(&manifest_element.value()))
-                        .to_string_lossy()
-                        .replace('\\', "/"),
+            let mut fields = HashMap::from([
+                (
+                    ContentType::Id.as_str(),
+                    Cow::Borrowed(manifest_element.name()),
                 ),
-            ),
-        ];
+                (
+                    ContentType::Path.as_str(),
+                    Cow::Owned(
+                        utility::normalize_path(&ebook.parse_path(&manifest_element.value()))
+                            .to_string_lossy()
+                            .replace('\\', "/"),
+                    ),
+                ),
+            ]);
 
-        if let Some(media_type) = manifest_element.get_attribute(constants::MEDIA_TYPE) {
-            fields.push((ContentType::Type.as_str(), Cow::Borrowed(media_type)));
+            if let Some(media_type) = manifest_element.get_attribute(constants::MEDIA_TYPE) {
+                fields.insert(ContentType::MediaType.as_str(), Cow::Borrowed(media_type));
+            }
+
+            Ok(Content::new(data, fields))
         }
 
-        Ok(Content::new(data, fields))
+        let spine_elements = self.spine.elements();
+        let spine_element = spine_elements.get(index)?;
+        Some(get_content(self, spine_element))
     }
 }
 

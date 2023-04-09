@@ -20,8 +20,8 @@
 //! let mut reader = epub.reader();
 //!
 //! // Printing the contents of each page
-//! while let Some(content) = reader.next_page() {
-//!     let media_type = content.get_content(ContentType::Type).unwrap();
+//! while let Some(Ok(content)) = reader.next_page() {
+//!     let media_type = content.get_content(ContentType::MediaType).unwrap();
 //!     assert_eq!("application/xhtml+xml", media_type);
 //!     println!("{content}");
 //! }
@@ -80,4 +80,5 @@ pub mod result {
 pub mod read {
     //! Access to reader contents.
     pub use super::reader::content::{Content, ContentType};
+    pub use super::reader::ReaderIter;
 }
