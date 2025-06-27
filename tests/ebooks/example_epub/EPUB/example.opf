@@ -1,31 +1,77 @@
 <package xmlns="http://www.idpf.org/2007/opf" unique-identifier="uid" version="3.0" xml:lang="en">
     <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
-        <dc:title>Directory Example</dc:title>
-        <dc:creator id="creator01">Devin Sterling</dc:creator>
+        <meta property="media:duration" refines="#c1_audio">0:32:29</meta>
+        <meta property="media:duration" refines="#c2_audio">0:29:49</meta>
+
+        <meta property="authority" refines="#tag">LCSH</meta>
+        <meta property="term" refines="#tag">sh2008110314</meta>
+
+        <meta property="role" refines="#author" scheme="marc:relators">aut</meta>
+        <meta property="display-seq" refines="#author">1</meta>
+        <!-- slightly malformed here for testing purposes (missing `#` in `refines` will still work) -->
+        <meta property="file-as" refines="author">Doe, John</meta>
+
+        <!-- chaining refines -->
+        <meta id="c3" refines="#c2" property="my-property3">data3</meta>
+        <meta refines="#c3" property="my-property4">data4</meta>
+        <meta id="c2" refines="#c1" property="my-property2">data2</meta>
+        <meta id="c1" refines="#author" property="my-property1">data1</meta>
+
+        <!-- <meta id="cycle1" refines="#cycle2" property="my-cycle2">cycle1</meta> -->
+        <!-- <meta id="cycle2" refines="#cycle1" property="my-cycle1">cycle2</meta> -->
+
+        <meta refines="#subtitle" property="title-type">subtitle</meta>
+
+        <dc:title opf:alt-rep="サンプルEPUB" opf:alt-rep-lang="ja">Example EPUB</dc:title>
+        <dc:title id="subtitle">A subtitle</dc:title>
+        <dc:creator id="author" opf:role="aut" opf:file-as="Doe, John">John Doe</dc:creator>
         <dc:source>rbook</dc:source>
         <dc:date>2023-01-25</dc:date>
         <meta property="dcterms:modified">2023-01-25T10:11:35Z</meta>
         <dc:language>en</dc:language>
-        <dc:identifier id="uid">https://github.com/devinsterling/rbook</dc:identifier>
-        <meta property="role" refines="#creator01" scheme="marc:relators">aut</meta>
-        <!-- slightly malformed here for testing purposes -->
-        <meta property="file-as" refines="creator01">Sterling, Devin</meta>
-        <meta property="display-seq" refines="#creator01">1</meta>
+        <dc:identifier id="uid" opf:scheme="URL">https://github.com/devinsterling/rbook</dc:identifier>
+        <dc:description>
+            <a>Hello world!</a>
+            <![CDATA[ CData 1. ]]>   A <![CDATA[descriptive]]> statement.
+            <![CDATA[ CData 2. ]]>   An<![CDATA[other]]> <!-- comment -->
+            <!-- comment 123 --> statement  <!--comment--> !
+        </dc:description>
+        <dc:subject opf:authority="BISAC" opf:term="FIC024000">
+            FICTION / Occult &amp; Supernatural
+        </dc:subject>
+        <dc:subject id="tag">Quests (Expeditions) -- Fiction</dc:subject>
+        <dc:subject>Fantasy</dc:subject>
+
+        <meta name="cover" content="cover-image1" />
     </metadata>
     <manifest>
         <item href="cover.xhtml" id="cover" media-type="application/xhtml+xml"/>
-        <item href="c1.xhtml" id="c1" media-type="application/xhtml+xml"/>
-        <item href="c2.xhtml" id="c2" media-type="application/xhtml+xml"/>
-        <item href="../toc.xhtml" id="toc" media-type="application/xhtml+xml" properties="nav"/>
+        <item href="c1.xhtml" id="c1" media-overlay="c1_audio" media-type="application/xhtml+xml" />
+        <item href="c1a.xhtml" id="c1a" media-type="application/xhtml+xml" />
+        <item href="c2.xhtml" id="c2" media-overlay="c2_audio" media-type="application/xhtml+xml"/>
+        <item href="../toc.xhtml" id="toc" media-type="application/xhtml+xml" properties="scripted nav"/>
+        <item href="../toc.ncx" id="toc-ncx" media-type="application/x-dtbncx+xml"/>
+
+        <!-- Literally empty files; but useful for tests -->
+        <item href="img/cover.webm" id="cover-image1" fallback="cover-image2" media-type="image/webm" properties="cover-image"/>
+        <item href="img/cover.avif" id="cover-image2" fallback="cover-image3" media-type="image/avif"/>
+        <item href="img/cover.png" id="cover-image3" fallback="ignored" media-type="image/png"/>
+        <item href="overlay/chapter1_audio.smil" id="c1_audio" media-type="application/smil+xml"/>
+        <item href="overlay/chapter2_audio.smil" id="c2_audio" media-type="application/smil+xml"/>
+
+        <!-- `../../` resolves to outside the EPUB container, so it's treated as `../` instead -->
+        <item href="../../file%20name%20with%20spaces.css" id="style" media-type="text/css"/>
     </manifest>
     <spine page-progression-direction="ltr">
         <itemref idref="cover" linear="no"/>
-        <itemref idref="toc" linear="yes"/>
-        <itemref idref="c1" linear="yes"/>
-        <itemref idref="c2" linear="yes"/>
+        <itemref id="spine-toc" idref="toc"/>
+        <itemref idref="c1" linear="yes" properties="page-spread-left"/>
+        <itemref id="supplementary" idref="c1a" linear="no" properties="rbook:prop rbook:prop2" />
+        <itemref idref="c2"/>
     </spine>
-    <guide>
-        <reference href="toc.xhtml" title="Table of Contents" type="toc"/>
-        <reference href="cover.xhtml" title="Cover Image" type="cover"/>
+    <guide rbook:test="epub2-feature">
+        <reference href="cover.xhtml" title="Cover" type="cover"/>
+        <reference href="../toc.xhtml" title="Table of Contents" type="toc"/>
+        <reference href="c1.xhtml" title="Start Here" type="bodymatter"/>
     </guide>
 </package>

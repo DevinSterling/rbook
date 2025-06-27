@@ -1,34 +1,42 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops">
-    <head>
-        <title>rbook</title>
-        <meta content="text/html" charset="utf-8"/>
-    </head>
-    <body>
-        <nav epub:type="toc">
-            <h1>Contents</h1>
+<head>
+    <title>rbook</title>
+    <meta content="text/html" charset="utf-8"/>
+</head>
+<body>
+<nav epub:type="toc" rbook:test="epub3-feature">
+    <h1>Contents</h1>
+    <ol>
+        <li>
+            <a href="EPUB/cover.xhtml" class="h1 cover start">The Cover</a>
+        </li>
+        <li>
+            <a href="EPUB/c1.xhtml?q=1#start">rbook Chapter 1</a>
             <ol>
                 <li>
-                    <a href="EPUB/cover.xhtml">The Cover</a>
-                </li>
-                <li>
-                    <a href="EPUB/c1.xhtml">rbook c1</a>
-                </li>
-                <li>
-                    <a href="EPUB/c2.xhtml">rbook c2</a>
+                    <a href="EPUB/c1a.xhtml">rbook Chapter 1a</a>
                 </li>
             </ol>
-        </nav>
-        <nav epub:type="landmarks">
-            <h2>The Guide</h2>
-            <ol>
-                <li>
-                    <a epub:type="toc" href="toc.xhtml">Table of Contents</a>
-                </li>
-                <li>
-                    <a epub:type="bodymatter" href="EPUB/c1.xhtml">Start Here</a>
-                </li>
-            </ol>
-        </nav>
-    </body>
+        </li>
+        <li>
+            <a href="EPUB/c2.xhtml">rbook Chapter 2</a>
+        </li>
+    </ol>
+</nav>
+<nav epub:type="landmarks" rbook:test="epub3-feature">
+    <h2>The Guide</h2>
+    <ol>
+        <li>
+            <a epub:type="cover" href="EPUB/cover.xhtml">Cover</a>
+        </li>
+        <li>
+            <a epub:type="toc" href="toc.xhtml">Table of Contents</a>
+        </li>
+        <li>
+            <a epub:type="bodymatter" href="EPUB/c1.xhtml">Start Here</a>
+        </li>
+    </ol>
+</nav>
+</body>
 </html>

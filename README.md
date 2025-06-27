@@ -2,135 +2,141 @@
 
 [![Crates.io](https://img.shields.io/crates/v/rbook.svg?style=flat-square)](https://crates.io/crates/rbook)
 [![Documentation](https://img.shields.io/badge/documentation-latest%20release-19e.svg?style=flat-square)](https://docs.rs/rbook)
+[![License](https://img.shields.io/badge/license-Apache%202.0-maroon?style=flat-square)](LICENSE)
 
-An ebook library that supports parsing and reading the epub format.
+![rbook](https://raw.githubusercontent.com/DevinSterling/devinsterling-com/master/public/images/rbook/rbook.png)
+
+A fast, format-agnostic, ergonomic ebook library with a focus on EPUB.
+
+## Features
+| Feature                     | Overview                                                                                    | Documentation                                                       |
+|-----------------------------|---------------------------------------------------------------------------------------------|---------------------------------------------------------------------|
+| **EPUB 2 and 3**            | Read-only (for now) view of EPUB `2` and `3` formats                                        | [epub module](https://docs.rs/rbook/0.6.0/rbook/ebook/epub)         |
+| **Reader**                  | Random‐access or sequential iteration over readable content.                                | [reader module](https://docs.rs/rbook/0.6.0/rbook/reader)           |
+| **Detailed Types**          | Abstractions built on expressive traits and types.                                          |                                                                     |
+| **Metadata**                | Typed access to titles, creators, publishers, languages, tags, roles, attributes, and more. | [metadata module](https://docs.rs/rbook/0.6.0/rbook/ebook/metadata) |
+| **Manifest**                | Lookup and traverse contained resources such as readable content (XHTML) and images.        | [manifest module](https://docs.rs/rbook/0.6.0/rbook/ebook/manifest) |
+| **Spine**                   | Chronological reading order and preferred page direction                                    | [spine module](https://docs.rs/rbook/0.6.0/rbook/ebook/spine)       |
+| **Table of Contents (ToC)** | Navigation points, including the EPUB 2 guide and EPUB 3 landmarks.                         | [toc module](https://docs.rs/rbook/0.6.0/rbook/ebook/toc)           |
+| **Resources**               | Retrieve bytes or UTF-8 strings for any manifest resource                                   | [resource module](https://docs.rs/rbook/0.6.0/rbook/ebook/resource) |
 
 ## Usage
-Including default features:
 ```toml
 [dependencies]
-rbook = "0.5.0"
+rbook = "0.6.0"                                           # with default features
+# rbook = { version = "0.6.0", default-features = false } # excluding default features
 ```
-Excluding default features and selection:
-```toml
-[dependencies]
-rbook = { version = "0.5.0", default-features = false, features = ["multi-thread"] }
-```
-Default features are the following:
-- `reader`: Enables reading of the ebook file by file.
-- `statistics`: Enables word/character counting.
 
-Non-default optional features:
-- `multi-thread`: Enables support for multithreaded environments.
+Default crate features:
+- `prelude`: Convenience prelude ***only*** including common traits.
+- `threadsafe`: Enables constraint and support for `Send + Sync`.
+
+## WebAssembly
+The `wasm32-unknown-unknown` target is supported by default.
+
 ## Examples
-Other examples can be found in the ['tests'](tests) directory.
-
-Opening and reading an epub file:
-```rust
-use rbook::Ebook;
-
-fn main() {
-    // Creating an epub instance
-    let epub = rbook::Epub::new("example.epub").unwrap();
-
-    // Retrieving the title
-    assert_eq!("Jane and John", epub.metadata().title().unwrap().value());
-
-    // Creating a reader instance
-    let reader = epub.reader();
-
-    // Printing the contents of each page
-    for content_result in &reader {
-        let content = content_result.unwrap();
-        let media_type = content.get_content(ContentType::MediaType).unwrap();
-        assert_eq!("application/xhtml+xml", media_type);
-        println!("{}", content);
-    }
-}
-```
-
-Accessing metadata elements and attributes:
-```rust
-use rbook::Ebook;
-
-fn main() {
-    let epub = rbook::Epub::new("example.epub").unwrap();
-
-    // Retrieving the first creator metadata element
-    let creator = epub.metadata().creators().first().unwrap();
-    assert_eq!("John Doe", creator.value());
-
-    // Retrieving an attribute
-    let id = creator.get_attribute("id").unwrap();
-    assert_eq!("creator01", id);
-
-    // Retrieving a child element
-    let role = creator.get_child("role").unwrap();
-    assert_eq!("aut", role.value());
-
-    let scheme = role.get_attribute("scheme").unwrap();
-    assert_eq!("marc:relators", scheme);
-}
-```
-
-Alternative way of accessing elements:
-```rust
-use rbook::Ebook;
-use rbook::xml::Find;
-
-fn main() {
-    let epub = rbook::Epub::new("example.epub").unwrap();
-
-    // Retrieving the title
-    let title = epub.metadata().find_value("title").unwrap();
-    assert_eq!("Jane and John", title);
-    
-    // Retrieving creator
-    let creator = epub.metadata().find_value("creator").unwrap();
-    assert_eq!("John Doe", creator);
-
-    // Retrieving role
-    let role = epub.metadata().find_value("creator > role").unwrap();
-    assert_eq!("aut", role);
-
-    // Retrieving file-as
-    let file_as = epub.metadata().find_value("creator > file-as").unwrap();
-    assert_eq!("Doe, John", file_as);
-}
-```
-
-Extracting images:
-```rust
-use rbook::Ebook;
-use std::fs::{self, File};
-use std::path::Path;
-
-fn main() {
-    let epub = rbook::Epub::new("example.epub").unwrap();
-
-    let img_elements = epub.manifest().images();
-
-    // Create new directory to store extracted images
-    let dir = Path::new("extracted_images");
-    fs::create_dir(&dir).unwrap();
-
-    for img_element in img_elements {
-        let img_href = img_element.value();
-
-        // Retrieve image contents
-        let img = epub.read_bytes_file(img_href).unwrap();
-
-        // Retrieve file name from image href
-        let file_name = Path::new(img_href).file_name().unwrap();
-
-        // Create new file
-        let mut file = File::create(dir.join(file_name)).unwrap();
-        file.write_all(&img).unwrap();
-    }
-}
-```
-
-## Sample ebooks
-Sample ebooks in the ['tests/ebooks'](tests/ebooks) directory are provided as is from 
-[IDPF](https://idpf.github.io/epub3-samples/30/samples.html) under the 
-[CC-BY-SA 3.0](http://creativecommons.org/licenses/by-sa/3.0/) license.
+- Opening and reading an EPUB file:
+  ```rust
+  use rbook::epub::{Epub, EpubSettings};
+  use rbook::prelude::*; // Prelude for traits
+  
+  fn main() {
+      // Opening an epub (file or directory)
+      let epub = Epub::open_with(
+         "tests/ebooks/example_epub",
+         // Toggle strict EPUB checks (`true` by default)
+         EpubSettings::builder().strict(false),
+      ).unwrap();
+  
+      // Retrieving the title
+      assert_eq!("Example EPUB", epub.metadata().title().unwrap().value());
+      
+      // Creating a reader instance:
+      let mut reader = epub.reader(); // or `epub.reader_with(EpubReaderSettings)`
+      // Printing the epub contents
+      while let Some(Ok(data)) = reader.read_next() {
+          let media_type = data.manifest_entry().media_type();
+          assert_eq!("application/xhtml+xml", media_type);
+          println!("{}", data.content());
+      }
+      
+      assert_eq!(Some(4), reader.current_position());
+  }
+  ```
+- Accessing a metadata element:
+  ```rust
+  use rbook::Epub;
+  use rbook::prelude::*;
+  
+  fn main() {
+      let epub = Epub::open("tests/ebooks/example_epub").unwrap();
+      
+      let creator = epub.metadata().creators().next().unwrap();
+      assert_eq!("John Doe", creator.value());
+      assert_eq!("Doe, John", creator.file_as().unwrap());
+      assert_eq!(0, creator.order());
+      
+      let role = creator.main_role().unwrap();
+      assert_eq!("aut", role.code());
+      assert_eq!("marc:relators", role.source().unwrap());
+  }
+  ```
+- Manifest media overlay and fallbacks:
+  ```rust
+  use rbook::Epub;
+  use rbook::prelude::*;
+  
+  fn main() {
+      let epub = Epub::open("tests/ebooks/example_epub").unwrap();
+      
+      // Retrieving media overlay information
+      let chapter_1 = epub.manifest().by_id("c1").unwrap();
+      let media_overlay = chapter_1.media_overlay().unwrap();
+      let duration = media_overlay.refinements().by_property("media:duration").next().unwrap().value();
+      assert_eq!("0:32:29", duration);
+      
+      // Fallbacks
+      let webm_cover = epub.manifest().cover_image().unwrap();
+      let kind = webm_cover.resource_kind();
+      assert_eq!(("image", "webm"), (kind.maintype(), kind.subtype()));
+      
+      // If the app does not support `webm`; fallback
+      let mut fallbacks = webm_cover.fallbacks();
+      let avif_cover = fallbacks.next().unwrap();
+      assert_eq!("image/avif", avif_cover.media_type());
+      
+      // If the app does not support `avif`; fallback
+      let png_cover = fallbacks.next().unwrap();
+      assert_eq!("image/png", png_cover.media_type());
+      
+      // No more fallbacks
+      assert_eq!(None, fallbacks.next());
+  }
+  ```
+- Extracting images from the manifest:
+  ```rust
+  use rbook::Epub;
+  use rbook::prelude::*;
+  use std::fs::{self, File};
+  use std::path::Path;
+  use std::io::Write;
+  
+  fn main() {
+      let epub = Epub::open("example.epub").unwrap();
+      
+      // Create a new directory to store the extracted images
+      let dir = Path::new("extracted_images");
+      fs::create_dir(&dir).unwrap();
+      
+      for image in epub.manifest().images() {
+          let img_href = image.href().as_str();
+          // Retrieve image contents
+          let img = epub.read_resource_bytes(image.resource()).unwrap();
+          // Retrieve the file name from the image href
+          let file_name = Path::new(img_href).file_name().unwrap();
+          // Create a new file
+          let mut file = File::create(dir.join(file_name)).unwrap();
+          file.write_all(&img).unwrap();
+      }
+  }
+  ```
