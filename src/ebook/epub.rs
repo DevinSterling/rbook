@@ -78,7 +78,7 @@ use std::path::Path;
 /// ```
 pub struct Epub {
     archive: Box<dyn Archive>,
-    root_file: String,
+    package_file: String,
     metadata: EpubMetadataData,
     manifest: EpubManifestData,
     spine: EpubSpineData,
@@ -101,10 +101,7 @@ impl Epub {
     /// - Opening an EPUB:
     /// ```
     /// # use rbook::ebook::errors::EbookResult;
-    /// # use rbook::ebook::manifest::{Manifest, ManifestEntry};
-    /// # use rbook::ebook::metadata::{MetaEntry, Metadata};
-    /// # use rbook::reader::ReaderContent;
-    /// # use rbook::{Ebook, Epub};
+    /// # use rbook::Epub;
     /// # fn main() -> EbookResult<()> {
     /// let epub = Epub::open("tests/ebooks/example_epub")?;
     /// # Ok(())
@@ -122,9 +119,8 @@ impl Epub {
     /// - Opening an EPUB with settings:
     /// ```
     /// # use rbook::ebook::errors::EbookResult;
-    /// # use rbook::epub::EpubSettings;
+    /// # use rbook::epub::{Epub, EpubSettings};
     /// # use rbook::epub::metadata::EpubVersion;
-    /// # use rbook::{Ebook, Epub};
     /// # fn main() -> EbookResult<()> {
     /// let epub = Epub::open_with(
     ///     "tests/ebooks/example_epub",
@@ -148,21 +144,31 @@ impl Epub {
         )
     }
 
-    /// Opens an EPUB from any `R: Read + Seek + 'static` reader
-    /// with the specified [`EpubSettings`].
-    ///
-    /// With the `threadsafe` feature enabled, `R` must also be `Send + Sync`.
+    /// With the specified [`EpubSettings`],
+    /// opens an EPUB from any implementation of [`Read`] + [`Seek`]
+    /// (and [`Send`] + [`Sync`] if the `threadsafe` feature is enabled).
     ///
     /// # Errors
     /// - [`ArchiveError`](EbookError::Archive): Missing or invalid EPUB files.
     /// - [`FormatError`](EbookError::Format): Malformed EPUB content.
     ///
     /// # Examples
-    /// - Opening an EPUB with settings:
+    /// - Opening from a [`Cursor`](std::io::Cursor) with an underlying [`Vec`] containing bytes:
     /// ```no_run
     /// # use rbook::ebook::errors::EbookResult;
-    /// # use rbook::epub::EpubSettings;
-    /// # use rbook::{Ebook, Epub};
+    /// # use rbook::epub::{Epub, EpubSettings};
+    /// # use std::error::Error;
+    /// # fn main() -> EbookResult<()> {
+    /// # let epub_bytes = b"";
+    /// let bytes_vec: Vec<u8> = Vec::from(epub_bytes);
+    /// let cursor = std::io::Cursor::new(bytes_vec);
+    /// let epub = Epub::read(cursor, EpubSettings::default())?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    /// - Opening from a [`File`](std::fs::File) directly:
+    /// ```no_run
+    /// # use rbook::epub::{Epub, EpubSettings};
     /// # use std::error::Error;
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// let epub_file = std::fs::File::open("tests/ebooks/example.epub")?;
@@ -207,7 +213,7 @@ impl Epub {
     /// # }
     /// ```
     pub fn package_file(&self) -> Href {
-        self.root_file.as_str().into()
+        self.package_file.as_str().into()
     }
 
     /// The absolute percent-encoded directory [`Self::package_file`] resides in.
@@ -226,19 +232,18 @@ impl Epub {
     /// ```
     /// # use rbook::{Ebook, Epub};
     /// # use rbook::ebook::errors::EbookResult;
-    /// # use std::path::Path;
     /// # fn main() -> EbookResult<()> {
     /// let epub = Epub::open("tests/ebooks/example_epub")?;
     /// let package_dir = epub.package_directory().as_str();
-    /// assert_eq!("/EPUB", package_dir);
+    /// let package_file = epub.package_file().as_str();
     ///
-    /// let package_file = Path::new(package_dir).join("example.opf");
-    /// assert_eq!(Path::new("/EPUB/example.opf"), package_file);
+    /// assert_eq!("/EPUB", package_dir);
+    /// assert_eq!(format!("{package_dir}/example.opf"), package_file);
     /// # Ok(())
     /// # }
     /// ```
     pub fn package_directory(&self) -> Href {
-        uri::parent(&self.root_file).into()
+        uri::parent(&self.package_file).into()
     }
 
     fn transform_resource<'b>(&self, resource: Resource<'b>) -> Resource<'b> {
@@ -263,7 +268,7 @@ impl Epub {
 
         Ok(Self {
             archive,
-            root_file: data.root_file,
+            package_file: data.package_file,
             metadata: data.metadata,
             manifest: data.manifest,
             spine: data.spine,
@@ -316,7 +321,7 @@ impl Ebook for Epub {
     /// # Examples:
     /// - Retrieving file content:
     /// ```
-    /// # use rbook::{Epub, Ebook};
+    /// # use rbook::{Ebook, Epub};
     /// # use rbook::ebook::errors::EbookResult;
     /// # fn main() -> EbookResult<()> {
     /// let epub = Epub::open("tests/ebooks/example_epub")?;
@@ -355,7 +360,7 @@ impl Ebook for Epub {
 impl Debug for Epub {
     fn fmt(&self, fmt: &mut Formatter<'_>) -> std::fmt::Result {
         fmt.debug_struct("Epub")
-            .field("root_file", &self.root_file)
+            .field("package_file", &self.package_file)
             .field("metadata", &self.metadata)
             .field("manifest", &self.manifest)
             .field("spine", &self.spine)
@@ -436,7 +441,7 @@ pub struct EpubSettings {
     /// - Has an **identifier**.
     /// - Has a **title**.
     /// - Has a primary **language**.
-    /// - Has a **version** within the range `[2..3]`.
+    /// - Has a **version** where `2.0 <= version < 4.0`.
     /// - Has a **table of contents**
     /// - Elements (i.e., `item`, `itemref`) have their required attributes present.
     ///

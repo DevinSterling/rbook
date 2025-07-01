@@ -329,7 +329,7 @@ pub trait MetaEntry<'ebook> {
     ///
     /// let creator = epub.metadata().creators().next().unwrap();
     /// assert_eq!("John Doe", creator.value());
-    /// assert_eq!("Doe, John", creator.file_as().unwrap());
+    /// assert_eq!(Some("Doe, John"), creator.file_as());
     /// # Ok(())
     /// # }
     /// ```

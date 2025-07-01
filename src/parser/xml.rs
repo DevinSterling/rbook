@@ -80,7 +80,7 @@ pub(crate) trait XmlReader<'a> {
     }
 }
 
-impl<'a> XmlReader<'a> for Reader<&'a [u8]> {
+impl<'a> XmlReader<'a> for ByteReader<'a> {
     fn next(&mut self) -> Option<ParserResult<Event<'a>>> {
         match self.read_event() {
             Ok(Event::Eof) => None,
@@ -112,7 +112,7 @@ impl<'a> XmlElement<'a> for BytesStart<'a> {
 
     fn get_attribute(&self, key: impl AsRef<[u8]>) -> Option<Cow<[u8]>> {
         match self.try_get_attribute(key) {
-            Ok(x) => x.map(|x| x.value),
+            Ok(option) => option.map(|attribute| attribute.value),
             Err(_) => None,
         }
     }

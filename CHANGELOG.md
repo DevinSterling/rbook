@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.6.1 (2025-07-01)
+### Additions　**＋**
+- Implement `IntoIterator` for:
+
+  | Implementor                          | Iterator Item                   |
+  |--------------------------------------|---------------------------------|
+  | `EpubSpine`/`&EpubSpine`             | `EpubSpineEntry`                |
+  | `EpubManifest`/`&EpubManifest`       | `EpubManifestEntry`             |
+  | `EpubToc`/`&EpubToc`                 | `(&TocEntryKind, EpubTocEntry)` |
+  | `EpubTocChildren`/`&EpubTocChildren` | `EpubTocEntry`                  |
+  | `EpubRefinements`/`&EpubRefinements` | `EpubMetaEntry`                 |
+  | `Attributes`/`&Attributes`           | `Attribute`                     |
+  | `Properties`/`&Properties`           | `&str`                          |
+
+### Changes　**⟳**
+- Update `zip` dependency: 3.0.0 → 4.2.0
+- Refine documentation for enhanced clarity.
+- Refactor/simplify internals.
+
 ## 0.6.0 (2025-06-27)
 ### Structural Overhaul　**⟳**
 This release introduces a major structural overhaul. 

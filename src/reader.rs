@@ -215,7 +215,7 @@ pub trait Reader<'ebook> {
     ///
     /// Returns [`None`] if the cursor is **before** the first entry
     /// (such as on a newly created reader or after invoking [`Self::reset`].
-    /// Otherwise, `Some(i)` where `0 <= i < entries_count`.
+    /// Otherwise, `Some(i)` where `0 <= i < len`.
     ///
     /// # Examples
     /// - Retrieving the position upon navigating:
@@ -240,7 +240,7 @@ pub trait Reader<'ebook> {
     /// reader.seek(reader.len() - 1)?;
     /// assert_eq!(Some(4), reader.current_position());
     ///
-    /// // position remains the same since the end is reached (entries_count - 1)
+    /// // position remains the same since the end is reached (len - 1)
     /// assert!(reader.read_next().is_none());
     /// assert_eq!(Some(4), reader.current_position());
     ///

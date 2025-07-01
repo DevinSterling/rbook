@@ -89,7 +89,6 @@ pub(crate) const PLAY_ORDER: &str = "playOrder"; // epub2 only
 
 // Media types
 pub(crate) const MEDIA_TYPE: &str = "media-type";
-pub(crate) const PACKAGE_TYPE: &str = "application/oebps-package+xml";
 pub(crate) const NCX_TYPE: &str = "application/x-dtbncx+xml";
 
 // constants where calling str.as_bytes() is not possible
@@ -116,4 +115,6 @@ pub(crate) mod bytes {
     pub(crate) const NAV_CONTENT: &[u8] = b"content"; // NCX
 
     pub(crate) const ANCHOR: &[u8] = b"a";
+
+    pub(crate) const PACKAGE_TYPE: &[u8] = b"application/oebps-package+xml";
 }

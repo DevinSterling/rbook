@@ -14,6 +14,7 @@ use std::fmt::{Display, Formatter};
 use std::hash::{Hash, Hasher};
 use std::iter;
 use std::ops::{Deref, DerefMut};
+use std::slice::Iter as SliceIter;
 
 ////////////////////////////////////////////////////////////////////////////////
 // PRIVATE API
@@ -349,7 +350,7 @@ impl<'ebook> Metadata<'ebook> for EpubMetadata<'ebook> {
     /// // Iterate over all non-refining metadata elements
     /// for entry in epub.metadata().entries() {
     ///     // Access refinements
-    ///     for refinement in entry.refinements().iter() {
+    ///     for refinement in entry.refinements() {
     ///         // A refinement references its parent by id
     ///         assert_eq!(entry.id(), refinement.refines());
     ///
@@ -400,8 +401,8 @@ impl<'ebook> EpubRefinements<'ebook> {
     }
 
     /// Returns an iterator over **all** refining [`EpubMetaEntry`] entries.
-    pub fn iter(&self) -> impl Iterator<Item = EpubMetaEntry<'ebook>> + 'ebook {
-        self.0.iter().map(EpubMetaEntry)
+    pub fn iter(&self) -> EpubRefinementsIter<'ebook> {
+        self.into_iter()
     }
 
     /// Returns an iterator over **all** refinements that match the specified `property`.
@@ -453,6 +454,53 @@ impl<'ebook> EpubRefinements<'ebook> {
 impl<'ebook> From<&'ebook EpubRefinementsData> for EpubRefinements<'ebook> {
     fn from(refinements: &'ebook EpubRefinementsData) -> Self {
         Self(refinements)
+    }
+}
+
+impl<'ebook> IntoIterator for &EpubRefinements<'ebook> {
+    type Item = EpubMetaEntry<'ebook>;
+    type IntoIter = EpubRefinementsIter<'ebook>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        EpubRefinementsIter(self.0.iter())
+    }
+}
+
+impl<'ebook> IntoIterator for EpubRefinements<'ebook> {
+    type Item = EpubMetaEntry<'ebook>;
+    type IntoIter = EpubRefinementsIter<'ebook>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        (&self).into_iter()
+    }
+}
+
+/// An iterator over all [`entries`](EpubMetaEntry) within [`EpubRefinements`].
+///
+/// See also: [`EpubRefinements::iter`]
+///
+/// # Examples
+/// - Iterating over all refinements of a metadata entry:
+/// ```
+/// # use rbook::ebook::errors::EbookResult;
+/// # use rbook::{Ebook, Epub};
+/// # fn main() -> EbookResult<()> {
+/// let epub = Epub::open("tests/ebooks/example_epub")?;
+/// let source = epub.metadata().by_property("dc:source").next().unwrap();
+///
+/// for refinement in source.refinements() {
+///     // process refinement //
+/// }
+/// # Ok(())
+/// # }
+/// ```
+pub struct EpubRefinementsIter<'ebook>(SliceIter<'ebook, EpubMetaEntryData>);
+
+impl<'ebook> Iterator for EpubRefinementsIter<'ebook> {
+    type Item = EpubMetaEntry<'ebook>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.next().map(EpubMetaEntry)
     }
 }
 

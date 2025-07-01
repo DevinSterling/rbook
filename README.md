@@ -23,8 +23,8 @@ A fast, format-agnostic, ergonomic ebook library with a focus on EPUB.
 ## Usage
 ```toml
 [dependencies]
-rbook = "0.6.0"                                           # with default features
-# rbook = { version = "0.6.0", default-features = false } # excluding default features
+rbook = "0.6.1"                                           # with default features
+# rbook = { version = "0.6.1", default-features = false } # excluding default features
 ```
 
 Default crate features:
@@ -73,12 +73,12 @@ The `wasm32-unknown-unknown` target is supported by default.
       
       let creator = epub.metadata().creators().next().unwrap();
       assert_eq!("John Doe", creator.value());
-      assert_eq!("Doe, John", creator.file_as().unwrap());
+      assert_eq!(Some("Doe, John"), creator.file_as());
       assert_eq!(0, creator.order());
       
       let role = creator.main_role().unwrap();
       assert_eq!("aut", role.code());
-      assert_eq!("marc:relators", role.source().unwrap());
+      assert_eq!(Some("marc:relators"), role.source());
   }
   ```
 - Manifest media overlay and fallbacks:
@@ -135,7 +135,7 @@ The `wasm32-unknown-unknown` target is supported by default.
           // Retrieve the file name from the image href
           let file_name = Path::new(img_href).file_name().unwrap();
           // Create a new file
-          let mut file = File::create(dir.join(file_name)).unwrap();
+          let mut file = fs::File::create(dir.join(file_name)).unwrap();
           file.write_all(&img).unwrap();
       }
   }

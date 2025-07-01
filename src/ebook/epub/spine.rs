@@ -5,6 +5,7 @@ use crate::ebook::epub::manifest::{EpubManifestEntry, EpubManifestEntryProvider}
 use crate::ebook::epub::metadata::{EpubRefinements, EpubRefinementsData};
 use crate::ebook::spine::{PageDirection, Spine, SpineEntry};
 use std::cmp::Ordering;
+use std::slice::Iter as SliceIter;
 
 ////////////////////////////////////////////////////////////////////////////////
 // PRIVATE API
@@ -111,20 +112,68 @@ impl<'ebook> Spine<'ebook> for EpubSpine<'ebook> {
             .map(|data| EpubSpineEntry::new(self.provider, data))
     }
 
-    fn entries(&self) -> impl Iterator<Item = EpubSpineEntry<'ebook>> + 'ebook {
-        // Copy the provider, so the iterator isn't tied down to the scope of this `Spine`
-        let provider = self.provider;
-
-        self.data
-            .entries
-            .iter()
-            .map(move |data| EpubSpineEntry::new(provider, data))
+    fn entries(&self) -> EpubSpineIter<'ebook> {
+        self.into_iter()
     }
 }
 
 impl PartialEq for EpubSpine<'_> {
     fn eq(&self, other: &Self) -> bool {
         self.data == other.data
+    }
+}
+
+impl<'ebook> IntoIterator for &EpubSpine<'ebook> {
+    type Item = EpubSpineEntry<'ebook>;
+    type IntoIter = EpubSpineIter<'ebook>;
+
+    fn into_iter(self) -> EpubSpineIter<'ebook> {
+        EpubSpineIter {
+            provider: self.provider,
+            iter: self.data.entries.iter(),
+        }
+    }
+}
+
+impl<'ebook> IntoIterator for EpubSpine<'ebook> {
+    type Item = EpubSpineEntry<'ebook>;
+    type IntoIter = EpubSpineIter<'ebook>;
+
+    fn into_iter(self) -> EpubSpineIter<'ebook> {
+        (&self).into_iter()
+    }
+}
+
+/// An iterator over all the [`entries`](EpubSpineEntry) of an [`EpubSpine`].
+///
+/// See also: [`EpubSpine::entries`]
+///
+/// # Examples
+/// - Iterating over all manifest entries:
+/// ```
+/// # use rbook::ebook::errors::EbookResult;
+/// # use rbook::{Ebook, Epub};
+/// # fn main() -> EbookResult<()> {
+/// let epub = Epub::open("tests/ebooks/example_epub")?;
+///
+/// for entry in epub.spine() {
+///     // process entry //
+/// }
+/// # Ok(())
+/// # }
+/// ```
+pub struct EpubSpineIter<'ebook> {
+    provider: EpubManifestEntryProvider<'ebook>,
+    iter: SliceIter<'ebook, EpubSpineEntryData>,
+}
+
+impl<'ebook> Iterator for EpubSpineIter<'ebook> {
+    type Item = EpubSpineEntry<'ebook>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter
+            .next()
+            .map(|data| EpubSpineEntry::new(self.provider, data))
     }
 }
 

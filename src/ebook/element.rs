@@ -4,6 +4,8 @@ use crate::util::{StringExt, uri};
 use std::borrow::Cow;
 use std::fmt::{Debug, Display, Formatter};
 use std::hash::Hash;
+use std::slice::Iter as SliceIter;
+use std::str::SplitWhitespace;
 
 /// The percent-encoded `href` of an element, pointing to a location.
 ///
@@ -172,8 +174,8 @@ impl<'a> Properties<'a> {
     }
 
     /// Returns an iterator over **all** properties.
-    pub fn iter(&self) -> impl Iterator<Item = &'a str> + 'a {
-        self.0.iter()
+    pub fn iter(&self) -> PropertiesIter<'a> {
+        self.into_iter()
     }
 
     /// Returns `true` if the provided property is present, otherwise `false`.
@@ -182,7 +184,7 @@ impl<'a> Properties<'a> {
     }
 
     /// The underlying raw properties.
-    pub fn as_str(&self) -> &str {
+    pub fn as_str(&self) -> &'a str {
         self.0.0.as_str()
     }
 }
@@ -196,6 +198,53 @@ impl<'a> AsRef<str> for Properties<'a> {
 impl<'a> From<&'a PropertiesData> for Properties<'a> {
     fn from(properties: &'a PropertiesData) -> Self {
         Self(properties)
+    }
+}
+
+impl<'a> IntoIterator for &Properties<'a> {
+    type Item = &'a str;
+    type IntoIter = PropertiesIter<'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        PropertiesIter(self.0.iter())
+    }
+}
+
+impl<'a> IntoIterator for Properties<'a> {
+    type Item = &'a str;
+    type IntoIter = PropertiesIter<'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        (&self).into_iter()
+    }
+}
+
+/// An iterator over each property within [`Properties`].
+///
+/// See also: [`Properties::iter`]
+///
+/// # Examples
+/// - Iterating over each property:
+/// ```
+/// # use rbook::ebook::errors::EbookResult;
+/// # use rbook::{Ebook, Epub};
+/// # fn main() -> EbookResult<()> {
+/// let epub = Epub::open("tests/ebooks/example_epub")?;
+/// let nav_xhtml = epub.manifest().by_property("nav").next().unwrap();
+///
+/// for property in nav_xhtml.properties() {
+///     // process property //
+/// }
+/// # Ok(())
+/// # }
+/// ```
+pub struct PropertiesIter<'a>(SplitWhitespace<'a>);
+
+impl<'a> Iterator for PropertiesIter<'a> {
+    type Item = &'a str;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.next()
     }
 }
 
@@ -221,10 +270,8 @@ impl<'a> Attributes<'a> {
     }
 
     /// Returns an iterator over **all** [`Attribute`] entries.
-    pub fn iter(&self) -> impl Iterator<Item = Attribute<'a>> + 'a {
-        // AttributeData is not returned directly here
-        // to allow greater flexibility in the future.
-        self.0.iter().map(Attribute)
+    pub fn iter(&self) -> AttributesIter<'a> {
+        self.into_iter()
     }
 
     /// Returns the [`Attribute`] with the given `name` if present,
@@ -247,6 +294,55 @@ impl<'a> Attributes<'a> {
 impl<'a> From<&'a Vec<AttributeData>> for Attributes<'a> {
     fn from(attributes: &'a Vec<AttributeData>) -> Self {
         Self(attributes)
+    }
+}
+
+impl<'a> IntoIterator for &Attributes<'a> {
+    type Item = Attribute<'a>;
+    type IntoIter = AttributesIter<'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        AttributesIter(self.0.iter())
+    }
+}
+
+impl<'a> IntoIterator for Attributes<'a> {
+    type Item = Attribute<'a>;
+    type IntoIter = AttributesIter<'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        (&self).into_iter()
+    }
+}
+
+/// An iterator over all [`Attribute`] entries within [`Attributes`].
+///
+/// See also: [`Attributes::iter`]
+///
+/// # Examples
+/// - Iterating over all attributes:
+/// ```
+/// # use rbook::ebook::errors::EbookResult;
+/// # use rbook::{Ebook, Epub};
+/// # fn main() -> EbookResult<()> {
+/// let epub = Epub::open("tests/ebooks/example_epub")?;
+/// let nav_xhtml = epub.manifest().by_property("nav").next().unwrap();
+///
+/// for attribute in nav_xhtml.attributes() {
+///     // process attribute //
+/// }
+/// # Ok(())
+/// # }
+/// ```
+pub struct AttributesIter<'a>(SliceIter<'a, AttributeData>);
+
+impl<'a> Iterator for AttributesIter<'a> {
+    // AttributeData is not returned directly here
+    // to allow greater flexibility in the future.
+    type Item = Attribute<'a>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.0.next().map(Attribute)
     }
 }
 
@@ -387,7 +483,7 @@ impl PropertiesData {
         }
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = &str> {
+    pub fn iter(&self) -> SplitWhitespace {
         self.0.split_whitespace()
     }
 

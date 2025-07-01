@@ -5,8 +5,10 @@ use crate::ebook::epub::manifest::{EpubManifestEntry, EpubManifestEntryProvider}
 use crate::ebook::epub::{EpubSettings, EpubVersion};
 use crate::ebook::toc::{Toc, TocChildren, TocEntry, TocEntryKind};
 use std::cmp::Ordering;
+use std::collections::hash_map::Iter as HashMapIter;
 use std::collections::{BinaryHeap, HashMap};
 use std::fmt::Debug;
+use std::slice::Iter as SliceIter;
 
 ////////////////////////////////////////////////////////////////////////////////
 // PRIVATE API
@@ -204,22 +206,68 @@ impl<'ebook> Toc<'ebook> for EpubToc<'ebook> {
         self.by_toc_key(kind, preferred_version)
     }
 
-    fn kinds(
-        &self,
-    ) -> impl Iterator<Item = (&'ebook TocEntryKind<'ebook>, EpubTocEntry<'ebook>)> + 'ebook {
-        // Copy the provider, so the iterator isn't tied down to the scope of this `Toc`
-        let provider = self.provider;
-
-        self.data
-            .toc_map
-            .iter()
-            .map(move |(kind, data)| (&kind.kind, EpubTocEntry::new(data, provider)))
+    fn kinds(&self) -> EpubTocIter<'ebook> {
+        self.into_iter()
     }
 }
 
 impl PartialEq for EpubToc<'_> {
     fn eq(&self, other: &Self) -> bool {
         self.data == other.data
+    }
+}
+
+impl<'ebook> IntoIterator for &EpubToc<'ebook> {
+    type Item = (&'ebook TocEntryKind<'ebook>, EpubTocEntry<'ebook>);
+    type IntoIter = EpubTocIter<'ebook>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        EpubTocIter {
+            provider: self.provider,
+            iter: self.data.toc_map.iter(),
+        }
+    }
+}
+
+impl<'ebook> IntoIterator for EpubToc<'ebook> {
+    type Item = (&'ebook TocEntryKind<'ebook>, EpubTocEntry<'ebook>);
+    type IntoIter = EpubTocIter<'ebook>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        (&self).into_iter()
+    }
+}
+
+/// An iterator over all root toc kinds within an [`EpubToc`].
+///
+/// See also: [`EpubToc::kinds`]
+///
+/// # Examples
+/// - Iterating over all root toc kinds:
+/// ```
+/// # use rbook::ebook::errors::EbookResult;
+/// # use rbook::{Ebook, Epub};
+/// # fn main() -> EbookResult<()> {
+/// let epub = Epub::open("tests/ebooks/example_epub")?;
+///
+/// for (kind, root) in epub.toc() {
+///     // process toc root //
+/// }
+/// # Ok(())
+/// # }
+/// ```
+pub struct EpubTocIter<'ebook> {
+    provider: EpubManifestEntryProvider<'ebook>,
+    iter: HashMapIter<'ebook, EpubTocKey<'ebook>, EpubTocEntryData>,
+}
+
+impl<'ebook> Iterator for EpubTocIter<'ebook> {
+    type Item = (&'ebook TocEntryKind<'ebook>, EpubTocEntry<'ebook>);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter
+            .next()
+            .map(move |(kind, data)| (&kind.kind, EpubTocEntry::new(data, self.provider)))
     }
 }
 
@@ -329,6 +377,27 @@ impl<'ebook> TocEntry<'ebook> for EpubTocEntry<'ebook> {
     }
 }
 
+impl<'a> IntoIterator for &EpubTocEntry<'a> {
+    type Item = EpubTocEntry<'a>;
+    type IntoIter = EpubTocEntryIter<'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        EpubTocEntryIter {
+            provider: self.provider,
+            iter: self.data.children.iter(),
+        }
+    }
+}
+
+impl<'a> IntoIterator for EpubTocEntry<'a> {
+    type Item = EpubTocEntry<'a>;
+    type IntoIter = EpubTocEntryIter<'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        (&self).into_iter()
+    }
+}
+
 /// The children of an [`EpubTocEntry`].
 ///
 /// See [`TocChildren`] for more details.
@@ -345,15 +414,8 @@ impl<'ebook> TocChildren<'ebook> for EpubTocChildren<'ebook> {
             .map(|data| EpubTocEntry::new(data, self.0.provider))
     }
 
-    fn iter(&self) -> impl Iterator<Item = EpubTocEntry<'ebook>> + 'ebook {
-        // Copy the provider, so the iterator isn't tied down to the scope of this `TocEntry`
-        let provider = self.0.provider;
-
-        self.0
-            .data
-            .children
-            .iter()
-            .map(move |data| EpubTocEntry::new(data, provider))
+    fn iter(&self) -> EpubTocEntryIter<'ebook> {
+        self.into_iter()
     }
 
     fn flatten(&self) -> impl Iterator<Item = EpubTocEntry<'ebook>> + 'ebook {
@@ -409,5 +471,60 @@ impl<'ebook> TocChildren<'ebook> for EpubTocChildren<'ebook> {
 impl PartialEq<Self> for EpubTocEntry<'_> {
     fn eq(&self, other: &Self) -> bool {
         self.data == other.data
+    }
+}
+
+impl<'ebook> IntoIterator for &EpubTocChildren<'ebook> {
+    type Item = EpubTocEntry<'ebook>;
+    type IntoIter = EpubTocEntryIter<'ebook>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+impl<'ebook> IntoIterator for EpubTocChildren<'ebook> {
+    type Item = EpubTocEntry<'ebook>;
+    type IntoIter = EpubTocEntryIter<'ebook>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.into_iter()
+    }
+}
+
+/// An iterator over the immediate [`children`](EpubTocEntry) of an [`EpubTocEntry`].
+///
+/// See also:
+/// - [`EpubTocChildren::iter`]
+/// - [`EpubTocChildren::flatten`]
+///
+/// # Examples
+/// - Iterating over immediate children:
+/// ```
+/// # use rbook::ebook::errors::EbookResult;
+/// # use rbook::ebook::toc::{Toc, TocEntry};
+/// # use rbook::{Ebook, Epub};
+/// # fn main() -> EbookResult<()> {
+/// let epub = Epub::open("tests/ebooks/example_epub")?;
+/// let nav_root = epub.toc().contents().unwrap();
+///
+/// for child in nav_root {
+///     // process immediate child //
+/// }
+/// # Ok(())
+/// # }
+/// ```
+pub struct EpubTocEntryIter<'ebook> {
+    provider: EpubManifestEntryProvider<'ebook>,
+    iter: SliceIter<'ebook, EpubTocEntryData>,
+}
+
+impl<'ebook> Iterator for EpubTocEntryIter<'ebook> {
+    type Item = EpubTocEntry<'ebook>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter
+            .next()
+            .map(|data| EpubTocEntry::new(data, self.provider))
     }
 }

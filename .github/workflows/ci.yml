@@ -43,15 +43,12 @@ jobs:
       run: cargo test ${{ matrix.feature }}
 
   test_wasm:
-    strategy:
-      matrix:
-        target: [wasm32-unknown-unknown]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.target }}
+          targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
       - uses: jetli/wasm-pack-action@v0.4.0
       - name: 'Test ${{ matrix.target }}'

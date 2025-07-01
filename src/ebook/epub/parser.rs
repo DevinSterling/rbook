@@ -17,7 +17,7 @@ use crate::parser::ParserResult;
 use crate::util::uri;
 
 pub(super) struct ParsedContent {
-    pub(super) root_file: String,
+    pub(super) package_file: String,
     pub(super) metadata: EpubMetadataData,
     pub(super) manifest: EpubManifestData,
     pub(super) spine: EpubSpineData,
@@ -56,14 +56,14 @@ impl<'a> EpubParser<'a> {
         // Parse "META-INF/container.xml"
         let content_meta_inf = self.read_resource(consts::CONTAINER)?;
 
-        let root_file = self.parse_container(&content_meta_inf)?;
+        let package_file = self.parse_container(&content_meta_inf)?;
         // A resolver to turn uris within the <package> from relative to absolute
-        let package_resolver = UriResolver(uri::parent(&root_file));
+        let package_resolver = UriResolver(uri::parent(&package_file));
 
         // Parse "package.opf"
-        let content_pkg_opf = self.read_resource(root_file.as_str())?;
+        let package_content = self.read_resource(package_file.as_str())?;
         let (toc_hrefs, metadata, manifest, spine, mut toc) =
-            self.parse_opf(package_resolver, &content_pkg_opf)?;
+            self.parse_opf(package_resolver, &package_content)?;
 
         // Parse "toc.xhtml/ncx"
         for TocLocation { href, version } in toc_hrefs {
@@ -77,7 +77,7 @@ impl<'a> EpubParser<'a> {
         toc.set_preferences(self.settings);
 
         Ok(ParsedContent {
-            root_file,
+            package_file,
             metadata,
             manifest,
             spine,

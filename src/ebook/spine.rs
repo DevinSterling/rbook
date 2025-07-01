@@ -49,7 +49,7 @@ pub trait Spine<'ebook> {
     ///
     /// // This ebook has 4 readable entries.
     /// assert_eq!(5, epub.spine().len());
-    /// // Invoking `entries_count` is preferred as it
+    /// // Invoking `len` is preferred as it
     /// // does not need to consume an iterator.
     /// assert_eq!(5, epub.spine().entries().count());
     /// # Ok(())

@@ -5,7 +5,7 @@
 //!
 //! A fast, format-agnostic, ergonomic ebook library with a focus on EPUB.
 //!
-//! ## Features
+//! # Features
 //! | Feature                                   | Overview                                                                                    |
 //! |-------------------------------------------|---------------------------------------------------------------------------------------------|
 //! | [**EPUB 2 and 3**](epub)                  | Read-only (for now) view of EPUB `2` and `3` formats                                        |
@@ -15,19 +15,38 @@
 //! | [**Manifest**](ebook::manifest)           | Lookup and traverse contained resources such as readable content (XHTML) and images.        |
 //! | [**Spine**](ebook::spine)                 | Chronological reading order and preferred page direction                                    |
 //! | [**Table of Contents (ToC)**](ebook::toc) | Navigation points, including the EPUB 2 guide and EPUB 3 landmarks.                         |
-//! | [**Resource API**](ebook::resource)       | Retrieve bytes or UTF-8 strings for any manifest resource                                   |
+//! | [**Resources**](ebook::resource)          | Retrieve bytes or UTF-8 strings for any manifest resource                                   |
 //!
 //! Default crate features:
 //! - `prelude`: Convenience prelude ***only*** including common traits.
 //! - `threadsafe`: Enables constraint and support for `Send + Sync`.
 //!
-//! ## Examples
-//! - Opening and reading an [`Epub`] file:
+//! # Opening an [`Ebook`]
+//! `rbook` supports several methods to open an ebook ([`Epub`]):
+//! - A directory containing the contents of an unzipped ebook:
+//!   ```no_run
+//!   # use rbook::Epub;
+//!   let epub = Epub::open("/ebooks/unzipped_epub_dir");
+//!   ```
+//! - A file path:
+//!   ```no_run
+//!   # use rbook::Epub;
+//!   let epub = Epub::open("/ebooks/zipped.epub");
+//!   ```
+//! - Or any implementation of [`Read`](std::io::Read) + [`Seek`](std::io::Seek)
+//!   (and [`Send`] + [`Sync`] if the `threadsafe` feature is enabled).
+//!   ```no_run
+//!   # use rbook::epub::{Epub, EpubSettings};
+//!   # let bytes_vec = Vec::new(); // Rea
+//!   let cursor = std::io::Cursor::new(bytes_vec);
+//!   let epub = Epub::read(cursor, EpubSettings::default());
+//!   ```
+//!
+//! Aside from how the contents of an ebook are stored, settings may also be provided
+//! to control parser behavior, such as [strictness](epub::EpubSettings::strict):
 //! ```
 //! // Import traits
 //! use rbook::Ebook;
-//! use rbook::ebook::metadata::{Metadata, MetaEntry};
-//! use rbook::reader::{Reader, ReaderContent};
 //! // use rbook::prelude::*; // or the prelude for convenient trait imports
 //!
 //! use rbook::epub::{Epub, EpubSettings};
@@ -38,9 +57,15 @@
 //!     // Toggle strict EPUB checks (`true` by default)
 //!     EpubSettings::builder().strict(false),
 //! ).unwrap();
-//!
-//! // Retrieving the title
-//! assert_eq!("Example EPUB", epub.metadata().title().unwrap().value());
+//! ```
+//! # Reading an [`Ebook`]
+//! Reading the contents of an ebook is handled by a [`Reader`](reader::Reader),
+//! which traverses end-user-readable resources in canonical order.
+//! Similar to how an ebook can receive settings, a reader may also too:
+//! ```
+//! # use rbook::{Ebook, Epub};
+//! use rbook::reader::{Reader, ReaderContent};
+//! # let epub = Epub::open("tests/ebooks/example_epub").unwrap();
 //!
 //! // Creating a reader instance:
 //! let mut reader = epub.reader(); // or `epub.reader_with(EpubReaderSettings)`
@@ -54,27 +79,29 @@
 //!
 //! assert_eq!(Some(4), reader.current_position());
 //! ```
-//! - Accessing a metadata element:
+//!
+//! # Examples
+//! ## Accessing [`Metadata`](ebook::metadata::Metadata)
 //! ```
-//! # use rbook::Ebook;
+//! # use rbook::{Ebook, Epub};
 //! # use rbook::ebook::metadata::{Metadata, MetaEntry, Contributor};
-//! let epub = rbook::Epub::open("tests/ebooks/example_epub").unwrap();
+//! # let epub = Epub::open("tests/ebooks/example_epub").unwrap();
 //! let creator = epub.metadata().creators().next().unwrap();
 //! assert_eq!("John Doe", creator.value());
-//! assert_eq!("Doe, John", creator.file_as().unwrap());
+//! assert_eq!(Some("Doe, John"), creator.file_as());
 //! assert_eq!(0, creator.order());
 //!
 //! let role = creator.main_role().unwrap();
 //! assert_eq!("aut", role.code());
-//! assert_eq!("marc:relators", role.source().unwrap());
+//! assert_eq!(Some("marc:relators"), role.source());
 //! ```
-//! - Manifest media overlays and fallbacks:
+//! ## Accessing Manifest media overlays and fallbacks
 //! ```
-//! # use rbook::Ebook;
+//! # use rbook::{Ebook, Epub};
 //! # use rbook::ebook::errors::EbookResult;
 //! # use rbook::ebook::manifest::{Manifest, ManifestEntry};
 //! # use rbook::ebook::metadata::MetaEntry;
-//! # let epub = rbook::Epub::open("tests/ebooks/example_epub").unwrap();
+//! # let epub = Epub::open("tests/ebooks/example_epub").unwrap();
 //! // Media overlay
 //! let chapter_1 = epub.manifest().by_id("c1").unwrap();
 //! let media_overlay = chapter_1.media_overlay().unwrap();
@@ -97,14 +124,14 @@
 //! // No more fallbacks
 //! assert_eq!(None, png_cover.fallback());
 //! ```
-//! - Extracting images from the manifest:
+//! ## Extracting images from the [`Manifest`](ebook::manifest::Manifest)
 //! ```no_run
 //! use std::fs::{self, File};
 //! use std::path::Path;
 //! use std::io::Write;
-//! # use rbook::Ebook;
+//! # use rbook::{Ebook, Epub};
 //! # use rbook::ebook::manifest::{Manifest, ManifestEntry};
-//! # let epub = rbook::Epub::open("example.epub").unwrap();
+//! # let epub = Epub::open("example.epub").unwrap();
 //!
 //! // Create a new directory to store the extracted images
 //! let dir = Path::new("extracted_images");

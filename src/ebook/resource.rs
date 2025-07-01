@@ -41,8 +41,8 @@ use std::path::Path;
 /// # use rbook::ebook::resource::Resource;
 /// # use rbook::{Ebook, Epub};
 /// # fn main() -> EbookResult<()> {
-/// let cover_path: &str = "/EPUB/cover.xhtml";
-/// let resource: Resource = Resource::from(cover_path);
+/// let cover_path = "/EPUB/cover.xhtml";
+/// let resource = Resource::from(cover_path);
 ///
 /// let epub = Epub::open("tests/ebooks/example_epub")?;
 ///
@@ -132,7 +132,7 @@ impl<'a> From<&'a Self> for Resource<'a> {
 /// let str_key = ResourceKey::from("OEBPS/nav/toc.xhtml");
 /// // A path may be passed as well, although it must contain valid UTF-8.
 /// // Otherwise, the requested file won't be found and an error will
-/// // be propagated for methods that read a `ResourceKey`:
+/// // be propagated from methods that process a `ResourceKey`:
 /// let str_key2 = ResourceKey::from(Path::new("EPUB/toc.ncx"));
 ///
 /// assert!(matches!(position_key, ResourceKey::Position(5)));
@@ -624,9 +624,6 @@ impl ResourceKind<'_> {
     ///
     /// Specifically, `true` is returned if the [`maintype`](Self::maintype)
     /// equals case-insensitive `text`.
-    ///
-    /// # Note
-    /// Operations are case-insensitive; capitalization has no effect.
     ///
     /// # Examples
     /// - Assessing if `css` is a text-related type:

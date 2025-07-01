@@ -12,6 +12,11 @@ use std::collections::{HashMap, HashSet};
 // PRIVATE API
 ////////////////////////////////////////////////////////////////////////////////
 
+/// The kinds of readable content for an epub intended for end-user reading,
+/// typically `application/xhtml+xml`.
+/// `text/html` is possible as well, although not as common.
+const READABLE_CONTENT: [&str; 2] = ["application/xhtml+xml", "text/html"];
+
 #[derive(Debug, PartialEq)]
 pub(super) struct EpubManifestData {
     entries: HashMap<String, EpubManifestEntryData>,
@@ -136,11 +141,8 @@ impl<'ebook> Manifest<'ebook> for EpubManifest<'ebook> {
     /// # Note
     /// Manifest entries are stored in a `HashMap` with the `id` as key,
     /// so iteration order is arbitrary and ***not*** guaranteed to be consistent.
-    fn entries(&self) -> impl Iterator<Item = EpubManifestEntry<'ebook>> + 'ebook {
-        let provider = EpubManifestEntryProvider(*self);
-        self.data
-            .iter()
-            .map(move |(id, data)| EpubManifestEntry::new(id, data, provider))
+    fn entries(&self) -> EpubManifestIter<'ebook> {
+        self.into_iter()
     }
 
     fn cover_image(&self) -> Option<EpubManifestEntry<'ebook>> {
@@ -152,7 +154,7 @@ impl<'ebook> Manifest<'ebook> for EpubManifest<'ebook> {
     }
 
     fn readable_content(&self) -> impl Iterator<Item = EpubManifestEntry<'ebook>> + 'ebook {
-        self.by_resource_kinds(["application/xhtml+xml", "text/html"])
+        self.by_resource_kinds(READABLE_CONTENT)
     }
 
     fn by_resource_kind(
@@ -182,6 +184,60 @@ impl<'ebook> Manifest<'ebook> for EpubManifest<'ebook> {
                 })
             })
             .map(move |(id, data)| EpubManifestEntry::new(id, data, provider))
+    }
+}
+
+impl<'ebook> IntoIterator for &EpubManifest<'ebook> {
+    type Item = EpubManifestEntry<'ebook>;
+    type IntoIter = EpubManifestIter<'ebook>;
+
+    fn into_iter(self) -> EpubManifestIter<'ebook> {
+        EpubManifestIter {
+            provider: EpubManifestEntryProvider(*self),
+            iter: self.data.iter(),
+        }
+    }
+}
+
+impl<'ebook> IntoIterator for EpubManifest<'ebook> {
+    type Item = EpubManifestEntry<'ebook>;
+    type IntoIter = EpubManifestIter<'ebook>;
+
+    fn into_iter(self) -> EpubManifestIter<'ebook> {
+        (&self).into_iter()
+    }
+}
+
+/// An iterator over all the [`entries`](EpubManifestEntry) of an [`EpubManifest`].
+///
+/// See also: [`EpubManifest::entries`]
+///
+/// # Examples
+/// - Iterating over all manifest entries:
+/// ```
+/// # use rbook::ebook::errors::EbookResult;
+/// # use rbook::{Ebook, Epub};
+/// # fn main() -> EbookResult<()> {
+/// let epub = Epub::open("tests/ebooks/example_epub")?;
+///
+/// for entry in epub.manifest() {
+///     // process entry //
+/// }
+/// # Ok(())
+/// # }
+/// ```
+pub struct EpubManifestIter<'ebook> {
+    provider: EpubManifestEntryProvider<'ebook>,
+    iter: HashMapIter<'ebook, String, EpubManifestEntryData>,
+}
+
+impl<'ebook> Iterator for EpubManifestIter<'ebook> {
+    type Item = EpubManifestEntry<'ebook>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self.iter
+            .next()
+            .map(|(id, data)| EpubManifestEntry::new(id, data, self.provider))
     }
 }
 

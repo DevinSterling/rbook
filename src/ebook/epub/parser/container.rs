@@ -12,26 +12,26 @@ impl EpubParser<'_> {
         let mut reader = Reader::from_reader(data);
 
         while let Some(event) = reader.next() {
-            if let Event::Empty(el) | Event::Start(el) = event? {
-                if !el.is_local_name(consts::ROOT_FILE) {
-                    continue;
-                }
-                // Although rare, multiple package.opf locations could exist.
-                // Only accept the first path as it is the default
-                if let (Some(media_type), Some(full_path)) = (
-                    el.get_attribute(consts::MEDIA_TYPE),
-                    el.get_attribute(consts::FULL_PATH),
-                ) {
-                    if media_type == consts::PACKAGE_TYPE.as_bytes() {
-                        let mut s = String::from_utf8(full_path.to_vec())?;
-                        // Make location absolute
-                        if !s.starts_with('/') {
-                            s.insert(0, '/');
-                        }
-                        return Ok(s);
-                    }
-                }
+            let el = match event? {
+                Event::Empty(el) | Event::Start(el) if el.is_local_name(consts::ROOT_FILE) => el,
+                _ => continue,
+            };
+            // Although rare, multiple package.opf locations could exist.
+            // Only accept the first path as it is the default
+            let full_path = match (
+                el.get_attribute(consts::MEDIA_TYPE).as_deref(),
+                el.get_attribute(consts::FULL_PATH),
+            ) {
+                (Some(consts::bytes::PACKAGE_TYPE), Some(full_path)) => full_path,
+                _ => continue,
+            };
+
+            let mut package_file = String::from_utf8(full_path.to_vec())?;
+            // Make location absolute
+            if !package_file.starts_with('/') {
+                package_file.insert(0, '/');
             }
+            return Ok(package_file);
         }
         Err(EpubFormatError::NoOpfReference.into())
     }
