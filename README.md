@@ -9,22 +9,22 @@
 A fast, format-agnostic, ergonomic ebook library with a focus on EPUB.
 
 ## Features
-| Feature                     | Overview                                                                                    | Documentation                                                       |
-|-----------------------------|---------------------------------------------------------------------------------------------|---------------------------------------------------------------------|
-| **EPUB 2 and 3**            | Read-only (for now) view of EPUB `2` and `3` formats                                        | [epub module](https://docs.rs/rbook/0.6.0/rbook/ebook/epub)         |
-| **Reader**                  | Random‐access or sequential iteration over readable content.                                | [reader module](https://docs.rs/rbook/0.6.0/rbook/reader)           |
-| **Detailed Types**          | Abstractions built on expressive traits and types.                                          |                                                                     |
-| **Metadata**                | Typed access to titles, creators, publishers, languages, tags, roles, attributes, and more. | [metadata module](https://docs.rs/rbook/0.6.0/rbook/ebook/metadata) |
-| **Manifest**                | Lookup and traverse contained resources such as readable content (XHTML) and images.        | [manifest module](https://docs.rs/rbook/0.6.0/rbook/ebook/manifest) |
-| **Spine**                   | Chronological reading order and preferred page direction                                    | [spine module](https://docs.rs/rbook/0.6.0/rbook/ebook/spine)       |
-| **Table of Contents (ToC)** | Navigation points, including the EPUB 2 guide and EPUB 3 landmarks.                         | [toc module](https://docs.rs/rbook/0.6.0/rbook/ebook/toc)           |
-| **Resources**               | Retrieve bytes or UTF-8 strings for any manifest resource                                   | [resource module](https://docs.rs/rbook/0.6.0/rbook/ebook/resource) |
+| Feature                     | Overview                                                                                    | Documentation                                                        |
+|-----------------------------|---------------------------------------------------------------------------------------------|----------------------------------------------------------------------|
+| **EPUB 2 and 3**            | Read-only (for now) view of EPUB `2` and `3` formats                                        | [epub module](https://docs.rs/rbook/latest/rbook/ebook/epub)         |
+| **Reader**                  | Random‐access or sequential iteration over readable content.                                | [reader module](https://docs.rs/rbook/latest/rbook/reader)           |
+| **Detailed Types**          | Abstractions built on expressive traits and types.                                          |                                                                      |
+| **Metadata**                | Typed access to titles, creators, publishers, languages, tags, roles, attributes, and more. | [metadata module](https://docs.rs/rbook/latest/rbook/ebook/metadata) |
+| **Manifest**                | Lookup and traverse contained resources such as readable content (XHTML) and images.        | [manifest module](https://docs.rs/rbook/latest/rbook/ebook/manifest) |
+| **Spine**                   | Chronological reading order and preferred page direction                                    | [spine module](https://docs.rs/rbook/latest/rbook/ebook/spine)       |
+| **Table of Contents (ToC)** | Navigation points, including the EPUB 2 guide and EPUB 3 landmarks.                         | [toc module](https://docs.rs/rbook/latest/rbook/ebook/toc)           |
+| **Resources**               | Retrieve bytes or UTF-8 strings for any manifest resource                                   | [resource module](https://docs.rs/rbook/latest/rbook/ebook/resource) |
 
 ## Usage
 ```toml
 [dependencies]
-rbook = "0.6.1"                                           # with default features
-# rbook = { version = "0.6.1", default-features = false } # excluding default features
+rbook = "0.6.2"                                           # with default features
+# rbook = { version = "0.6.2", default-features = false } # excluding default features
 ```
 
 Default crate features:
@@ -140,3 +140,4 @@ The `wasm32-unknown-unknown` target is supported by default.
       }
   }
   ```
+- More examples are available in the documentation: <https://docs.rs/rbook>

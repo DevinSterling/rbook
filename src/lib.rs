@@ -3,9 +3,29 @@
 //! - Repository: <https://github.com/DevinSterling/rbook>
 //! - Documentation: <https://docs.rs/rbook>
 //!
-//! A fast, format-agnostic, ergonomic ebook library with a focus on EPUB.
+//! A fast, format-agnostic, ergonomic ebook library with a current focus on EPUB.
+//!
+//! The primary goal of `rbook` is to provide an ease-of-use high-level API for handling ebooks.
+//! Most importantly, this library is designed with future formats in mind
+//! (`CBZ`, `FB2`, `MOBI`, etc.) via core traits defined within the [`ebook`] and [`reader`]
+//! module, allowing all formats to share the same "base" API.
+//!
+//! Traits such as [`Ebook`] allow formats to be handled generically.
+//! For example, retrieving the data of a cover image agnostic to whether
+//! the implementation is [`Epub`] or not:
+//! ```
+//! # use rbook::Ebook;
+//! # use rbook::ebook::manifest::{Manifest, ManifestEntry};
+//! // Here `ebook` may be of any supported format.
+//! fn cover_image_bytes<E: Ebook>(ebook: &E) -> Option<Vec<u8>> {
+//!     let manifest_entry = ebook.manifest().cover_image()?;
+//!     ebook.read_resource_bytes(manifest_entry.resource()).ok()
+//! }
+//! ```
 //!
 //! # Features
+//! Here is a non-exhaustive list of the features `rbook` provides:
+//!
 //! | Feature                                   | Overview                                                                                    |
 //! |-------------------------------------------|---------------------------------------------------------------------------------------------|
 //! | [**EPUB 2 and 3**](epub)                  | Read-only (for now) view of EPUB `2` and `3` formats                                        |
@@ -34,7 +54,7 @@
 //!   let epub = Epub::open("/ebooks/zipped.epub");
 //!   ```
 //! - Or any implementation of [`Read`](std::io::Read) + [`Seek`](std::io::Seek)
-//!   (and [`Send`] + [`Sync`] if the `threadsafe` feature is enabled).
+//!   (and [`Send`] + [`Sync`] if the `threadsafe` feature is enabled):
 //!   ```no_run
 //!   # use rbook::epub::{Epub, EpubSettings};
 //!   # let bytes_vec = Vec::new(); // Rea
@@ -95,7 +115,34 @@
 //! assert_eq!("aut", role.code());
 //! assert_eq!(Some("marc:relators"), role.source());
 //! ```
-//! ## Accessing Manifest media overlays and fallbacks
+//! ## Extracting images from the [`Manifest`](ebook::manifest::Manifest)
+//! ```no_run
+//! use std::fs::{self, File};
+//! use std::path::Path;
+//! use std::io::Write;
+//! # use rbook::{Ebook, Epub};
+//! # use rbook::ebook::manifest::{Manifest, ManifestEntry};
+//! # let epub = Epub::open("example.epub").unwrap();
+//!
+//! // Create a new directory to store the extracted images
+//! let dir = Path::new("extracted_images");
+//! fs::create_dir(&dir).unwrap();
+//!
+//! for image in epub.manifest().images() {
+//!     let img_href = image.href().as_str();
+//!
+//!     // Retrieve image contents
+//!     let img = epub.read_resource_bytes(image.resource()).unwrap();
+//!
+//!     // Retrieve the file name from the image href
+//!     let file_name = Path::new(img_href).file_name().unwrap();
+//!
+//!     // Create a new file
+//!     let mut file = File::create(dir.join(file_name)).unwrap();
+//!     file.write_all(&img).unwrap();
+//! }
+//! ```
+//! ## Accessing [`EpubManifest`](epub::manifest::EpubManifest) media overlays and fallbacks
 //! ```
 //! # use rbook::{Ebook, Epub};
 //! # use rbook::ebook::errors::EbookResult;
@@ -123,33 +170,6 @@
 //!
 //! // No more fallbacks
 //! assert_eq!(None, png_cover.fallback());
-//! ```
-//! ## Extracting images from the [`Manifest`](ebook::manifest::Manifest)
-//! ```no_run
-//! use std::fs::{self, File};
-//! use std::path::Path;
-//! use std::io::Write;
-//! # use rbook::{Ebook, Epub};
-//! # use rbook::ebook::manifest::{Manifest, ManifestEntry};
-//! # let epub = Epub::open("example.epub").unwrap();
-//!
-//! // Create a new directory to store the extracted images
-//! let dir = Path::new("extracted_images");
-//! fs::create_dir(&dir).unwrap();
-//!
-//! for image in epub.manifest().images() {
-//!     let img_href = image.href().as_str();
-//!
-//!     // Retrieve image contents
-//!     let img = epub.read_resource_bytes(image.resource()).unwrap();
-//!
-//!     // Retrieve the file name from the image href
-//!     let file_name = Path::new(img_href).file_name().unwrap();
-//!
-//!     // Create a new file
-//!     let mut file = File::create(dir.join(file_name)).unwrap();
-//!     file.write_all(&img).unwrap();
-//! }
 //! ```
 
 mod parser;

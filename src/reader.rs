@@ -130,7 +130,7 @@ pub trait Reader<'ebook> {
     /// # Ok(())
     /// # }
     /// ```
-    fn read_next(&mut self) -> Option<ReaderResult<impl ReaderContent<'ebook>>>;
+    fn read_next(&mut self) -> Option<ReaderResult<impl ReaderContent<'ebook> + 'ebook>>;
 
     /// Returns the previous [`ReaderContent`] and decrements a reader's cursor by one.
     ///
@@ -169,7 +169,7 @@ pub trait Reader<'ebook> {
     /// # Ok(())
     /// # }
     /// ```
-    fn read_prev(&mut self) -> Option<ReaderResult<impl ReaderContent<'ebook>>>;
+    fn read_prev(&mut self) -> Option<ReaderResult<impl ReaderContent<'ebook> + 'ebook>>;
 
     /// Returns the [`ReaderContent`] that a reader's cursor is currently positioned at.
     ///
@@ -178,7 +178,7 @@ pub trait Reader<'ebook> {
     /// - `Some(Err(e))`: Entry exists yet reading it failed
     ///   (see [`ReaderError`](errors::ReaderError)).
     /// - `None`: No current entry ([`Self::current_position`] is [`None`]).
-    fn read_current(&self) -> Option<ReaderResult<impl ReaderContent<'ebook>>>;
+    fn read_current(&self) -> Option<ReaderResult<impl ReaderContent<'ebook> + 'ebook>>;
 
     /// Returns the [`ReaderContent`] at the provided [`ReaderKey`]
     /// and moves the reader’s cursor at that position.
@@ -190,7 +190,7 @@ pub trait Reader<'ebook> {
     fn read<'a>(
         &mut self,
         key: impl Into<ReaderKey<'a>>,
-    ) -> ReaderResult<impl ReaderContent<'ebook>>;
+    ) -> ReaderResult<impl ReaderContent<'ebook> + 'ebook>;
 
     /// Moves a reader’s cursor **at** the provided [`ReaderKey`],
     /// returning the position the reader's cursor points to.
@@ -201,14 +201,18 @@ pub trait Reader<'ebook> {
 
     /// Returns the [`ReaderContent`] at the provided [`ReaderKey`]
     /// without updating the reader's cursor.
-    fn get<'a>(&self, key: impl Into<ReaderKey<'a>>) -> ReaderResult<impl ReaderContent<'ebook>>;
+    fn get<'a>(
+        &self,
+        key: impl Into<ReaderKey<'a>>,
+    ) -> ReaderResult<impl ReaderContent<'ebook> + 'ebook>;
 
     /// The total number of traversable [`ReaderContent`] entries in a reader.
     ///
     /// This method returns the same value regardless of calls to methods that mutate
     /// a reader's cursor such as [`Self::read`].
-    /// To find out how many entries are left relative to a cursor,
-    /// see [`Self::remaining`].
+    ///
+    /// # See Also
+    /// - [`Self::remaining`] to find out how many entries are left relative to a cursor.
     fn len(&self) -> usize;
 
     /// The position of a reader’s cursor (current entry).
@@ -240,7 +244,7 @@ pub trait Reader<'ebook> {
     /// reader.seek(reader.len() - 1)?;
     /// assert_eq!(Some(4), reader.current_position());
     ///
-    /// // position remains the same since the end is reached (len - 1)
+    /// // The position remains the same since the end is reached (len - 1)
     /// assert!(reader.read_next().is_none());
     /// assert_eq!(Some(4), reader.current_position());
     ///
@@ -253,6 +257,29 @@ pub trait Reader<'ebook> {
 
     /// The total number of remaining traversable [`ReaderContent`]
     /// until a reader's cursor reaches the end.
+    ///
+    /// # Examples
+    /// - Observing the number of contents remaining:
+    /// ```
+    /// # use rbook::{Ebook, Epub};
+    /// # use rbook::reader::{Reader, ReaderContent};
+    /// # use std::error::Error;
+    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// let epub = Epub::open("tests/ebooks/example_epub")?;
+    /// let mut reader = epub.reader();
+    ///
+    /// assert_eq!(5, reader.len());
+    /// assert_eq!(5, reader.remaining());
+    /// assert_eq!(None, reader.current_position());
+    ///
+    /// // `len` remains fixed while `remaining` changes:
+    /// reader.seek(3)?;
+    /// assert_eq!(5, reader.len());
+    /// assert_eq!(1, reader.remaining());
+    /// assert_eq!(Some(3), reader.current_position());
+    /// # Ok(())
+    /// # }
+    /// ```
     fn remaining(&self) -> usize {
         match self.current_position() {
             Some(position) => self.len().saturating_sub(position + 1),
@@ -261,6 +288,23 @@ pub trait Reader<'ebook> {
     }
 
     /// Returns `true` if a reader has no [`ReaderContent`] to provide; a [`Reader::len`] of `0`.
+    ///
+    /// # Examples
+    /// - Assessing if a reader has content:
+    /// ```
+    /// # use rbook::{Ebook, Epub};
+    /// # use rbook::reader::{Reader, ReaderContent};
+    /// # use std::error::Error;
+    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// let epub = Epub::open("tests/ebooks/example_epub")?;
+    /// let mut reader = epub.reader();
+    ///
+    /// assert_eq!(5, reader.len());
+    /// // The reader has 5 entries, so it is not empty:
+    /// assert!(!reader.is_empty());
+    /// # Ok(())
+    /// # }
+    /// ```
     fn is_empty(&self) -> bool {
         self.len() == 0
     }
@@ -344,23 +388,59 @@ pub trait ReaderContent<'ebook>: PartialEq + Into<String> + Into<Vec<u8>> {
     fn content(&self) -> &str;
 
     /// The associated [`SpineEntry`] containing reading order details.
-    fn spine_entry(&self) -> impl SpineEntry<'ebook>;
+    fn spine_entry(&self) -> impl SpineEntry<'ebook> + 'ebook;
 
     /// The associated [`ManifestEntry`] containing resource details.
-    fn manifest_entry(&self) -> impl ManifestEntry<'ebook>;
+    fn manifest_entry(&self) -> impl ManifestEntry<'ebook> + 'ebook;
 
-    /// Takes the contained content string.
+    /// Takes the contained readable content string.
     ///
-    /// This method is equivalent to calling:
-    /// `let string: String = reader_content.into();`
+    /// This method is equivalent to calling `into::<String>()`.
+    ///
+    /// See [`Self::content`] to retrieve a reference without taking ownership.
+    ///
+    /// # Examples:
+    /// - Extracting the contained content in the form of a [`String`]:
+    /// ```
+    /// # use rbook::{Ebook, Epub};
+    /// # use rbook::reader::{Reader, ReaderContent};
+    /// # use std::error::Error;
+    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// let epub = Epub::open("tests/ebooks/example_epub")?;
+    /// let mut reader = epub.reader();
+    ///
+    /// let content_a: String = reader.get(2)?.into();
+    /// let content_b = reader.get(2)?.into_string();
+    ///
+    /// assert_eq!(content_a, content_b);
+    /// # Ok(())
+    /// # }
+    /// ```
     fn into_string(self) -> String {
         self.into()
     }
 
-    /// Takes the contained content bytes.
+    /// Takes the contained readable content bytes.
     ///
-    /// This method is equivalent to calling:
-    /// `let bytes: Vec<u8> = reader_content.into();`
+    /// This method is equivalent to calling `into::<Vec<u8>()`.
+    ///
+    /// # Examples:
+    /// - Extracting the contained content in the form of bytes:
+    /// ```
+    /// # use rbook::{Ebook, Epub};
+    /// # use rbook::reader::{Reader, ReaderContent};
+    /// # use std::error::Error;
+    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// let epub = Epub::open("tests/ebooks/example_epub")?;
+    /// let mut reader = epub.reader();
+    ///
+    /// let content_a: Vec<u8> = reader.get(2)?.into();
+    /// let content_b = reader.get(2)?.into_bytes();
+    ///
+    /// assert_eq!(content_a, content_b);
+    /// # Ok(())
+    /// # }
+    /// ```
     fn into_bytes(self) -> Vec<u8> {
         self.into()
     }
@@ -368,12 +448,13 @@ pub trait ReaderContent<'ebook>: PartialEq + Into<String> + Into<Vec<u8>> {
 
 /// A key to access content within a [`Reader`].
 #[non_exhaustive]
-#[derive(Debug, Copy, Clone, Hash, Eq, PartialEq)]
+#[derive(Copy, Clone, Debug, Hash, Eq, PartialEq)]
 pub enum ReaderKey<'a> {
     /// A string value, intended for lookup within a [`Reader`].
     ///
     /// For an [`Epub`](crate::Epub), this value corresponds to the `idref` of a spine entry.
     Value(&'a str),
+
     /// An absolute position within the internal buffer of a [`Reader`].
     ///
     /// When passed as an argument to a reader,

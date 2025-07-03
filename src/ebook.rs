@@ -62,7 +62,8 @@ pub trait Ebook {
 
     /// The [`Spine`], encompassing the canonical reading-order sequence.
     ///
-    /// See [`Self::reader`] to sequentially read over the spine contents with greater control.
+    /// # See Also
+    /// - [`Self::reader`] to sequentially read over the spine contents with greater control.
     fn spine(&self) -> impl Spine;
 
     /// The table of contents ([`Toc`]), encompassing navigation points.

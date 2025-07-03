@@ -304,7 +304,8 @@ impl From<EpubReaderSettingsBuilder> for EpubReaderSettings {
 /// Indicates arrangement/omission of `linear` and `non-linear` spine content
 /// within an [`Epub`].
 ///
-/// See [`EpubSpineEntry::is_linear`] for the difference between `linear` and `non-linear` content.
+/// # See Also
+/// - [`EpubSpineEntry::is_linear`] for the difference between `linear` and `non-linear` content.
 ///
 /// Default: [`LinearBehavior::Original`]
 #[derive(Copy, Clone, Debug, Default, Hash, PartialEq, Eq)]

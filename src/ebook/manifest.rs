@@ -53,23 +53,26 @@ pub trait Manifest<'ebook> {
     /// # Note
     /// Entries may be of different [`ResourceKinds`](ResourceKind)
     /// (e.g., `PNG`, `JPEG`, `CSS`).
-    fn entries(&self) -> impl Iterator<Item = impl ManifestEntry<'ebook>> + 'ebook;
+    fn entries(&self) -> impl Iterator<Item = impl ManifestEntry<'ebook> + 'ebook> + 'ebook;
 
     /// The [`ManifestEntry`] of an ebook’s cover image if present.
     ///
-    /// To inspect the kind of image format, see [ManifestEntry::resource_kind].
-    fn cover_image(&self) -> Option<impl ManifestEntry<'ebook>>;
+    /// # See Also
+    /// - [`ManifestEntry::resource_kind`] to inspect the kind of image format.
+    fn cover_image(&self) -> Option<impl ManifestEntry<'ebook> + 'ebook>;
 
     /// Returns an iterator over all image [`entries`](ManifestEntry) in the manifest.
     ///
     /// The iterated entries may correspond to different image kinds,
-    /// such as `PNG`, `JPEG`, etc. To inspect the exact kind, see
-    /// [ManifestEntry::resource_kind].
+    /// such as `PNG`, `JPEG`, etc.
     ///
     /// This method provides the same functionality as invoking
     /// [`Self::by_resource_kind`] with the argument as
     /// [`ResourceKind::IMAGE`].
-    fn images(&self) -> impl Iterator<Item = impl ManifestEntry<'ebook>> + 'ebook;
+    ///
+    /// # See Also
+    /// - [`ManifestEntry::resource_kind`] to inspect the exact image kind.
+    fn images(&self) -> impl Iterator<Item = impl ManifestEntry<'ebook> + 'ebook> + 'ebook;
 
     /// Returns an iterator over all "readable content"
     /// [`entries`](ManifestEntry) in the manifest.
@@ -80,14 +83,16 @@ pub trait Manifest<'ebook> {
     /// # Note
     /// To traverse readable content in canonical reading order, the
     /// [`Spine`](crate::ebook::spine::Spine) is preferred over this method.
-    fn readable_content(&self) -> impl Iterator<Item = impl ManifestEntry<'ebook>> + 'ebook;
+    fn readable_content(
+        &self,
+    ) -> impl Iterator<Item = impl ManifestEntry<'ebook> + 'ebook> + 'ebook;
 
     /// Returns an iterator over all [`entries`](ManifestEntry) in the
     /// manifest whose resource kind matches the specified [`ResourceKind`].
     fn by_resource_kind(
         &self,
         kind: impl Into<ResourceKind<'ebook>>,
-    ) -> impl Iterator<Item = impl ManifestEntry<'ebook>> + 'ebook;
+    ) -> impl Iterator<Item = impl ManifestEntry<'ebook> + 'ebook> + 'ebook;
 
     /// Returns an iterator over all [`entries`](ManifestEntry) in the
     /// manifest whose resource kind matches the specified [`ResourceKinds`](ResourceKind).
@@ -125,9 +130,13 @@ pub trait Manifest<'ebook> {
     fn by_resource_kinds(
         &self,
         kinds: impl IntoIterator<Item = impl Into<ResourceKind<'ebook>>>,
-    ) -> impl Iterator<Item = impl ManifestEntry<'ebook>> + 'ebook;
+    ) -> impl Iterator<Item = impl ManifestEntry<'ebook> + 'ebook> + 'ebook;
 
-    /// Returns `true` if there are no [`entries`](ManifestEntry), otherwise `false`.
+    /// Returns `true` if there are no [`entries`](ManifestEntry).
+    ///
+    /// Generally, manifests are not empty as ebooks *should* have content.
+    /// However, this is possible if a feature such as
+    /// [`EpubSettings::strict`](crate::epub::EpubSettings::strict) is set to `false`.
     fn is_empty(&self) -> bool {
         self.len() == 0
     }
@@ -142,9 +151,46 @@ pub trait ManifestEntry<'ebook> {
     fn key(&self) -> Option<&'ebook str>;
 
     /// The underlying [`Resource`] a manifest entry points to.
+    ///
+    /// # Examples
+    /// - Reading a resource provided by the manifest:
+    /// ```
+    /// # use rbook::ebook::errors::EbookResult;
+    /// # use rbook::ebook::manifest::{Manifest, ManifestEntry};
+    /// # use rbook::{Ebook, Epub};
+    /// # fn main() -> EbookResult<()> {
+    /// let epub = Epub::open("tests/ebooks/example_epub")?;
+    ///
+    /// let chapter_1 = epub.manifest().by_id("c1").unwrap();
+    /// let content = epub.read_resource_str(chapter_1.resource())?;
+    ///
+    /// // process content //
+    /// # Ok(())
+    /// # }
+    /// ```
     fn resource(&self) -> Resource<'ebook>;
 
     /// The kind of [`ResourceKind`] a manifest entry represents,
     /// such as `XHTML`, `PNG`, `CSS`, etc.
+    ///
+    /// # Examples
+    /// - Observing a manifest entry's resource kind:
+    /// ```
+    /// # use rbook::ebook::errors::EbookResult;
+    /// # use rbook::ebook::manifest::{Manifest, ManifestEntry};
+    /// # use rbook::{Ebook, Epub};
+    /// # fn main() -> EbookResult<()> {
+    /// let epub = Epub::open("tests/ebooks/example_epub")?;
+    ///
+    /// let chapter_1 = epub.manifest().by_id("c1").unwrap();
+    /// let kind = chapter_1.resource_kind();
+    ///
+    /// assert_eq!("application/xhtml+xml", kind.as_str());
+    /// assert_eq!("application", kind.maintype());
+    /// assert_eq!("xhtml", kind.subtype());
+    /// assert_eq!(Some("xml"), kind.suffix());
+    /// # Ok(())
+    /// # }
+    /// ```
     fn resource_kind(&self) -> ResourceKind<'ebook>;
 }

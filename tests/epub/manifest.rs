@@ -39,6 +39,7 @@ fn test_manifest() {
     ];
 
     assert_eq!(expected.len(), entries.len());
+    assert!(!manifest.is_empty());
 
     for (entry, (id, href, href_raw, media_type, overlay, fallback, properties)) in
         entries.into_iter().zip(expected)

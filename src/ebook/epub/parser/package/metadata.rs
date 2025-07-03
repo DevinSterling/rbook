@@ -368,6 +368,7 @@ impl<'a> EpubParser<'a> {
                 group
             } else {
                 meta_groups.insert(meta.property.clone(), Vec::new());
+                // Calling `unwrap` is safe here as `meta.property` was just added as a key
                 meta_groups.get_mut(&meta.property).unwrap()
             }
             .push(meta);

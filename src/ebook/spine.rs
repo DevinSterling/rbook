@@ -68,26 +68,37 @@ pub trait Spine<'ebook> {
     /// # use rbook::{Ebook, Epub};
     /// # fn main() -> EbookResult<()> {
     /// let epub = Epub::open("tests/ebooks/example_epub")?;
+    /// let spine = epub.spine();
     ///
-    /// let spine_entry = epub.spine().by_order(2).unwrap();
+    /// let spine_entry = spine.by_order(2).unwrap();
     /// assert_eq!(2, spine_entry.order());
     /// assert_eq!("c1", spine_entry.idref());
     ///
-    /// let spine_entry = epub.spine().by_order(4).unwrap();
+    /// let spine_entry = spine.by_order(4).unwrap();
     /// assert_eq!(4, spine_entry.order());
     /// assert_eq!("c2", spine_entry.idref());
+    ///
+    /// // Attempting to retrieve a non-existent entry; out-of-bounds
+    /// // Since `len` is 5, the retrievable range is `[0, 4]`.
+    /// assert_eq!(5, spine.len());
+    /// assert_eq!(None, spine.by_order(5));
+    /// assert_eq!(None, spine.by_order(100));
+    ///
     /// # Ok(())
     /// # }
     /// ```
-    fn by_order(&self, order: usize) -> Option<impl SpineEntry<'ebook>>;
+    fn by_order(&self, order: usize) -> Option<impl SpineEntry<'ebook> + 'ebook>;
 
     /// Returns an iterator over all [`entries`](SpineEntry) within
     /// the spine in canonical order.
     ///
-    /// See [`Spine::len`] to retrieve the total number of entries.
-    fn entries(&self) -> impl Iterator<Item = impl SpineEntry<'ebook>> + 'ebook;
+    /// # See Also
+    /// - [`Spine::len`] to retrieve the total number of entries.
+    fn entries(&self) -> impl Iterator<Item = impl SpineEntry<'ebook> + 'ebook> + 'ebook;
 
-    /// Returns `true` if there are no [`entries`](SpineEntry), otherwise `false`.
+    /// Returns `true` if there are no [`entries`](SpineEntry).
+    ///
+    /// Although possible, spines are generally not empty as ebooks *should* have readable content.
     fn is_empty(&self) -> bool {
         self.len() == 0
     }
@@ -101,10 +112,15 @@ pub trait SpineEntry<'ebook>: Ord {
     /// The [`ManifestEntry`] associated with a [`SpineEntry`].
     ///
     /// Returns [`None`] if the spine entry references a non-existent
-    /// [`ManifestEntry`] within the [`Manifest`](super::Manifest).
-    fn manifest_entry(&self) -> Option<impl ManifestEntry<'ebook>>;
+    /// [`ManifestEntry`] within the [`Manifest`](super::Manifest),
+    /// indicating a malformed EPUB file.
+    fn manifest_entry(&self) -> Option<impl ManifestEntry<'ebook> + 'ebook>;
 
     /// The textual [`Resource`] intended for end-user reading an entry points to.
+    ///
+    /// Returns [`None`] if the spine entry references a non-existent
+    /// [`ManifestEntry`] within the [`Manifest`](super::Manifest),
+    /// preventing resource retrieval and indicating a malformed EPUB file.
     fn resource(&self) -> Option<Resource<'ebook>> {
         self.manifest_entry().map(|entry| entry.resource())
     }
@@ -126,7 +142,7 @@ pub trait SpineEntry<'ebook>: Ord {
 ///
 /// Default: [`PageDirection::Default`]
 #[non_exhaustive]
-#[derive(Debug, Default, Copy, Clone, PartialEq, Eq, Hash)]
+#[derive(Copy, Clone, Debug, Default, Hash, PartialEq, Eq)]
 pub enum PageDirection {
     /// Pages flow from left-to-right (`ltr`).
     LeftToRight,
@@ -144,8 +160,8 @@ impl PageDirection {
     const LEFT_TO_RIGHT_BYTES: &'static [u8] = Self::LEFT_TO_RIGHT.as_bytes();
     const RIGHT_TO_LEFT_BYTES: &'static [u8] = Self::RIGHT_TO_LEFT.as_bytes();
 
-    pub(crate) fn from_bytes(bytes: &[u8]) -> Self {
-        match bytes {
+    pub(crate) fn from_bytes(bytes: impl AsRef<[u8]>) -> Self {
+        match bytes.as_ref() {
             Self::LEFT_TO_RIGHT_BYTES => Self::LeftToRight,
             Self::RIGHT_TO_LEFT_BYTES => Self::RightToLeft,
             _ => Self::Default,
@@ -174,5 +190,41 @@ impl PageDirection {
 impl Display for PageDirection {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.as_str())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::PageDirection;
+
+    #[test]
+    fn test_page_direction_from_bytes() {
+        let expected = [
+            (PageDirection::LeftToRight, "ltr"),
+            (PageDirection::RightToLeft, "rtl"),
+            (PageDirection::Default, ""),
+            (PageDirection::Default, "auto"),
+            (PageDirection::Default, "default"),
+            // Must be `ltr`; not `left-to-right`/`LTR`
+            (PageDirection::Default, "LTR"),
+            (PageDirection::Default, "left-to-right"),
+        ];
+
+        for (expect, input) in expected {
+            assert_eq!(expect, PageDirection::from_bytes(input));
+        }
+    }
+
+    #[test]
+    fn test_page_direction_display() {
+        let expected = [
+            ("ltr", PageDirection::LeftToRight),
+            ("rtl", PageDirection::RightToLeft),
+            ("default", PageDirection::Default),
+        ];
+
+        for (expect, input) in expected {
+            assert_eq!(expect, input.to_string());
+        }
     }
 }

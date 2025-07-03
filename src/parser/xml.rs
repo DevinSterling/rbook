@@ -16,7 +16,7 @@ pub(crate) trait XmlReader<'a> {
     fn next(&mut self) -> Option<ParserResult<Event<'a>>>;
 
     /// If `event` is [Some], takes the [Event] and returns it,
-    /// otherwise, invokes [Self::next].
+    /// otherwise invokes [Self::next].
     ///
     /// After this call, `event` **will** have a value of [None].
     fn take_or_next(&mut self, event: &mut Option<Event<'a>>) -> Option<ParserResult<Event<'a>>> {

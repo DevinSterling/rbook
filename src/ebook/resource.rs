@@ -1,5 +1,6 @@
 //! Format-agnostic [`Resource`] types for ebooks.
 
+use crate::ebook::element::Href;
 use crate::util::{StrExt, StringExt};
 use std::borrow::Cow;
 use std::fmt::{Display, Formatter};
@@ -147,6 +148,7 @@ pub enum ResourceKey<'a> {
     /// When using the [`From<&Path>`](ResourceKey::from) impl, the input must be
     /// valid UTF-8; any non-UTF-8 sequences will be replaced with `�`.
     Value(Cow<'a, str>),
+
     /// A numeric index-based [`key`](ResourceKey) for locations that
     /// cannot be represented with a string value.
     ///
@@ -196,6 +198,12 @@ impl<'a> ResourceKey<'a> {
             Self::Position(position) => Some(*position),
             _ => None,
         }
+    }
+}
+
+impl<'a> From<Href<'a>> for ResourceKey<'a> {
+    fn from(value: Href<'a>) -> Self {
+        value.path().as_str().into()
     }
 }
 
@@ -443,7 +451,8 @@ impl ResourceKind<'_> {
     /// - `application/xhtml+xml;`_**`charset=UTF-8`**_
     /// - The parameters: `charset=UTF-8`
     ///
-    /// See [`Self::params_iter`] to iterate over all parameters.
+    /// # See Also
+    /// - [`Self::params_iter`] to iterate over all parameters.
     ///
     /// # Examples
     /// - Retrieving the suffix of a resource kind (with and without):
@@ -532,7 +541,7 @@ impl ResourceKind<'_> {
         self.subtype().is_empty() || self.maintype().is_empty()
     }
 
-    /// Returns `true` if the kind of resource is an application-level resource, otherwise `false`.
+    /// Returns `true` if the kind of resource is an application-level resource.
     ///
     /// Specifically, `true` is returned if the [`maintype`](Self::maintype)
     /// equals case-insensitive `application`.
@@ -549,7 +558,7 @@ impl ResourceKind<'_> {
         self.maintype().eq_ignore_ascii_case(Self::_APPLICATION)
     }
 
-    /// Returns `true` if the kind of resource is audio, otherwise `false`.
+    /// Returns `true` if the kind of resource is audio.
     ///
     /// Specifically, `true` is returned if the [`maintype`](Self::maintype)
     /// equals case-insensitive `audio`.
@@ -566,7 +575,7 @@ impl ResourceKind<'_> {
         self.maintype().eq_ignore_ascii_case(Self::_AUDIO)
     }
 
-    /// Returns `true` if the kind of resource is a font, otherwise `false`.
+    /// Returns `true` if the kind of resource is a font.
     ///
     /// Specifically, `true` is returned if the [`maintype`](Self::maintype) equals `font`
     /// or the [`subtype`](Self::subtype) matches one of the following:
@@ -579,7 +588,7 @@ impl ResourceKind<'_> {
     /// Operations are case-insensitive; capitalization has no effect.
     ///
     /// # Examples
-    /// - Assessing if `woff` is a font type:
+    /// - Assessing if the specified kinds are fonts:
     /// ```
     /// # use rbook::ebook::resource::ResourceKind;
     /// assert!(ResourceKind::from("font/woff").is_font());
@@ -603,7 +612,7 @@ impl ResourceKind<'_> {
             || subtype.eq_ignore_ascii_case("vnd.ms-opentype")
     }
 
-    /// Returns `true` if the kind of resource is an image, otherwise `false`.
+    /// Returns `true` if the kind of resource is an image.
     ///
     /// Specifically, `true` is returned if the [`maintype`](Self::maintype)
     /// equals case-insensitive `image`.
@@ -620,7 +629,7 @@ impl ResourceKind<'_> {
         self.maintype().eq_ignore_ascii_case(Self::_IMAGE)
     }
 
-    /// Returns `true` if the kind of resource is text-related, otherwise `false`.
+    /// Returns `true` if the kind of resource is text-related.
     ///
     /// Specifically, `true` is returned if the [`maintype`](Self::maintype)
     /// equals case-insensitive `text`.
@@ -637,7 +646,7 @@ impl ResourceKind<'_> {
         self.maintype().eq_ignore_ascii_case(Self::_TEXT)
     }
 
-    /// Returns `true` if the kind of resource is a video, otherwise `false`.
+    /// Returns `true` if the kind of resource is a video.
     ///
     /// Specifically, `true` is returned if the [`maintype`](Self::maintype)
     /// equals case-insensitive `video`.
@@ -726,4 +735,28 @@ impl<'a> From<&'a Self> for ResourceKind<'a> {
     fn from(value: &'a Self) -> Self {
         Self(Cow::Borrowed(value.0.as_ref()))
     }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::ebook::resource::{Resource, ResourceKind};
+
+    #[test]
+    fn test_resource_from() {
+        let a = Resource::from("r1");
+        let b = Resource::from(&a);
+        assert_eq!(a, b);
+
+        let c = Resource::from((ResourceKind::UNSPECIFIED, "r1"));
+        assert_eq!(b, c);
+
+        let d = Resource::from((ResourceKind::TEXT, 0));
+        assert_ne!(c, d);
+
+        let e = Resource::from(0);
+        assert_ne!(b, e);
+    }
+
+    #[test]
+    fn test_resource_display() {}
 }

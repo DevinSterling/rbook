@@ -51,5 +51,5 @@ jobs:
           targets: wasm32-unknown-unknown
       - uses: Swatinem/rust-cache@v2
       - uses: jetli/wasm-pack-action@v0.4.0
-      - name: 'Test ${{ matrix.target }}'
+      - name: 'Test WebAssembly'
         run: wasm-pack test --node

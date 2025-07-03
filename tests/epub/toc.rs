@@ -1,6 +1,7 @@
 use crate::epub::open_example_epub_file_with;
 use rbook::Ebook;
 use rbook::ebook::element::Attributes;
+use rbook::ebook::manifest::ManifestEntry;
 use rbook::ebook::toc::{Toc, TocChildren, TocEntry, TocEntryKind};
 use rbook::epub::EpubSettings;
 use rbook::epub::metadata::EpubVersion;
@@ -47,6 +48,9 @@ fn test_toc() {
         let root = epub.toc().by_kind_version(&kind, version).unwrap();
         let contents = root.children().flatten().collect::<Vec<_>>();
 
+        assert!(root.is_root());
+        // The root must contain children
+        assert!(!root.children().is_empty());
         assert_eq!(&kind, root.kind());
         assert_eq!(expected.len(), contents.len());
 
@@ -59,6 +63,8 @@ fn test_toc() {
 
             let manifest_entry = entry.manifest_entry().unwrap();
             assert_eq!(entry.href().unwrap().path(), manifest_entry.href());
+            // Resources must be identical
+            assert_eq!(entry.resource().unwrap(), manifest_entry.resource());
         }
     }
 }

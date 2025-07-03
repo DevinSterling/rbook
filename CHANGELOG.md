@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.6.2 (2025-07-03)
+### Additions　**＋**
+- Implement `From<Href>` for `ResourceKey`.
+- Expand test coverage.
+
+### Changes　**⟳**
+- Refine documentation for enhanced clarity.
+- Refactor/simplify internals.
+
+### Fixes　**✓**
+- Fix shorter than expected lifetimes on references/instances returned by: 
+  - `Ebook`
+  - `Manifest`
+  - `Metadata`
+  - `Spine`
+  - `Toc`
+  - `Reader`
+  - `ReaderContent`
+  - `Href`
+  - `Name`
+
 ## 0.6.1 (2025-07-01)
 ### Additions　**＋**
 - Implement `IntoIterator` for:

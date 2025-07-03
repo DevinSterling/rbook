@@ -34,6 +34,9 @@ use std::hash::Hash;
 pub trait Metadata<'ebook> {
     /// The version of an [`ebook's`](super::Ebook) format in the form of a string.
     ///
+    /// # See Also
+    /// - [`Self::version`] for the parsed representation.
+    ///
     /// # Examples
     /// - Retrieving the version of an ebook in EPUB format:
     /// ```
@@ -48,10 +51,12 @@ pub trait Metadata<'ebook> {
     /// # Ok(())
     /// # }
     /// ```
-    /// See [`Self::version`] for the parsed representation.
     fn version_str(&self) -> Option<&'ebook str>;
 
     /// The version of an [`Ebook`](super::Ebook).
+    ///
+    /// # See Also
+    /// - [`Self::version_str`] for the original representation.
     ///
     /// # Examples
     /// - Retrieving the version of an ebook in EPUB format:
@@ -67,7 +72,6 @@ pub trait Metadata<'ebook> {
     /// # Ok(())
     /// # }
     /// ```
-    /// See [`Self::version_str`] for the original representation.
     fn version(&self) -> Option<Version>;
 
     /// The publication date; when an [`Ebook`](super::Ebook) was published.
@@ -75,27 +79,29 @@ pub trait Metadata<'ebook> {
 
     /// The last modified date; when an [`Ebook`](super::Ebook) was last modified.
     ///
-    /// See also: [`Self::publication_date`]
+    /// # See Also
+    /// - [`Self::publication_date`]
     fn modified_date(&self) -> Option<DateTime<'ebook>>;
 
     /// The primary unique [`Identifier`] tied to an [`Ebook`](super::Ebook).
-    fn identifier(&self) -> Option<impl Identifier<'ebook>>;
+    fn identifier(&self) -> Option<impl Identifier<'ebook> + 'ebook>;
 
     /// Returns an iterator over **all** [`Identifiers`](Identifier)
     /// by [`order`](MetaEntry::order).
-    fn identifiers(&self) -> impl Iterator<Item = impl Identifier<'ebook>> + 'ebook;
+    fn identifiers(&self) -> impl Iterator<Item = impl Identifier<'ebook> + 'ebook> + 'ebook;
 
     /// The main [`Language`].
-    fn language(&self) -> Option<impl Language<'ebook>>;
+    fn language(&self) -> Option<impl Language<'ebook> + 'ebook>;
 
     /// Returns an iterator over **all** [`Languages`](Language)
     /// by [`order`](MetaEntry::order).
-    fn languages(&self) -> impl Iterator<Item = impl Language<'ebook>> + 'ebook;
+    fn languages(&self) -> impl Iterator<Item = impl Language<'ebook> + 'ebook> + 'ebook;
 
     /// The main [`Title`].
     ///
-    /// See [`Self::titles`] to retrieve all titles by [`order`](MetaEntry::order).
-    fn title(&self) -> Option<impl Title<'ebook>>;
+    /// # See Also
+    /// - [`Self::titles`] to retrieve all titles by [`order`](MetaEntry::order).
+    fn title(&self) -> Option<impl Title<'ebook> + 'ebook>;
 
     /// Returns an iterator over **all** [`Titles`](Title)
     /// by [`order`](MetaEntry::order).
@@ -104,32 +110,32 @@ pub trait Metadata<'ebook> {
     /// as depending on the ebook, it could have a display order greater than `1`.
     ///
     /// To get the main title, disregarding display order, use [`Self::title`].
-    fn titles(&self) -> impl Iterator<Item = impl Title<'ebook>> + 'ebook;
+    fn titles(&self) -> impl Iterator<Item = impl Title<'ebook> + 'ebook> + 'ebook;
 
     /// The main description of an [`Ebook`](super::Ebook).
-    fn description(&self) -> Option<impl MetaEntry<'ebook>>;
+    fn description(&self) -> Option<impl MetaEntry<'ebook> + 'ebook>;
 
     /// Returns an iterator over **all** descriptions by [`order`](MetaEntry::order).
-    fn descriptions(&self) -> impl Iterator<Item = impl MetaEntry<'ebook>> + 'ebook;
+    fn descriptions(&self) -> impl Iterator<Item = impl MetaEntry<'ebook> + 'ebook> + 'ebook;
 
     /// Returns an iterator over **all** [`Creators`](Contributor)
     /// by [`order`](MetaEntry::order).
-    fn creators(&self) -> impl Iterator<Item = impl Contributor<'ebook>> + 'ebook;
+    fn creators(&self) -> impl Iterator<Item = impl Contributor<'ebook> + 'ebook> + 'ebook;
 
     /// Returns an iterator over **all** [`Contributors`](Contributor)
     /// by [`order`](MetaEntry::order).
-    fn contributors(&self) -> impl Iterator<Item = impl Contributor<'ebook>> + 'ebook;
+    fn contributors(&self) -> impl Iterator<Item = impl Contributor<'ebook> + 'ebook> + 'ebook;
 
     /// Returns an iterator over **all** [`Publishers`](Contributor)
     /// by [`order`](MetaEntry::order).
-    fn publishers(&self) -> impl Iterator<Item = impl Contributor<'ebook>> + 'ebook;
+    fn publishers(&self) -> impl Iterator<Item = impl Contributor<'ebook> + 'ebook> + 'ebook;
 
     /// Returns an iterator over **all** [`Tags`](Tag)
     /// by [`order`](MetaEntry::order).
-    fn tags(&self) -> impl Iterator<Item = impl Tag<'ebook>> + 'ebook;
+    fn tags(&self) -> impl Iterator<Item = impl Tag<'ebook> + 'ebook> + 'ebook;
 
     /// Returns an iterator over **all** metadata entries.
-    fn entries(&self) -> impl Iterator<Item = impl MetaEntry<'ebook>> + 'ebook;
+    fn entries(&self) -> impl Iterator<Item = impl MetaEntry<'ebook> + 'ebook> + 'ebook;
 }
 
 /// The scheme of metadata entries, specifying a registry [`source`](Scheme::source)
@@ -187,7 +193,8 @@ impl<'ebook> Scheme<'ebook> {
 /// Unlike [`Language`], [`LanguageTag`] complements metadata entries
 /// instead of specifying an ebook-wide language.
 ///
-/// See also: [`AlternateScript`]
+/// # See Also
+/// - [`AlternateScript`]
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub struct LanguageTag<'ebook> {
     scheme: Scheme<'ebook>,
@@ -586,7 +593,7 @@ pub struct Version(
 
 impl Version {
     pub(crate) fn from_str(version: &str) -> Option<Version> {
-        let mut components = version.trim().split('.').map(|x| x.parse());
+        let mut components = version.trim().split('.').map(str::parse);
 
         Some(Self(
             // Required

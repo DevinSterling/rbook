@@ -173,7 +173,7 @@ impl<'ebook> EpubMetadata<'ebook> {
         self.data
             .entries
             .get(property)
-            .map(|vec| vec.as_slice())
+            .map(Vec::as_slice)
             .unwrap_or(&[])
             .iter()
     }
@@ -194,13 +194,14 @@ impl<'ebook> EpubMetadata<'ebook> {
     /// For more information regarding EPUB metadata see:
     /// <https://www.w3.org/TR/epub/#sec-pkg-metadata>
     ///
-    /// See also: [`Self::entries`]
-    ///
     /// # Note
     /// Refining entries, `<meta>` elements with a `refines` field, are excluded:
     /// ```xhtml
     /// <meta refines="#parent-id">...</meta>
     /// ```
+    ///
+    /// # See Also
+    /// - [`Self::entries`]
     pub fn by_property(
         &self,
         property: &str,
@@ -336,7 +337,8 @@ impl<'ebook> Metadata<'ebook> for EpubMetadata<'ebook> {
     /// <meta refines="#parent-id">...</meta>
     /// ```
     ///
-    /// See also: [`Self::by_property`]
+    /// # See Also
+    /// - [`Self::by_property`]
     ///
     /// # Examples
     /// - Iterating over metadata entries:
@@ -389,7 +391,7 @@ impl<'ebook> EpubRefinements<'ebook> {
         self.0.len()
     }
 
-    /// Returns `true` if there are no refinements, otherwise `false`.
+    /// Returns `true` if there are no refinements.
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
@@ -429,7 +431,7 @@ impl<'ebook> EpubRefinements<'ebook> {
         self.0.by_refinements(property).map(EpubMetaEntry)
     }
 
-    /// Returns `true` if the `property` is present, otherwise `false`.
+    /// Returns `true` if the `property` is present.
     ///
     /// # Examples
     /// - Checking if a refinement exists:
@@ -440,9 +442,9 @@ impl<'ebook> EpubRefinements<'ebook> {
     /// # fn main() -> EbookResult<()> {
     /// let epub = Epub::open("tests/ebooks/example_epub")?;
     /// let author = epub.metadata().creators().next().unwrap();
-    /// let has_file_as = author.as_meta().refinements().has_property("file-as");
+    /// let refinements = author.as_meta().refinements();
     ///
-    /// assert!(has_file_as);
+    /// assert!(refinements.has_property("file-as"));
     /// # Ok(())
     /// # }
     /// ```
@@ -477,7 +479,8 @@ impl<'ebook> IntoIterator for EpubRefinements<'ebook> {
 
 /// An iterator over all [`entries`](EpubMetaEntry) within [`EpubRefinements`].
 ///
-/// See also: [`EpubRefinements::iter`]
+/// # See Also
+/// - [`EpubRefinements::iter`]
 ///
 /// # Examples
 /// - Iterating over all refinements of a metadata entry:
@@ -677,7 +680,8 @@ impl<'ebook> EpubMetaEntry<'ebook> {
 /// - [`Epub3`](EpubVersion::Epub3)
 /// - [`Unknown`](EpubVersion::Unknown)
 ///
-/// See [`EpubMetadata::version_str`] for the original representation.
+/// # See Also
+/// - [`EpubMetadata::version_str`] for the original representation.
 #[non_exhaustive]
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub enum EpubVersion {
@@ -715,8 +719,11 @@ impl EpubVersion {
         }
     }
 
-    /// If strict mode is disabled and the version is [`unknown`](EpubVersion::Unknown),
-    /// [`NaN`](f32::NAN) may be returned if the original input is malformed.
+    /// The encapsulated version information.
+    ///
+    /// # Note
+    /// If [`EpubSettings::strict`](super::EpubSettings::strict) is set to `false`,
+    /// the returned [`Version`] may not be within the valid range: `2 <= version < 4`.
     pub fn version(&self) -> Version {
         match self {
             EpubVersion::Epub2(version) => *version,
@@ -725,17 +732,17 @@ impl EpubVersion {
         }
     }
 
-    /// Returns `true` if the variant is [`EpubVersion::Epub2`], otherwise `false`.
+    /// Returns `true` if the variant is [`EpubVersion::Epub2`].
     pub fn is_epub2(&self) -> bool {
         matches!(self, EpubVersion::Epub2(_))
     }
 
-    /// Returns `true` if the variant is [`EpubVersion::Epub3`], otherwise `false`.
+    /// Returns `true` if the variant is [`EpubVersion::Epub3`].
     pub fn is_epub3(&self) -> bool {
         matches!(self, EpubVersion::Epub3(_))
     }
 
-    /// Returns `true` if the variant is [`EpubVersion::Unknown`], otherwise `false`.
+    /// Returns `true` if the variant is [`EpubVersion::Unknown`].
     pub fn is_unknown(&self) -> bool {
         matches!(self, EpubVersion::Unknown(_))
     }
@@ -917,7 +924,8 @@ impl<'ebook> Language<'ebook> for EpubLanguage<'ebook> {
     ///
     /// See [`EpubLanguage`] for more information.
     ///
-    /// See also: [`Language::scheme`]
+    /// # See Also
+    /// - [`Language::scheme`]
     fn scheme(&self) -> Scheme<'ebook> {
         Scheme::new(Some(LanguageKind::Bcp47.as_str()), &self.0.value)
     }
@@ -926,7 +934,8 @@ impl<'ebook> Language<'ebook> for EpubLanguage<'ebook> {
     ///
     /// See [`EpubLanguage`] for more information.
     ///
-    /// See also: [`Language::kind`]
+    /// # See Also
+    /// - [`Language::kind`]
     fn kind(&self) -> LanguageKind {
         // Normalize both as BCP 47:
         // - EPUB-2 requires RFC 3066 (a subset of BCP 47)

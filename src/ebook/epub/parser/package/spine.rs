@@ -16,7 +16,7 @@ impl EpubParser<'_> {
         let mut entries = Vec::new();
         let page_direction = spine
             .get_attribute(consts::PAGE_PROGRESSION_DIRECTION)
-            .map(|bytes| PageDirection::from_bytes(bytes.as_ref()))
+            .map(PageDirection::from_bytes)
             .unwrap_or_default();
 
         while let Some(el) = Self::simple_handler(&mut ctx.reader, bytes::SPINE, bytes::ITEMREF)? {

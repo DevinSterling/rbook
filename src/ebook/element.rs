@@ -39,7 +39,7 @@ impl<'a> Href<'a> {
     ///
     /// An href such as `s04.xhtml#pgepubid00588` will become `s04.xhtml`.
     ///
-    /// See also:
+    /// # See Also
     /// - [`Self::fragment`]
     /// - [`Self::query`]
     ///
@@ -86,7 +86,7 @@ impl<'a> Href<'a> {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn fragment(&self) -> Option<&str> {
+    pub fn fragment(&self) -> Option<&'a str> {
         self.0.find('#').map(|index| &self.0[index + 1..])
     }
 
@@ -109,7 +109,7 @@ impl<'a> Href<'a> {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn query(&self) -> Option<&str> {
+    pub fn query(&self) -> Option<&'a str> {
         self.0
             .find('?')
             .and_then(|query| self.0[query + 1..].split('#').next())
@@ -162,7 +162,7 @@ impl<'a> Properties<'a> {
         self.iter().count()
     }
 
-    /// Returns `true` if there are no properties, otherwise `false`.
+    /// Returns `true` if there are no properties.
     pub fn is_empty(&self) -> bool {
         self.as_str().trim().is_empty()
     }
@@ -178,7 +178,7 @@ impl<'a> Properties<'a> {
         self.into_iter()
     }
 
-    /// Returns `true` if the provided property is present, otherwise `false`.
+    /// Returns `true` if the provided property is present.
     pub fn has_property(&self, property: &str) -> bool {
         self.0.has_property(property)
     }
@@ -221,7 +221,8 @@ impl<'a> IntoIterator for Properties<'a> {
 
 /// An iterator over each property within [`Properties`].
 ///
-/// See also: [`Properties::iter`]
+/// # See Also
+/// - [`Properties::iter`]
 ///
 /// # Examples
 /// - Iterating over each property:
@@ -258,7 +259,7 @@ impl<'a> Attributes<'a> {
         self.0.len()
     }
 
-    /// Returns `true` if there are no attributes, otherwise `false`.
+    /// Returns `true` if there are no attributes.
     pub fn is_empty(&self) -> bool {
         self.0.is_empty()
     }
@@ -283,7 +284,7 @@ impl<'a> Attributes<'a> {
             .map(Attribute)
     }
 
-    /// Returns `true` if an [`Attribute`] with the given `name` is present, otherwise `false`.
+    /// Returns `true` if an [`Attribute`] with the given `name` is present.
     pub fn has_name(&self, name: &str) -> bool {
         self.0
             .iter()
@@ -317,7 +318,8 @@ impl<'a> IntoIterator for Attributes<'a> {
 
 /// An iterator over all [`Attribute`] entries within [`Attributes`].
 ///
-/// See also: [`Attributes::iter`]
+/// # See Also
+/// - [`Attributes::iter`]
 ///
 /// # Examples
 /// - Iterating over all attributes:
@@ -381,25 +383,25 @@ impl<'a> Name<'a> {
     /// The prefix of a name.
     ///
     /// For example, the name `dcterms:modified` has a prefix of `dcterms`.
-    pub fn prefix(&self) -> Option<&str> {
+    pub fn prefix(&self) -> Option<&'a str> {
         self.index().map(|i| &self.0[..i])
     }
 
     /// The name with its prefix stripped.
     ///
     /// For example, the name `dcterms:modified` with its prefix stripped is `modified`.
-    pub fn local(&self) -> &str {
+    pub fn local(&self) -> &'a str {
         self.index().map_or(self.0, |i| &self.0[i + 1..])
     }
 
     /// The raw name with its prefix intact (e.g., `dcterms:modified`).
-    pub fn as_str(&self) -> &str {
+    pub fn as_str(&self) -> &'a str {
         self.0
     }
 }
 
-impl AsRef<str> for Name<'_> {
-    fn as_ref(&self) -> &str {
+impl<'a> AsRef<str> for Name<'a> {
+    fn as_ref(&self) -> &'a str {
         self.0
     }
 }
@@ -483,11 +485,11 @@ impl PropertiesData {
         }
     }
 
-    pub fn iter(&self) -> SplitWhitespace {
+    pub(crate) fn iter(&self) -> SplitWhitespace {
         self.0.split_whitespace()
     }
 
-    pub fn has_property(&self, property: &str) -> bool {
+    pub(crate) fn has_property(&self, property: &str) -> bool {
         self.iter().any(|value| value == property)
     }
 }

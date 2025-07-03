@@ -19,17 +19,20 @@ pub(crate) fn normalize(href: &str) -> String {
     buf.to_string_lossy().replace('\\', "/")
 }
 
-pub(crate) fn as_absolute<'a>(absolute_dir: &str, relative: &'a str) -> Cow<'a, str> {
+/// Resolve a child path against its parent, normalizing if necessary.
+pub(crate) fn resolve<'a>(parent_dir: &str, relative: &'a str) -> Cow<'a, str> {
     let (main_href, frag) = relative
         .find(['?', '#'])
         .map(|position| (&relative[..position], &relative[position..]))
         .unwrap_or((relative, ""));
 
     if main_href.starts_with('/') || has_scheme(main_href) {
+        // If the path is absolute or has a scheme,
+        // it is most likely resolved already.
         return Cow::Borrowed(relative);
     }
 
-    let mut buf = Path::new(absolute_dir).join(main_href);
+    let mut buf = Path::new(parent_dir).join(main_href);
     normalize_href_path(&mut buf);
 
     // 1: `buf` is UTF-8 as its data derives from `absolute_dir` and `href`.
@@ -92,9 +95,11 @@ mod tests {
     }
 
     #[test]
-    fn test_to_absolute_href() {
+    fn test_as_absolute_href() {
         #[rustfmt::skip]
         let expected = [
+            ("/c3.xhtml", "OPS/content", "/c3.xhtml"),
+            ("content/c3.xhtml", "./content", "c3.xhtml"),
             ("OPS/content/toc/toc.xhtml", "OPS/content/toc", "toc.xhtml"),
             ("OPS/content/toc/toc.xhtml", "OPS/content/toc", "./toc.xhtml",),
             ("OPS/content/toc/toc.xhtml", "OPS/content/toc", "./././././////./toc.xhtml",),
@@ -106,7 +111,7 @@ mod tests {
         ];
 
         for (expect_href, absolute_dir, relative_href) in expected {
-            assert_eq!(expect_href, super::as_absolute(absolute_dir, relative_href));
+            assert_eq!(expect_href, super::resolve(absolute_dir, relative_href));
         }
     }
 }

@@ -27,6 +27,7 @@ fn test_spine() {
     assert_eq!(PageDirection::LeftToRight, spine.page_direction());
     assert_eq!(spine.len(), entries.len());
     assert_eq!(expected.len(), entries.len());
+    assert!(!spine.is_empty());
 
     for (entry, (id, idref, is_linear, properties)) in entries.into_iter().zip(expected) {
         let entry_properties = entry.properties().iter().collect::<Vec<_>>();

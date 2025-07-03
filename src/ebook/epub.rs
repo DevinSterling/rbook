@@ -91,22 +91,25 @@ impl Epub {
     /// The provided path may be an EPUB **file** or **directory** containing the
     /// contents of an unzipped EPUB.
     ///
-    /// To specify settings, see [`Self::open_with`].
-    ///
     /// # Errors
     /// - [`ArchiveError`](EbookError::Archive): Missing or invalid EPUB files.
     /// - [`FormatError`](EbookError::Format): Malformed EPUB content.
     ///
+    /// # See Also
+    /// - [`Self::open_with`] to specify settings.
+    /// - [`Self::read`] to open from a byte buffer.
+    ///
     /// # Examples
-    /// - Opening an EPUB:
-    /// ```
-    /// # use rbook::ebook::errors::EbookResult;
-    /// # use rbook::Epub;
-    /// # fn main() -> EbookResult<()> {
-    /// let epub = Epub::open("tests/ebooks/example_epub")?;
-    /// # Ok(())
-    /// # }
-    /// ```
+    /// - Opening from an EPUB file:
+    ///   ```no_run
+    ///   # use rbook::Epub;
+    ///   let epub = Epub::open("/ebooks/zipped.epub");
+    ///   ```
+    /// - Opening from a directory containing the contents of an unzipped EPUB:
+    ///   ```no_run
+    ///   # use rbook::Epub;
+    ///   let epub = Epub::open("/ebooks/unzipped_epub_dir");
+    ///   ```
     pub fn open(path: impl AsRef<Path>) -> EbookResult<Self> {
         Self::open_with(path, EpubSettings::default())
     }
@@ -198,7 +201,8 @@ impl Epub {
     /// It always starts with `/` to indicate the EPUB container root,
     /// and ***is*** percent encoded (e.g., `/my%20dir/my%20pkg.opf`).
     ///
-    /// See also: [`Href::decode`]
+    /// # See Also
+    /// - [`Href::decode`]
     ///
     /// # Examples
     /// - Retrieving the package file:
@@ -225,7 +229,8 @@ impl Epub {
     /// [`Resources`](Resource) referenced in the package file are resolved relative to the
     /// package directory.
     ///
-    /// See also: [`Href::decode`]
+    /// # See Also
+    /// - [`Href::decode`]
     ///
     /// # Examples
     /// - Retrieving the package file and directory:
@@ -256,7 +261,7 @@ impl Epub {
         let modified_href = if href.starts_with('/') {
             uri::normalize(href.as_ref())
         } else {
-            uri::as_absolute(package_dir.as_ref(), href.as_ref()).into_owned()
+            uri::resolve(package_dir.as_ref(), href.as_ref()).into_owned()
         };
 
         resource.swap_value(modified_href)
@@ -316,7 +321,8 @@ impl Ebook for Epub {
     ///
     /// Paths are percent-decoded ***then*** normalized before resource retrieval.
     ///
-    /// See also: [`Ebook::read_resource_bytes`]
+    /// # See Also
+    /// - [`Ebook::read_resource_bytes`]
     ///
     /// # Examples:
     /// - Retrieving file content:

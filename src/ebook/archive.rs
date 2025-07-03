@@ -8,7 +8,6 @@ use crate::ebook::archive::zip::ZipArchive;
 use crate::ebook::resource::{Resource, ResourceKey};
 use crate::util;
 use crate::util::sync::SendAndSync;
-use std::borrow::Cow;
 use std::fs::File;
 use std::io;
 use std::io::BufReader;
@@ -18,15 +17,13 @@ pub(super) trait Archive: SendAndSync {
     fn read_resource_bytes(&self, resource: &Resource) -> ArchiveResult<Vec<u8>>;
 
     fn read_resource_bytes_utf8(&self, resource: &Resource) -> ArchiveResult<Vec<u8>> {
-        util::utf8::to_utf8(&self.read_resource_bytes(resource)?)
-            .map(Cow::into_owned)
+        util::utf::into_utf8(self.read_resource_bytes(resource)?)
             .map_err(|_| ArchiveError::InvalidUtf8Resource(resource.as_static()))
     }
 
     fn read_resource_str(&self, resource: &Resource) -> ArchiveResult<String> {
         // Retrieve converted bytes
-        util::utf8::to_utf8_str(&self.read_resource_bytes(resource)?)
-            .map(Cow::into_owned)
+        util::utf::into_utf8_str(self.read_resource_bytes(resource)?)
             .map_err(|_| ArchiveError::InvalidUtf8Resource(resource.as_static()))
     }
 }

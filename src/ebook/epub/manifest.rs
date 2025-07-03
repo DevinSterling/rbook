@@ -210,7 +210,8 @@ impl<'ebook> IntoIterator for EpubManifest<'ebook> {
 
 /// An iterator over all the [`entries`](EpubManifestEntry) of an [`EpubManifest`].
 ///
-/// See also: [`EpubManifest::entries`]
+/// # See Also
+/// - [`EpubManifest::entries`]
 ///
 /// # Examples
 /// - Iterating over all manifest entries:
@@ -266,7 +267,13 @@ impl<'ebook> EpubManifestEntry<'ebook> {
     /// The resolved absolute percent-encoded `href`,
     /// pointing to the location of the associated resource.
     ///
-    /// Example of a resolved href: `/EPUB/OEBPS/chapters/c1.xhtml`
+    /// Example of a resolved href:
+    /// ```text
+    /// /EPUB/OEBPS/chapters/c1.xhtml
+    /// ```
+    ///
+    /// # See Also
+    /// - [`Self::resource`] as the primary means for retrieving ebook content.
     pub fn href(&self) -> Href<'ebook> {
         self.data.href.as_str().into()
     }
@@ -274,7 +281,10 @@ impl<'ebook> EpubManifestEntry<'ebook> {
     /// The raw (relative) percent-encoded `href`,
     /// pointing to the location of the associated resource.
     ///
-    /// Example of a raw (relative) href: `../../../c1.xhtml`
+    /// Example of a raw (relative) href:
+    /// ```text
+    /// ../../../c1.xhtml
+    /// ```
     ///
     /// # Note
     /// [`Self::href`] is recommended over this method unless access to the original
@@ -282,8 +292,8 @@ impl<'ebook> EpubManifestEntry<'ebook> {
     /// Providing the raw value to a method such as
     /// [`Ebook::read_resource_bytes`](crate::Ebook::read_resource_bytes) can fail.
     ///
-    /// See the [`Epub`](super::Epub) implementation of `read_resource_bytes`
-    /// for normalization details.
+    /// # See Also
+    /// - [`Epub`](super::Epub) documentation of `read_resource_bytes` for normalization details.
     pub fn href_raw(&self) -> Href<'ebook> {
         self.data.href_raw.as_str().into()
     }

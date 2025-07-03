@@ -33,7 +33,7 @@ pub(super) struct UriResolver<'a>(
 
 impl UriResolver<'_> {
     pub(super) fn resolve(&self, href: &str) -> String {
-        uri::as_absolute(self.0, href).into_owned()
+        uri::resolve(self.0, href).into_owned()
     }
 }
 

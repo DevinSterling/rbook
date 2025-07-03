@@ -7,7 +7,7 @@ use wasm_bindgen_test::wasm_bindgen_test;
 
 #[test]
 #[wasm_bindgen_test]
-fn reader_linear_behavior() {
+fn test_reader_linear_behavior() {
     let epub = open_example_epub_file();
     #[rustfmt::skip]
     let linear_behaviors = [
@@ -38,7 +38,7 @@ fn reader_linear_behavior() {
 
 #[test]
 #[wasm_bindgen_test]
-fn reader_cursor() -> ReaderResult<()> {
+fn test_reader_cursor() -> ReaderResult<()> {
     let epub = open_example_epub_file();
     let mut reader = epub.reader();
 
@@ -46,6 +46,9 @@ fn reader_cursor() -> ReaderResult<()> {
         content.spine_entry().idref()
     }
 
+    assert!(!reader.is_empty());
+    assert_eq!(5, reader.len());
+    assert_eq!(reader.len(), reader.remaining());
     assert_eq!(None, reader.current_position());
 
     // Jump
@@ -86,6 +89,26 @@ fn reader_cursor() -> ReaderResult<()> {
     assert_eq!(2, reader.remaining());
 
     assert_eq!(5, reader.len());
+
+    Ok(())
+}
+
+#[test]
+#[wasm_bindgen_test]
+fn test_reader_into_content_integrity() -> ReaderResult<()> {
+    let epub = open_example_epub_file();
+
+    // Ensure integrity
+    for content_result in epub.reader() {
+        let entry_a = content_result?;
+        let entry_b = entry_a.clone();
+
+        let href = entry_a.manifest_entry().href();
+        let resource = epub.read_resource_str(href)?;
+
+        assert_eq!(resource, entry_a.into_string());
+        assert_eq!(resource.as_bytes(), entry_b.into_bytes());
+    }
 
     Ok(())
 }

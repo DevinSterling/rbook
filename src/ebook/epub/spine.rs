@@ -146,7 +146,8 @@ impl<'ebook> IntoIterator for EpubSpine<'ebook> {
 
 /// An iterator over all the [`entries`](EpubSpineEntry) of an [`EpubSpine`].
 ///
-/// See also: [`EpubSpine::entries`]
+/// # See Also
+/// - [`EpubSpine::entries`]
 ///
 /// # Examples
 /// - Iterating over all manifest entries:
@@ -197,8 +198,8 @@ impl<'ebook> EpubSpineEntry<'ebook> {
     /// The unique id reference to a [`EpubManifestEntry`] in the
     /// [`EpubManifest`](super::EpubManifest).
     ///
-    /// For direct access to the resource, see [`Self::resource`] or
-    /// [`Self::manifest_entry`].
+    /// For direct access to the resource, [`Self::resource`] or
+    /// [`Self::manifest_entry`] is preferred.
     pub fn idref(&self) -> &'ebook str {
         &self.data.idref
     }

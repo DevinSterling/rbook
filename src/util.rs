@@ -1,5 +1,5 @@
 pub(crate) mod uri;
-pub(crate) mod utf8;
+pub(crate) mod utf;
 
 #[cfg(feature = "threadsafe")]
 pub(crate) mod sync {

@@ -166,11 +166,11 @@ impl<'ebook> EpubToc<'ebook> {
     /// Returns the **root** toc entry for a given [`TocEntryKind`],
     /// using the specified [`EpubVersion`].
     ///
-    /// **This method is useful when `store_all` is enabled in [`EpubSettings`].**
+    /// **This method is useful when [`EpubSettings::store_all`] is set to `true`.**
     ///
     /// An example:
-    /// - [`TocEntryKind::PageList`] + [`EpubVersion::Epub2`]: legacy EPUB 2 NCX page list.
-    /// - [`TocEntryKind::PageList`] + [`EpubVersion::Epub3`]: EPUB 3 XHTML page list.
+    /// - [`TocEntryKind::PageList`] + [`EpubVersion::Epub2`] = Legacy EPUB 2 NCX page list.
+    /// - [`TocEntryKind::PageList`] + [`EpubVersion::Epub3`] = EPUB 3 XHTML page list.
     ///
     /// This method is **only** effective for the following kinds,
     /// otherwise [`None`] is always returned:
@@ -240,7 +240,8 @@ impl<'ebook> IntoIterator for EpubToc<'ebook> {
 
 /// An iterator over all root toc kinds within an [`EpubToc`].
 ///
-/// See also: [`EpubToc::kinds`]
+/// # See Also
+/// - [`EpubToc::kinds`]
 ///
 /// # Examples
 /// - Iterating over all root toc kinds:
@@ -294,10 +295,14 @@ impl<'ebook> EpubTocEntry<'ebook> {
     /// Returns [`None`] if no `href` (EPUB 3) nor `src` (EPUB 2) attribute
     /// is associated with an entry.
     ///
-    /// Example of a resolved href: `/EPUB/OEBPS/chapters/c1.xhtml#part-1`
+    /// Example of a resolved href:
+    /// ```text
+    /// /EPUB/OEBPS/chapters/c1.xhtml#part-1
+    /// ```
     ///
-    /// For retrieving the href value without the query and fragment, see
-    /// [`Href::path`].
+    /// # See Also
+    /// - [`Href::path`] for retrieving the href value without the query and fragment.
+    /// - [`Self::resource`] as the primary means for retrieving ebook content.
     pub fn href(&self) -> Option<Href<'ebook>> {
         self.data.href.as_deref().map(Into::into)
     }
@@ -308,10 +313,10 @@ impl<'ebook> EpubTocEntry<'ebook> {
     /// Returns [`None`] if no `href` (EPUB 3) nor `src` (EPUB 2) attribute
     /// is associated with an entry.
     ///
-    /// Example of a raw (relative) href: `../../../c1.xhtml#part-1`
-    ///
-    /// For retrieving the href value without the query and fragment, see
-    /// [`Href::path`].
+    /// Example of a raw (relative) href:
+    /// ```text
+    /// ../../../c1.xhtml#part-1
+    /// ```
     ///
     /// # Note
     /// [`Self::href`] is recommended over this method unless access to the original
@@ -319,8 +324,9 @@ impl<'ebook> EpubTocEntry<'ebook> {
     /// Providing the raw value to a method such as
     /// [`Ebook::read_resource_bytes`](crate::Ebook::read_resource_bytes) can fail.
     ///
-    /// See the [`Epub`](super::Epub) implementation of `read_resource_bytes`
-    /// for normalization details.
+    /// # See Also
+    /// - [`Epub`](super::Epub) documentation of `read_resource_bytes` for normalization details.
+    /// - [`Href::path`] for retrieving the href value without the query and fragment.
     pub fn href_raw(&self) -> Option<Href<'ebook>> {
         self.data.href_raw.as_deref().map(Into::into)
     }
@@ -494,7 +500,7 @@ impl<'ebook> IntoIterator for EpubTocChildren<'ebook> {
 
 /// An iterator over the immediate [`children`](EpubTocEntry) of an [`EpubTocEntry`].
 ///
-/// See also:
+/// # See Also
 /// - [`EpubTocChildren::iter`]
 /// - [`EpubTocChildren::flatten`]
 ///

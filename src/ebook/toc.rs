@@ -37,7 +37,7 @@ pub trait Toc<'ebook> {
     /// Returns the **root** [`TocEntry`] of the primary TOC, or [`None`] if it does not exist.
     ///
     /// See the [trait-level example](Toc) for how to traverse the hierarchy.
-    fn contents(&self) -> Option<impl TocEntry<'ebook>>;
+    fn contents(&self) -> Option<impl TocEntry<'ebook> + 'ebook>;
 
     /// Returns the **root** [`TocEntry`] for the given [`TocEntryKind`],
     /// or [`None`] if it does not exist.
@@ -63,7 +63,10 @@ pub trait Toc<'ebook> {
     /// # Ok(())
     /// # }
     /// ```
-    fn by_kind(&self, kind: impl Into<TocEntryKind<'ebook>>) -> Option<impl TocEntry<'ebook>>;
+    fn by_kind(
+        &self,
+        kind: impl Into<TocEntryKind<'ebook>>,
+    ) -> Option<impl TocEntry<'ebook> + 'ebook>;
 
     /// Returns an iterator over all **root** [`entries`](TocEntry).
     /// Each `Item` within the iterator is a tuple containing the
@@ -72,7 +75,7 @@ pub trait Toc<'ebook> {
     /// Tuple structure: ([`TocEntryKind`], [`TocEntry`])
     fn kinds(
         &self,
-    ) -> impl Iterator<Item = (&'ebook TocEntryKind<'ebook>, impl TocEntry<'ebook>)> + 'ebook;
+    ) -> impl Iterator<Item = (&'ebook TocEntryKind<'ebook>, impl TocEntry<'ebook> + 'ebook)> + 'ebook;
 }
 
 /// An entry contained within a [`Toc`], encompassing associated metadata.
@@ -93,20 +96,64 @@ pub trait TocEntry<'ebook> {
     fn kind(&self) -> &'ebook TocEntryKind;
 
     /// The nested children (toc entries) associated with an entry.
-    fn children(&self) -> impl TocChildren<'ebook>;
+    fn children(&self) -> impl TocChildren<'ebook> + 'ebook;
 
     /// The [`ManifestEntry`] associated with a [`TocEntry`].
     ///
     /// Returns [`None`] if the toc entry references a non-existent
     /// [`ManifestEntry`] within the [`Manifest`](super::Manifest).
-    fn manifest_entry(&self) -> Option<impl ManifestEntry<'ebook>>;
+    fn manifest_entry(&self) -> Option<impl ManifestEntry<'ebook> + 'ebook>;
 
     /// The [`Resource`] intended to navigate from an entry.
+    ///
+    /// # Examples
+    /// - Retrieving the resource associated with an entry:
+    /// ```
+    /// # use rbook::ebook::errors::EbookResult;
+    /// # use rbook::ebook::toc::{Toc, TocEntry, TocEntryKind, TocChildren};
+    /// # use rbook::{Ebook, Epub};
+    /// # fn main() -> EbookResult<()> {
+    /// let epub = Epub::open("tests/ebooks/example_epub")?;
+    /// let main_toc_root = epub.toc().contents().unwrap();
+    ///
+    /// // Root has no associated resource
+    /// assert_eq!(None, main_toc_root.resource());
+    ///
+    /// for child in main_toc_root {
+    ///     let resource = child.resource().unwrap();
+    ///     assert_eq!("application/xhtml+xml", resource.kind().as_str());
+    ///     
+    ///     let content = epub.read_resource_str(resource)?;
+    ///     // process content //
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
     fn resource(&self) -> Option<Resource<'ebook>> {
         self.manifest_entry().map(|entry| entry.resource())
     }
 
-    /// Returns `true` if the depth of a toc entry is `0`, indicating the root, otherwise `false`.
+    /// Returns `true` if the depth of a toc entry is `0`, indicating the root.
+    ///
+    /// # Examples
+    /// - Assessing if an entry is a root:
+    /// ```
+    /// # use rbook::ebook::errors::EbookResult;
+    /// # use rbook::ebook::toc::{Toc, TocEntry, TocEntryKind};
+    /// # use rbook::{Ebook, Epub};
+    /// # fn main() -> EbookResult<()> {
+    /// let epub = Epub::open("tests/ebooks/example_epub")?;
+    /// let main_toc_root = epub.toc().contents().unwrap();
+    ///
+    /// assert!(main_toc_root.is_root());
+    ///
+    /// for child in main_toc_root {
+    ///     // Immediate children are never roots:
+    ///     assert!(!child.is_root());
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
     fn is_root(&self) -> bool {
         self.depth() == 0
     }
@@ -120,21 +167,22 @@ pub trait TocEntry<'ebook> {
 pub trait TocChildren<'ebook> {
     /// Returns the associated immediate child [`TocEntry`] if the provided `index` is less than
     /// [`Self::len`], otherwise [`None`].
-    fn get(&self, index: usize) -> Option<impl TocEntry<'ebook>>;
+    fn get(&self, index: usize) -> Option<impl TocEntry<'ebook> + 'ebook>;
 
     /// Returns an iterator over immediate child entries
     /// (whose [`depth`](TocEntry::depth) is one greater than the parent).
     ///
-    /// See [`Self::flatten`] for ***all*** children, sorted by their [`order`](TocEntry::order).
-    fn iter(&self) -> impl Iterator<Item = impl TocEntry<'ebook>> + 'ebook;
+    /// # See Also
+    /// - [`Self::flatten`] for ***all*** children, sorted by their [`order`](TocEntry::order).
+    fn iter(&self) -> impl Iterator<Item = impl TocEntry<'ebook> + 'ebook> + 'ebook;
 
     /// Returns a recursive iterator over **all** children in ascending [`order`](TocEntry::order).
-    fn flatten(&self) -> impl Iterator<Item = impl TocEntry<'ebook>> + 'ebook;
+    fn flatten(&self) -> impl Iterator<Item = impl TocEntry<'ebook> + 'ebook> + 'ebook;
 
     /// The total number of immediate [`children`](Self::iter) a toc entry has.
     fn len(&self) -> usize;
 
-    /// Returns `true` if there are no [`children`](Self::iter), otherwise `false`.
+    /// Returns `true` if there are no children.
     fn is_empty(&self) -> bool {
         self.len() == 0
     }
