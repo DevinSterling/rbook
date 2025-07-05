@@ -173,8 +173,7 @@ impl<'ebook> EpubMetadata<'ebook> {
         self.data
             .entries
             .get(property)
-            .map(Vec::as_slice)
-            .unwrap_or(&[])
+            .map_or::<&[_], _>(&[], Vec::as_slice)
             .iter()
     }
 
@@ -702,20 +701,20 @@ pub enum EpubVersion {
 
 impl EpubVersion {
     /// [`EpubVersion::Epub2`] constant with a predefined version of `2.0`.
-    pub const EPUB2: EpubVersion = EpubVersion::Epub2(Version(2, 0));
+    pub const EPUB2: Self = Self::Epub2(Version(2, 0));
 
     /// [`EpubVersion::Epub3`] constant with a predefined version of `3.0`.
-    pub const EPUB3: EpubVersion = EpubVersion::Epub3(Version(3, 0));
+    pub const EPUB3: Self = Self::Epub3(Version(3, 0));
 
     /// Returns the major form of an epub version.
     ///
     /// If the contained [`Version`] is `3.3`, then the returned [`EpubVersion`]
     /// will have a contained value of `3.0`.
-    pub fn as_major(&self) -> EpubVersion {
+    pub fn as_major(&self) -> Self {
         match self {
-            EpubVersion::Epub2(_) => EpubVersion::EPUB2,
-            EpubVersion::Epub3(_) => EpubVersion::EPUB3,
-            EpubVersion::Unknown(version) => EpubVersion::Unknown(Version(version.0, 0)),
+            Self::Epub2(_) => Self::EPUB2,
+            Self::Epub3(_) => Self::EPUB3,
+            Self::Unknown(version) => Self::Unknown(Version(version.0, 0)),
         }
     }
 
@@ -726,25 +725,23 @@ impl EpubVersion {
     /// the returned [`Version`] may not be within the valid range: `2 <= version < 4`.
     pub fn version(&self) -> Version {
         match self {
-            EpubVersion::Epub2(version) => *version,
-            EpubVersion::Epub3(version) => *version,
-            EpubVersion::Unknown(version) => *version,
+            Self::Epub2(version) | Self::Epub3(version) | Self::Unknown(version) => *version,
         }
     }
 
     /// Returns `true` if the variant is [`EpubVersion::Epub2`].
     pub fn is_epub2(&self) -> bool {
-        matches!(self, EpubVersion::Epub2(_))
+        matches!(self, Self::Epub2(_))
     }
 
     /// Returns `true` if the variant is [`EpubVersion::Epub3`].
     pub fn is_epub3(&self) -> bool {
-        matches!(self, EpubVersion::Epub3(_))
+        matches!(self, Self::Epub3(_))
     }
 
     /// Returns `true` if the variant is [`EpubVersion::Unknown`].
     pub fn is_unknown(&self) -> bool {
-        matches!(self, EpubVersion::Unknown(_))
+        matches!(self, Self::Unknown(_))
     }
 }
 

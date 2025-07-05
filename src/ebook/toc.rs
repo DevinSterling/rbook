@@ -285,6 +285,7 @@ mod macros {
                 /// assert_eq!("titlepage", title_page_kind.as_str());
                 /// assert_eq!("chapter", chapter_kind.as_str());
                 /// ```
+                #[must_use]
                 pub fn as_str(&self) -> &str {
                     match self {
                         $(Self::$map_enum => $map_string,)*

@@ -61,7 +61,7 @@ impl PendingRefinements {
     }
 
     pub(super) fn empty() -> Self {
-        PendingRefinements(HashMap::new())
+        Self(HashMap::new())
     }
 
     pub(super) fn take_refinements(&mut self, parent_id: &str) -> Option<EpubRefinementsData> {
@@ -75,7 +75,7 @@ impl PendingRefinements {
     }
 }
 
-impl<'a> EpubParser<'a> {
+impl EpubParser<'_> {
     pub(super) fn parse_metadata(
         &mut self,
         ctx: &mut PackageContext,
@@ -199,7 +199,7 @@ impl<'a> EpubParser<'a> {
     }
 
     fn finalize_metadata(
-        &mut self,
+        &self,
         id_meta: HashMap<String, IdMetaWithDepth>,
         no_id_refinements: Vec<EpubMetaEntryData>,
         mut root_meta: Vec<EpubMetaEntryData>,
@@ -209,7 +209,7 @@ impl<'a> EpubParser<'a> {
 
         root_meta.extend(roots);
 
-        let mut grouped_meta = Self::group_metadata(root_meta)?;
+        let mut grouped_meta = Self::group_metadata(root_meta);
 
         if self.settings.strict {
             Self::assert_metadata(&grouped_meta)?;
@@ -246,10 +246,9 @@ impl<'a> EpubParser<'a> {
         no_id_refinements: Vec<EpubMetaEntryData>,
     ) -> ParserResult<Vec<Vec<EpubMetaEntryData>>> {
         fn compute_depth(id: &str, id_map: &HashMap<String, IdMetaWithDepth>) -> ParserResult<u8> {
-            let meta = match id_map.get(id) {
-                Some(meta) => meta,
+            let Some(meta) = id_map.get(id) else {
                 // This may happen if the requested element resides in the manifest or spine
-                None => return Ok(0),
+                return Ok(0);
             };
             let state = meta.depth.get();
 
@@ -275,7 +274,7 @@ impl<'a> EpubParser<'a> {
         let mut max_depth = 0;
 
         // Iterate over map keys
-        for (id, _) in id_meta.iter() {
+        for id in id_meta.keys() {
             max_depth = max_depth.max(compute_depth(id, &id_meta)?);
         }
 
@@ -357,7 +356,7 @@ impl<'a> EpubParser<'a> {
         Ok((roots.unwrap_or_default(), PendingRefinements::new(pending)))
     }
 
-    fn group_metadata(root_meta: Vec<EpubMetaEntryData>) -> ParserResult<EpubMetaGroups> {
+    fn group_metadata(root_meta: Vec<EpubMetaEntryData>) -> EpubMetaGroups {
         let mut meta_groups = HashMap::new();
 
         // Group by property
@@ -374,7 +373,7 @@ impl<'a> EpubParser<'a> {
             .push(meta);
         }
 
-        Ok(meta_groups)
+        meta_groups
     }
 
     ////////////////////////////////////////////////////////////////////////////////
@@ -407,7 +406,8 @@ impl<'a> EpubParser<'a> {
                 .and_then(|refinement| refinement.value.parse().ok())
                 // Typically EPUB `display-seq` starts from `1` (1-based index).
                 // However, to ensure consistency with the rest of rbook API, use 0-based.
-                .map(|mut seq: usize| {
+                // * An order of MAX indicates no explicitly set display-seq by the author
+                .map_or(usize::MAX, |mut seq: usize| {
                     seq = seq.saturating_sub(1);
                     // If there is a duplicate display-seq value;
                     // increment by 1 until a slot is free.
@@ -415,9 +415,7 @@ impl<'a> EpubParser<'a> {
                         seq += 1;
                     }
                     seq
-                })
-                // An order of MAX indicates no explicitly set display-seq by the author
-                .unwrap_or(usize::MAX);
+                });
         }
 
         if reserved_indices.len() < group.len() {

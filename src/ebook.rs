@@ -57,13 +57,13 @@ pub trait Ebook {
     /// Attributes associated with an ebook, such as title and author information.
     fn metadata(&self) -> impl Metadata;
 
-    /// The [`Manifest`], encompassing all [`resources`](Resource) contained within an ebook.
+    /// The [`Manifest`], encompassing the [`resources`](Resource) contained within an ebook.
     fn manifest(&self) -> impl Manifest;
 
     /// The [`Spine`], encompassing the canonical reading-order sequence.
     ///
     /// # See Also
-    /// - [`Self::reader`] to sequentially read over the spine contents with greater control.
+    /// - [`Self::reader`] to sequentially read spine content with greater control.
     fn spine(&self) -> impl Spine;
 
     /// The table of contents ([`Toc`]), encompassing navigation points.
@@ -73,11 +73,19 @@ pub trait Ebook {
     ///
     /// # Errors
     /// [`ArchiveError`](errors::ArchiveError): When retrieval of the specified [`Resource`] fails.
+    ///
+    /// # See Also
+    /// - [`ManifestEntry::read_str`](manifest::ManifestEntry::read_str)
+    ///   to alternatively retrieve the data from a manifest entry.
     fn read_resource_str<'a>(&self, resource: impl Into<Resource<'a>>) -> EbookResult<String>;
 
     /// Returns the specified [`Resource`] in the form of bytes.
     ///
     /// # Errors
     /// [`ArchiveError`](errors::ArchiveError): When retrieval of the specified [`Resource`] fails.
+    ///
+    /// # See Also
+    /// - [`ManifestEntry::read_bytes`](manifest::ManifestEntry::read_bytes)
+    ///   to alternatively retrieve the data from a manifest entry.
     fn read_resource_bytes<'a>(&self, resource: impl Into<Resource<'a>>) -> EbookResult<Vec<u8>>;
 }

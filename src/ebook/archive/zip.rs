@@ -38,7 +38,7 @@ where
 {
     fn read_resource_bytes(&self, resource: &Resource) -> Result<Vec<u8>, ArchiveError> {
         let mut lock = acquire_archive_lock(&self.0)?;
-        let mut zip_file = ZipArchive::get_file(&mut lock, resource)?;
+        let mut zip_file = Self::get_file(&mut lock, resource)?;
         let mut buf = Vec::new();
 
         zip_file

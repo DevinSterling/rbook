@@ -59,7 +59,7 @@ pub(super) struct PackageContext<'a> {
     pub(super) refinements: PendingRefinements,
 }
 
-impl<'a> EpubParser<'a> {
+impl EpubParser<'_> {
     /// Parses the epub `.opf` file and returns all
     /// necessary data required for further processing.
     pub(super) fn parse_opf(
@@ -77,7 +77,7 @@ impl<'a> EpubParser<'a> {
 
         // Post-process
         if self.version_hint.is_epub2() {
-            self.handle_epub2_cover_image(&mut metadata, &mut manifest);
+            Self::handle_epub2_cover_image(&mut metadata, &mut manifest);
         }
         let toc_hrefs = self.get_toc_hrefs(&manifest)?;
 
@@ -100,7 +100,7 @@ impl<'a> EpubParser<'a> {
             if let Event::Start(el) = event? {
                 match el.local_name().as_ref() {
                     bytes::PACKAGE => {
-                        package.replace(self.parse_package(el)?);
+                        package.replace(self.parse_package(&el)?);
                     }
                     bytes::METADATA => {
                         metadata.replace(self.parse_metadata(
@@ -112,10 +112,10 @@ impl<'a> EpubParser<'a> {
                         manifest.replace(self.parse_manifest(&mut ctx)?);
                     }
                     bytes::SPINE => {
-                        spine.replace(self.parse_spine(&mut ctx, el)?);
+                        spine.replace(self.parse_spine(&mut ctx, &el)?);
                     }
                     bytes::GUIDE => {
-                        guide.replace(self.parse_guide(&mut ctx, el)?);
+                        guide.replace(self.parse_guide(&mut ctx, &el)?);
                     }
                     _ => {}
                 }
@@ -125,7 +125,7 @@ impl<'a> EpubParser<'a> {
         Ok((metadata, manifest, spine, guide))
     }
 
-    fn parse_package(&mut self, package: BytesStart) -> ParserResult<PackageData> {
+    fn parse_package(&mut self, package: &BytesStart) -> ParserResult<PackageData> {
         let mut attributes = package.bytes_attributes();
 
         // Required attributes
@@ -176,11 +176,7 @@ impl<'a> EpubParser<'a> {
     /// referenced manifest entry (if it doesn't contain it already).
     ///
     /// This is ignored for EPUB 3
-    fn handle_epub2_cover_image(
-        &self,
-        metadata: &mut EpubMetadataData,
-        manifest: &mut EpubManifestData,
-    ) {
+    fn handle_epub2_cover_image(metadata: &mut EpubMetadataData, manifest: &mut EpubManifestData) {
         if let Some(properties) = metadata
             .by_group_mut(consts::COVER)
             .and_then(|group| group.first())

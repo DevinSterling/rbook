@@ -14,10 +14,10 @@ use std::borrow::Cow;
 use std::collections::HashMap;
 use std::default::Default;
 
-impl<'a> EpubParser<'a> {
+impl EpubParser<'_> {
     pub(super) fn parse_toc(
         &mut self,
-        resolver: UriResolver,
+        resolver: &UriResolver,
         data: &[u8],
     ) -> ParserResult<EpubTocData> {
         let toc_groups = self.handle_toc(resolver, data)?;
@@ -31,8 +31,8 @@ impl<'a> EpubParser<'a> {
     }
 
     pub(super) fn handle_toc(
-        &mut self,
-        resolver: UriResolver,
+        &self,
+        resolver: &UriResolver,
         data: &[u8],
     ) -> ParserResult<TocGroups> {
         // Keep track of latest nav element entry
@@ -63,14 +63,14 @@ impl<'a> EpubParser<'a> {
                     if Self::is_nav_details(el.local_name()) =>
                 {
                     let is_start = matches!(event, Event::Start(_));
-                    Self::handle_details(&resolver, el, is_start, &mut entry_stack, &mut reader)?;
+                    Self::handle_details(resolver, el, is_start, &mut entry_stack, &mut reader)?;
                 }
                 // Pop from `entry_stack`; backtrack
                 Event::End(el)
                     if Self::is_nav_root(el.local_name())
                         || Self::is_nav_child(el.local_name()) =>
                 {
-                    self.handle_pop(&mut toc_groups, &mut entry_stack)?;
+                    self.handle_pop(&mut toc_groups, &mut entry_stack);
                 }
                 _ => {}
             }
@@ -138,7 +138,7 @@ impl<'a> EpubParser<'a> {
             child.order = attributes
                 .take_attribute_value(consts::PLAY_ORDER)?
                 .and_then(|value| value.parse().ok())
-                .unwrap_or(order)
+                .unwrap_or(order);
         }
 
         child.attributes = attributes.try_into()?;
@@ -146,14 +146,9 @@ impl<'a> EpubParser<'a> {
         Ok(continue_from_event)
     }
 
-    fn handle_pop(
-        &self,
-        toc_groups: &mut TocGroups,
-        stack: &mut Vec<EpubTocEntryData>,
-    ) -> ParserResult<()> {
-        let nav_entry = match stack.pop() {
-            Some(nav_entry) => nav_entry,
-            None => return Ok(()),
+    fn handle_pop(&self, toc_groups: &mut TocGroups, stack: &mut Vec<EpubTocEntryData>) {
+        let Some(nav_entry) = stack.pop() else {
+            return;
         };
 
         // The nav element has a parent
@@ -166,8 +161,6 @@ impl<'a> EpubParser<'a> {
             let toc_kind = nav_entry.kind.clone();
             toc_groups.insert(EpubTocKey::of(toc_kind, *version), nav_entry);
         }
-
-        Ok(())
     }
 
     fn handle_details(
@@ -177,9 +170,8 @@ impl<'a> EpubParser<'a> {
         stack: &mut [EpubTocEntryData],
         reader: &mut ByteReader,
     ) -> ParserResult<()> {
-        let nav_entry = match stack.last_mut() {
-            Some(nav_entry) => nav_entry,
-            None => return Ok(()),
+        let Some(nav_entry) = stack.last_mut() else {
+            return Ok(());
         };
 
         // Get attributes and potentially get the `href/src`
@@ -212,12 +204,12 @@ impl<'a> EpubParser<'a> {
         Ok(())
     }
 
-    fn assert_toc(&mut self, map: &TocGroups) -> ParserResult<()> {
+    fn assert_toc(&self, map: &TocGroups) -> ParserResult<()> {
         // Check if the epub contains a main table of contents
-        if !map.contains_key(&EpubTocKey::of(TocEntryKind::Toc, self.version_hint)) {
-            Err(EpubFormatError::NoTocFound.into())
-        } else {
+        if map.contains_key(&EpubTocKey::of(TocEntryKind::Toc, self.version_hint)) {
             Ok(())
+        } else {
+            Err(EpubFormatError::NoTocFound.into())
         }
     }
 

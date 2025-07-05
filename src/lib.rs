@@ -11,15 +11,16 @@
 //! module, allowing all formats to share the same "base" API.
 //!
 //! Traits such as [`Ebook`] allow formats to be handled generically.
-//! For example, retrieving the data of a cover image agnostic to whether
-//! the implementation is [`Epub`] or not:
+//! For example, retrieving the data of a cover image agnostic to the
+//! concrete format (e.g., [`Epub`]):
 //! ```
 //! # use rbook::Ebook;
 //! # use rbook::ebook::manifest::{Manifest, ManifestEntry};
 //! // Here `ebook` may be of any supported format.
 //! fn cover_image_bytes<E: Ebook>(ebook: &E) -> Option<Vec<u8>> {
-//!     let manifest_entry = ebook.manifest().cover_image()?;
-//!     ebook.read_resource_bytes(manifest_entry.resource()).ok()
+//!     // 1 - An ebook may not have a `cover_image` entry, hence the try operator (`?`).
+//!     // 2 - `read_bytes` returns a `Result`; `ok()` coverts the result into `Option`.
+//!     ebook.manifest().cover_image()?.read_bytes().ok()
 //! }
 //! ```
 //!
@@ -99,6 +100,52 @@
 //!
 //! assert_eq!(Some(4), reader.current_position());
 //! ```
+//! # Resource retrieval from an [`Ebook`]
+//! All files such as text, images, and video are accessible within an ebook programmatically.
+//!
+//! The simplest way to access and retrieve resources from an ebook is through the
+//! [`Manifest`](ebook::manifest::Manifest), specifically through its entries via
+//! [`ManifestEntry::read_str`](ebook::manifest::ManifestEntry::read_str) and
+//! [`ManifestEntry::read_bytes`](ebook::manifest::ManifestEntry::read_bytes):
+//! ```
+//! # use rbook::ebook::errors::EbookResult;
+//! # use rbook::ebook::manifest::{Manifest, ManifestEntry};
+//! # use rbook::{Ebook, Epub};
+//! # fn main() -> EbookResult<()> {
+//! # let epub = Epub::open("tests/ebooks/example_epub")?;
+//! let manifest_entry = epub.manifest().cover_image().unwrap();
+//! let cover_image_bytes = manifest_entry.read_bytes()?;
+//!
+//! // process bytes //
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! For finer grain control, the [`Ebook`] trait provides two methods
+//! that accept a [`Resource`](ebook::resource::Resource) as an argument:
+//! - [`Ebook::read_resource_str`] to retrieve the content as a UTF-8 string.
+//! - [`Ebook::read_resource_bytes`] to retrieve the content in the form of raw bytes.
+//! ```
+//! # use rbook::ebook::errors::EbookResult;
+//! # use rbook::ebook::manifest::{Manifest, ManifestEntry};
+//! # use rbook::{Ebook, Epub};
+//! # fn main() -> EbookResult<()> {
+//! # let epub = Epub::open("tests/ebooks/example_epub")?;
+//! let manifest_entry = epub.manifest().cover_image().unwrap();
+//!
+//! let bytes_a = epub.read_resource_bytes(manifest_entry.resource())?;
+//! let bytes_b = epub.read_resource_bytes("/EPUB/img/cover.webm")?;
+//!
+//! assert_eq!(bytes_a, bytes_b);
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! All resource retrieval methods are fallible and attempts to access malformed or missing
+//! resources will return an [`EbookError::Archive`](ebook::errors::EbookError::Archive) error.
+//!
+//! ## See Also
+//! - [`Epub`] documentation of `read_resource_*` methods for normalization details.
 //!
 //! # Examples
 //! ## Accessing [`Metadata`](ebook::metadata::Metadata)
@@ -124,22 +171,22 @@
 //! # use rbook::ebook::manifest::{Manifest, ManifestEntry};
 //! # let epub = Epub::open("example.epub").unwrap();
 //!
-//! // Create a new directory to store the extracted images
+//! // Creating a new directory to store the extracted images
 //! let dir = Path::new("extracted_images");
 //! fs::create_dir(&dir).unwrap();
 //!
 //! for image in epub.manifest().images() {
 //!     let img_href = image.href().as_str();
 //!
-//!     // Retrieve image contents
-//!     let img = epub.read_resource_bytes(image.resource()).unwrap();
+//!     // Retrieving the raw image data
+//!     let img_data = image.read_bytes().unwrap();
 //!
-//!     // Retrieve the file name from the image href
+//!     // Retrieving the file name from the image href
 //!     let file_name = Path::new(img_href).file_name().unwrap();
 //!
-//!     // Create a new file
+//!     // Creating a new file to store the image data
 //!     let mut file = File::create(dir.join(file_name)).unwrap();
-//!     file.write_all(&img).unwrap();
+//!     file.write_all(&img_data).unwrap();
 //! }
 //! ```
 //! ## Accessing [`EpubManifest`](epub::manifest::EpubManifest) media overlays and fallbacks

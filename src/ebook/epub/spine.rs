@@ -5,6 +5,7 @@ use crate::ebook::epub::manifest::{EpubManifestEntry, EpubManifestEntryProvider}
 use crate::ebook::epub::metadata::{EpubRefinements, EpubRefinementsData};
 use crate::ebook::spine::{PageDirection, Spine, SpineEntry};
 use std::cmp::Ordering;
+use std::fmt::{Debug, Formatter};
 use std::slice::Iter as SliceIter;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -42,7 +43,7 @@ pub(super) struct EpubSpineEntryData {
 ////////////////////////////////////////////////////////////////////////////////
 
 /// An EPUB spine, see [`Spine`] for more details.
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone)]
 pub struct EpubSpine<'ebook> {
     /// Manifest entry provider for resource lookup within the spine itself
     provider: EpubManifestEntryProvider<'ebook>,
@@ -117,6 +118,14 @@ impl<'ebook> Spine<'ebook> for EpubSpine<'ebook> {
     }
 }
 
+impl Debug for EpubSpine<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("EpubSpine")
+            .field("data", self.data)
+            .finish_non_exhaustive()
+    }
+}
+
 impl PartialEq for EpubSpine<'_> {
     fn eq(&self, other: &Self) -> bool {
         self.data == other.data
@@ -179,7 +188,7 @@ impl<'ebook> Iterator for EpubSpineIter<'ebook> {
 }
 
 /// An entry contained within an [`EpubSpine`], encompassing associated metadata.
-#[derive(Copy, Clone, Debug)]
+#[derive(Copy, Clone)]
 pub struct EpubSpineEntry<'ebook> {
     provider: EpubManifestEntryProvider<'ebook>,
     data: &'ebook EpubSpineEntryData,
@@ -259,7 +268,15 @@ impl<'ebook> SpineEntry<'ebook> for EpubSpineEntry<'ebook> {
     }
 
     fn manifest_entry(&self) -> Option<EpubManifestEntry<'ebook>> {
-        self.provider.provide_by_id(self.idref())
+        self.provider.by_id(self.idref())
+    }
+}
+
+impl Debug for EpubSpineEntry<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("EpubSpineEntry")
+            .field("data", self.data)
+            .finish_non_exhaustive()
     }
 }
 

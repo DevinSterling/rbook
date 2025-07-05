@@ -511,7 +511,7 @@ impl AttributeData {
         let mut value = value.into().into_owned();
         value.trim_in_place();
 
-        AttributeData {
+        Self {
             name: name.into().into_owned(),
             value,
         }

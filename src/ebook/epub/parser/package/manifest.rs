@@ -11,7 +11,7 @@ use std::collections::HashMap;
 
 impl EpubParser<'_> {
     pub(super) fn parse_manifest(
-        &mut self,
+        &self,
         ctx: &mut PackageContext,
     ) -> ParserResult<EpubManifestData> {
         let mut entries = HashMap::new();

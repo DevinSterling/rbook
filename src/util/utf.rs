@@ -17,7 +17,7 @@ pub(crate) enum UtfError {
 // Support for UTF-16 by converting it to UTF-8
 pub(crate) fn into_utf8(data: Vec<u8>) -> Result<Vec<u8>, UtfError> {
     if is_utf16(&data) {
-        from_utf16(data).map(String::into_bytes)
+        from_utf16(&data).map(String::into_bytes)
     } else {
         Ok(data)
     }
@@ -25,7 +25,7 @@ pub(crate) fn into_utf8(data: Vec<u8>) -> Result<Vec<u8>, UtfError> {
 
 pub(crate) fn into_utf8_str(data: Vec<u8>) -> Result<String, UtfError> {
     if is_utf16(&data) {
-        from_utf16(data)
+        from_utf16(&data)
     } else {
         String::from_utf8(data).map_err(UtfError::InvalidUtf8)
     }
@@ -36,7 +36,7 @@ fn is_utf16(data: &[u8]) -> bool {
     data.starts_with(b"\xFF\xFE") || data.starts_with(b"\xFE\xFF")
 }
 
-fn from_utf16(data: Vec<u8>) -> Result<String, UtfError> {
+fn from_utf16(data: &[u8]) -> Result<String, UtfError> {
     // Determine byte order for little endian (le) and big endian (be)
     let endian = if data.starts_with(b"\xFF") {
         u16::from_le_bytes
@@ -107,16 +107,16 @@ mod tests {
 
     #[test]
     fn test_from_utf16() {
-        assert_eq!(UTF_8, super::from_utf16(UTF_16_LE.to_vec()).unwrap());
-        assert_eq!(UTF_8, super::from_utf16(UTF_16_BE.to_vec()).unwrap());
+        assert_eq!(UTF_8, super::from_utf16(UTF_16_LE).unwrap());
+        assert_eq!(UTF_8, super::from_utf16(UTF_16_BE).unwrap());
 
-        assert!(super::into_utf8_str(UTF_16_MALFORMED.to_vec()).is_err());
+        assert!(super::from_utf16(UTF_16_MALFORMED).is_err());
 
         // Despite passing, the behavior is undefined.
         // Lack of a BOM means improper handling of endian byte order.
         // This scenario will never occur in the public API as conversion
         // from UTF-16 to UTF-8 is guarded by `is_utf16()` which checks
         // if there is a BOM before calling `from_utf16(...)`.
-        assert!(super::from_utf16(UTF_16_NO_BOM.to_vec()).is_ok());
+        assert!(super::from_utf16(UTF_16_NO_BOM).is_ok());
     }
 }

@@ -56,7 +56,7 @@ impl<'a> EpubParser<'a> {
         // Parse "META-INF/container.xml"
         let content_meta_inf = self.read_resource(consts::CONTAINER)?;
 
-        let package_file = self.parse_container(&content_meta_inf)?;
+        let package_file = Self::parse_container(&content_meta_inf)?;
         // A resolver to turn uris within the <package> from relative to absolute
         let package_resolver = UriResolver(uri::parent(&package_file));
 
@@ -71,7 +71,7 @@ impl<'a> EpubParser<'a> {
             // A resolver to turn uris within the toc file from relative to absolute
             let toc_resolver = UriResolver(uri::parent(&href));
             let content_toc = self.read_resource(href.as_str())?;
-            toc.extend(self.parse_toc(toc_resolver, &content_toc)?);
+            toc.extend(self.parse_toc(&toc_resolver, &content_toc)?);
         }
 
         toc.set_preferences(self.settings);

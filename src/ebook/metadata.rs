@@ -592,7 +592,7 @@ pub struct Version(
 );
 
 impl Version {
-    pub(crate) fn from_str(version: &str) -> Option<Version> {
+    pub(crate) fn from_str(version: &str) -> Option<Self> {
         let mut components = version.trim().split('.').map(str::parse);
 
         Some(Self(

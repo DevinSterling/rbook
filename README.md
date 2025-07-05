@@ -23,8 +23,8 @@ A fast, format-agnostic, ergonomic ebook library with a focus on EPUB.
 ## Usage
 ```toml
 [dependencies]
-rbook = "0.6.2"                                           # with default features
-# rbook = { version = "0.6.2", default-features = false } # excluding default features
+rbook = "0.6.3"                                           # with default features
+# rbook = { version = "0.6.3", default-features = false } # excluding default features
 ```
 
 Default crate features:
@@ -81,6 +81,36 @@ The `wasm32-unknown-unknown` target is supported by default.
       assert_eq!(Some("marc:relators"), role.source());
   }
   ```
+- Extracting images from the manifest:
+  ```rust
+  use rbook::Epub;
+  use rbook::prelude::*;
+  use std::fs::{self, File};
+  use std::path::Path;
+  use std::io::Write;
+  
+  fn main() {
+      let epub = Epub::open("example.epub").unwrap();
+      
+      // Creating a new directory to store the extracted images
+      let dir = Path::new("extracted_images");
+      fs::create_dir(&dir).unwrap();
+      
+      for image in epub.manifest().images() {
+          let img_href = image.href().as_str();
+  
+          // Retrieving the raw image data
+          let img_data = image.read_bytes().unwrap();
+  
+          // Retrieving the file name from the image href
+          let file_name = Path::new(img_href).file_name().unwrap();
+  
+          // Creating a new file to store the image data
+          let mut file = fs::File::create(dir.join(file_name)).unwrap();
+          file.write_all(&img_data).unwrap();
+      }
+  }
+  ```
 - Manifest media overlay and fallbacks:
   ```rust
   use rbook::Epub;
@@ -111,33 +141,6 @@ The `wasm32-unknown-unknown` target is supported by default.
       
       // No more fallbacks
       assert_eq!(None, fallbacks.next());
-  }
-  ```
-- Extracting images from the manifest:
-  ```rust
-  use rbook::Epub;
-  use rbook::prelude::*;
-  use std::fs::{self, File};
-  use std::path::Path;
-  use std::io::Write;
-  
-  fn main() {
-      let epub = Epub::open("example.epub").unwrap();
-      
-      // Create a new directory to store the extracted images
-      let dir = Path::new("extracted_images");
-      fs::create_dir(&dir).unwrap();
-      
-      for image in epub.manifest().images() {
-          let img_href = image.href().as_str();
-          // Retrieve image contents
-          let img = epub.read_resource_bytes(image.resource()).unwrap();
-          // Retrieve the file name from the image href
-          let file_name = Path::new(img_href).file_name().unwrap();
-          // Create a new file
-          let mut file = fs::File::create(dir.join(file_name)).unwrap();
-          file.write_all(&img).unwrap();
-      }
   }
   ```
 - More examples are available in the documentation: <https://docs.rs/rbook>

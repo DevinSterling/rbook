@@ -10,9 +10,9 @@ use quick_xml::events::BytesStart;
 
 impl EpubParser<'_> {
     pub(super) fn parse_guide(
-        &mut self,
+        &self,
         ctx: &mut PackageContext,
-        guide: BytesStart,
+        guide: &BytesStart,
     ) -> ParserResult<EpubTocData> {
         let mut root = EpubTocEntryData {
             kind: TocEntryKind::Landmarks,

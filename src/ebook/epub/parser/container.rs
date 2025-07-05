@@ -8,7 +8,7 @@ use quick_xml::events::Event;
 
 impl EpubParser<'_> {
     /// Parses `META-INF/container.xml` and retrieves the package `.opf` file location.
-    pub(super) fn parse_container(&self, data: &[u8]) -> ParserResult<String> {
+    pub(super) fn parse_container(data: &[u8]) -> ParserResult<String> {
         let mut reader = Reader::from_reader(data);
 
         while let Some(event) = reader.next() {
@@ -18,12 +18,11 @@ impl EpubParser<'_> {
             };
             // Although rare, multiple package.opf locations could exist.
             // Only accept the first path as it is the default
-            let full_path = match (
+            let (Some(consts::bytes::PACKAGE_TYPE), Some(full_path)) = (
                 el.get_attribute(consts::MEDIA_TYPE).as_deref(),
                 el.get_attribute(consts::FULL_PATH),
-            ) {
-                (Some(consts::bytes::PACKAGE_TYPE), Some(full_path)) => full_path,
-                _ => continue,
+            ) else {
+                continue;
             };
 
             let mut package_file = String::from_utf8(full_path.to_vec())?;

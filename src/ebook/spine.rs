@@ -7,6 +7,10 @@ use std::fmt::{Display, Formatter};
 /// The "spine" of an [`Ebook`](super::Ebook) encompassing the canonical
 /// reading order of textual resources intended for end-user reading.
 ///
+/// # See Also
+/// - [`Reader`](crate::reader::Reader)
+///   to sequentially read spine content with greater control.
+///
 /// # Examples
 /// - Traversing the contents in canonical order:
 /// ```

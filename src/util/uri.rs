@@ -23,8 +23,9 @@ pub(crate) fn normalize(href: &str) -> String {
 pub(crate) fn resolve<'a>(parent_dir: &str, relative: &'a str) -> Cow<'a, str> {
     let (main_href, frag) = relative
         .find(['?', '#'])
-        .map(|position| (&relative[..position], &relative[position..]))
-        .unwrap_or((relative, ""));
+        .map_or((relative, ""), |position| {
+            (&relative[..position], &relative[position..])
+        });
 
     if main_href.starts_with('/') || has_scheme(main_href) {
         // If the path is absolute or has a scheme,

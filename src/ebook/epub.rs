@@ -18,7 +18,7 @@ use crate::ebook::Ebook;
 use crate::ebook::archive::zip::ZipArchive;
 use crate::ebook::archive::{self, Archive};
 use crate::ebook::element::Href;
-use crate::ebook::epub::manifest::{EpubManifest, EpubManifestData, EpubManifestEntryProvider};
+use crate::ebook::epub::manifest::{EpubManifest, EpubManifestData};
 use crate::ebook::epub::metadata::{EpubMetadata, EpubMetadataData, EpubVersion};
 use crate::ebook::epub::parser::EpubParser;
 use crate::ebook::epub::reader::{EpubReader, EpubReaderSettings};
@@ -48,7 +48,7 @@ use std::path::Path;
 /// rbook = { version = "...", features = ["threadsafe"] }
 /// ```
 /// # Renditions
-/// Multi-rendition EPUBs are not fully supported,  
+/// Multi-rendition EPUBs are not fully supported,
 /// and the first OPF `rootfile` will always be selected.  
 ///
 /// # Examples
@@ -254,7 +254,7 @@ impl Epub {
     fn transform_resource<'b>(&self, resource: Resource<'b>) -> Resource<'b> {
         let href = match resource.key() {
             ResourceKey::Value(value) => uri::decode(value.as_ref()),
-            _ => return resource,
+            ResourceKey::Position(_) => return resource,
         };
         let package_dir = self.package_directory().decode();
 
@@ -267,6 +267,7 @@ impl Epub {
         resource.swap_value(modified_href)
     }
 
+    // For now, `EpubSettings` are not stored within the `Epub` struct.
     fn new(settings: EpubSettings, archive: Box<dyn Archive>) -> EbookResult<Self> {
         let mut parser = EpubParser::new(&settings, archive.as_ref());
         let data = parser.parse()?;
@@ -293,15 +294,15 @@ impl Ebook for Epub {
     }
 
     fn manifest(&self) -> EpubManifest {
-        EpubManifest::new(&self.manifest)
+        EpubManifest::new(&self.manifest, EpubResourceProvider(self))
     }
 
     fn spine(&self) -> EpubSpine {
-        EpubSpine::new(EpubManifestEntryProvider(self.manifest()), &self.spine)
+        EpubSpine::new(self.manifest().into(), &self.spine)
     }
 
     fn toc(&self) -> EpubToc {
-        EpubToc::new(EpubManifestEntryProvider(self.manifest()), &self.toc)
+        EpubToc::new(self.manifest().into(), &self.toc)
     }
 
     /// See [`Self::read_resource_bytes`] for EPUB-specific information regarding
@@ -337,7 +338,7 @@ impl Ebook for Epub {
     /// // Absolute container path (leading slash stripped):
     /// let c1 = epub.read_resource_bytes("/EPUB/c1.xhtml")?;
     /// // Resolves to existing `/EPUB/c1.xhtml`:
-    /// assert_eq!(c1, epub.read_resource_bytes("c1.xhtml")?);       
+    /// assert_eq!(c1, epub.read_resource_bytes("c1.xhtml")?);
     /// // Resolves to non-existing `/c1.xhtml`:
     /// assert!(epub.read_resource_bytes("/c1.xhtml").is_err());
     /// // Resolves to non-existing `/EPUB/EPUB/c1.xhtml`:
@@ -350,7 +351,7 @@ impl Ebook for Epub {
     /// // Resolves to existing `/META-INF/container.xml`:
     /// assert_eq!(toc, epub.read_resource_bytes("/EPUB/../META-INF/container.xml")?);
     /// // Resolves to non-existing `/EPUB/META-INF/container.xml`:
-    /// assert!(epub.read_resource_bytes("META-INF/container.xml").is_err());          
+    /// assert!(epub.read_resource_bytes("META-INF/container.xml").is_err());
     /// // Resolves to non-existing `/EPUB/META-INF/container.xml`:
     /// assert!(epub.read_resource_bytes("EPUB/../META-INF/container.xml").is_err());
     /// # Ok(())
@@ -371,7 +372,7 @@ impl Debug for Epub {
             .field("manifest", &self.manifest)
             .field("spine", &self.spine)
             .field("toc", &self.toc)
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 
@@ -462,15 +463,15 @@ pub struct EpubSettings {
 }
 
 impl EpubSettings {
-    /// Returns a builder to create an [EpubSettings] instance.
+    /// Returns a builder to create an [`EpubSettings`] instance.
     pub fn builder() -> EpubSettingsBuilder {
-        EpubSettingsBuilder(Default::default())
+        EpubSettingsBuilder(Self::default())
     }
 }
 
 impl Default for EpubSettings {
     fn default() -> Self {
-        EpubSettings {
+        Self {
             preferred_toc: EpubVersion::EPUB3,
             preferred_landmarks: EpubVersion::EPUB3,
             preferred_page_list: EpubVersion::EPUB3,
@@ -543,5 +544,18 @@ impl EpubSettingsBuilder {
     pub fn strict(mut self, strict: bool) -> Self {
         self.0.strict = strict;
         self
+    }
+}
+
+#[derive(Copy, Clone)]
+pub(super) struct EpubResourceProvider<'ebook>(&'ebook Epub);
+
+impl EpubResourceProvider<'_> {
+    pub(crate) fn read_str(&self, resource: Resource) -> EbookResult<String> {
+        self.0.read_resource_str(resource)
+    }
+
+    pub(crate) fn read_bytes(&self, resource: Resource) -> EbookResult<Vec<u8>> {
+        self.0.read_resource_bytes(resource)
     }
 }

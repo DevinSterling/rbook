@@ -38,7 +38,7 @@ fn extract_resource_key<'a>(resource: &'a Resource<'a>) -> ArchiveResult<&'a str
             // `/EPUB/OEBPS/toc.xhtml` -> `EPUB/OEBPS/toc.xhtml`
             Ok(value.strip_prefix('/').unwrap_or(value))
         }
-        _ => Err(ArchiveError::InvalidResource {
+        ResourceKey::Position(_) => Err(ArchiveError::InvalidResource {
             source: io::Error::from(io::ErrorKind::InvalidFilename),
             resource: resource.as_static(),
         }),

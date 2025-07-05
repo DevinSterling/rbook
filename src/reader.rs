@@ -469,7 +469,7 @@ impl<'a> From<&'a str> for ReaderKey<'a> {
     }
 }
 
-impl<'a> From<usize> for ReaderKey<'a> {
+impl From<usize> for ReaderKey<'_> {
     fn from(index: usize) -> Self {
         Self::Position(index)
     }

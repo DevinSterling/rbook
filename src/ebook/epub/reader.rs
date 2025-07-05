@@ -46,7 +46,6 @@ use std::cmp::PartialEq;
 /// ```
 #[derive(Clone, Debug, PartialEq)]
 pub struct EpubReader<'ebook> {
-    epub: &'ebook Epub,
     entries: Vec<EpubSpineEntry<'ebook>>,
     cursor: IndexCursor,
 }
@@ -57,7 +56,6 @@ impl<'ebook> EpubReader<'ebook> {
 
         EpubReader {
             cursor: IndexCursor::new(entries.len()),
-            epub,
             entries,
         }
     }
@@ -77,7 +75,7 @@ impl<'ebook> EpubReader<'ebook> {
                 let (mut linear, mut non_linear) =
                     iterator.partition::<Vec<_>, _>(EpubSpineEntry::is_linear);
 
-                if let LinearBehavior::AppendNonLinear = &behavior {
+                if matches!(&behavior, LinearBehavior::AppendNonLinear) {
                     linear.extend(non_linear);
                     linear
                 } else {
@@ -89,7 +87,6 @@ impl<'ebook> EpubReader<'ebook> {
     }
 
     fn get_manifest_entry(
-        &self,
         spine_entry: EpubSpineEntry<'ebook>,
     ) -> ReaderResult<EpubManifestEntry<'ebook>> {
         spine_entry.manifest_entry().ok_or_else(|| {
@@ -112,7 +109,7 @@ impl<'ebook> EpubReader<'ebook> {
 
     fn find_entry_by_position(&self, position: usize) -> ReaderResult<EpubReaderContent<'ebook>> {
         let spine_entry = self.entries[position];
-        let manifest_entry = self.get_manifest_entry(spine_entry)?;
+        let manifest_entry = Self::get_manifest_entry(spine_entry)?;
 
         self.crate_reader_content(position, spine_entry, manifest_entry)
     }
@@ -120,7 +117,7 @@ impl<'ebook> EpubReader<'ebook> {
     fn find_entry_by_str(&self, idref: &str) -> ReaderResult<(usize, EpubReaderContent<'ebook>)> {
         let position = self.find_entry_by_idref(idref)?;
         let spine_entry = self.entries[position];
-        let manifest_entry = self.get_manifest_entry(spine_entry)?;
+        let manifest_entry = Self::get_manifest_entry(spine_entry)?;
 
         Ok((
             position,
@@ -135,7 +132,7 @@ impl<'ebook> EpubReader<'ebook> {
         manifest_entry: EpubManifestEntry<'ebook>,
     ) -> ReaderResult<EpubReaderContent<'ebook>> {
         Ok(EpubReaderContent {
-            content: self.epub.read_resource_str(manifest_entry.resource())?,
+            content: manifest_entry.read_str()?,
             position,
             spine_entry,
             manifest_entry,
@@ -291,7 +288,7 @@ pub struct EpubReaderSettings {
 impl EpubReaderSettings {
     /// Returns a builder to create an [`EpubReaderSettings`] instance.
     pub fn builder() -> EpubReaderSettingsBuilder {
-        EpubReaderSettingsBuilder(Default::default())
+        EpubReaderSettingsBuilder(Self::default())
     }
 }
 

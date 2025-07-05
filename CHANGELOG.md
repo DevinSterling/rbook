@@ -1,5 +1,13 @@
 # Changelog
 
+## 0.6.3 (2025-07-04)
+### Additions　**＋**
+- New `read_str` and `read_bytes` methods for resource retrieval directly from `ManifestEntry` instances.
+
+### Changes　**⟳**
+- Refine documentation for enhanced clarity.
+- Refactor/simplify internals.
+
 ## 0.6.2 (2025-07-03)
 ### Additions　**＋**
 - Implement `From<Href>` for `ResourceKey`.

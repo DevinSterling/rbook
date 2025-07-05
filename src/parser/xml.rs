@@ -12,13 +12,13 @@ use std::string::FromUtf8Error;
 pub(crate) type ByteReader<'a> = Reader<&'a [u8]>;
 
 pub(crate) trait XmlReader<'a> {
-    /// Iterator-like method to read the next [Event].
+    /// Iterator-like method to read the next [`Event`].
     fn next(&mut self) -> Option<ParserResult<Event<'a>>>;
 
-    /// If `event` is [Some], takes the [Event] and returns it,
-    /// otherwise invokes [Self::next].
+    /// If `event` is [`Some`], takes the [`Event`] and returns it,
+    /// otherwise invokes [`Self::next`].
     ///
-    /// After this call, `event` **will** have a value of [None].
+    /// After this call, `event` **will** have a value of [`None`].
     fn take_or_next(&mut self, event: &mut Option<Event<'a>>) -> Option<ParserResult<Event<'a>>> {
         event.take().map(Ok).or_else(|| self.next())
     }
@@ -45,8 +45,8 @@ pub(crate) trait XmlReader<'a> {
                 break;
             }
             match event {
-                Event::Text(text) => text_to_str(&mut value, text),
-                Event::CData(cdata) => cdata_to_str(&mut value, cdata),
+                Event::Text(mut text) => text_to_str(&mut value, &mut text),
+                Event::CData(cdata) => cdata_to_str(&mut value, &cdata),
                 _ => {}
             }
         }
@@ -61,7 +61,7 @@ pub(crate) trait XmlReader<'a> {
         )
     }
 
-    /// See [Self::get_text]
+    /// See [`Self::get_text`]
     fn get_text_till_either(
         &mut self,
         last_event: &mut Option<Event<'a>>,
@@ -118,7 +118,7 @@ impl<'a> XmlElement<'a> for BytesStart<'a> {
     }
 
     fn bytes_attributes(&self) -> BytesAttributes {
-        BytesAttributes(self.attributes().filter_map(|result| result.ok()).collect())
+        BytesAttributes(self.attributes().filter_map(Result::ok).collect())
     }
 }
 
@@ -193,7 +193,7 @@ impl TryFrom<Attribute<'_>> for AttributeData {
         let name = attribute.key.0;
         let value = attribute.value.into_owned();
 
-        Ok(AttributeData::new(
+        Ok(Self::new(
             str::from_utf8(name)
                 .map(Cow::Borrowed)
                 // fallback; this generally should never occur
@@ -204,7 +204,7 @@ impl TryFrom<Attribute<'_>> for AttributeData {
 }
 
 // Helper methods
-fn cdata_to_str(value: &mut String, cdata: BytesCData) {
+fn cdata_to_str(value: &mut String, cdata: &BytesCData) {
     let text = cdata
         .decode()
         .unwrap_or_else(|_| String::from_utf8_lossy(cdata.as_ref()));
@@ -212,7 +212,7 @@ fn cdata_to_str(value: &mut String, cdata: BytesCData) {
     value.push_str(text.trim());
 }
 
-fn text_to_str(value: &mut String, mut text: BytesText) {
+fn text_to_str(value: &mut String, text: &mut BytesText) {
     // Determine when to add spacing
     let has_padding_start = text.try_trim_start();
     let has_padding_end = text.try_trim_end();
@@ -255,18 +255,18 @@ mod tests {
         let mut s = String::new();
         super::text_to_str(
             &mut s,
-            BytesText::from_escaped(" \n \t \r  data1 &amp; data2  \n\r \n  \t "),
+            &mut BytesText::from_escaped(" \n \t \r  data1 &amp; data2  \n\r \n  \t "),
         );
         // If there is whitespace at the end, a single `space` must replace it all.
         assert_eq!("data1 & data2 ", s);
 
-        super::text_to_str(&mut s, BytesText::from_escaped("data3 "));
+        super::text_to_str(&mut s, &mut BytesText::from_escaped("data3 "));
         assert_eq!("data1 & data2 data3 ", s);
 
-        super::text_to_str(&mut s, BytesText::from_escaped("  data4"));
+        super::text_to_str(&mut s, &mut BytesText::from_escaped("  data4"));
         assert_eq!("data1 & data2 data3 data4", s);
 
-        super::text_to_str(&mut s, BytesText::from_escaped("data5"));
+        super::text_to_str(&mut s, &mut BytesText::from_escaped("data5"));
         assert_eq!("data1 & data2 data3 data4data5", s);
     }
 }

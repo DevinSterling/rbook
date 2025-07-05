@@ -3,7 +3,7 @@
 use crate::ebook::element::Href;
 use crate::util::{StrExt, StringExt};
 use std::borrow::Cow;
-use std::fmt::{Display, Formatter};
+use std::fmt::{Debug, Display, Formatter};
 use std::path::Path;
 
 /// A resource within an [`Ebook`](crate::Ebook), pointing to where associated content is stored.
@@ -56,7 +56,7 @@ use std::path::Path;
 /// # Ok(())
 /// # }
 /// ```
-#[derive(Clone, Debug, Hash, PartialEq)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct Resource<'a> {
     key: ResourceKey<'a>,
     kind: ResourceKind<'a>,
@@ -83,13 +83,13 @@ impl<'a> Resource<'a> {
     }
 
     /// The [`ResourceKey`], indicating where the associated content is held.
-    pub fn key(&self) -> &ResourceKey {
+    pub fn key(&self) -> &ResourceKey<'a> {
         &self.key
     }
 
     /// The [`ResourceKind`], indicating if a resource is an `XHTML` file,
     /// `JPEG` image, `CSS` stylesheet, etc.
-    pub fn kind(&self) -> &ResourceKind {
+    pub fn kind(&self) -> &ResourceKind<'a> {
         &self.kind
     }
 }
@@ -158,7 +158,7 @@ pub enum ResourceKey<'a> {
     Position(usize),
 }
 
-impl<'a> ResourceKey<'a> {
+impl ResourceKey<'_> {
     fn as_static(&self) -> ResourceKey<'static> {
         match self {
             Self::Value(value) => ResourceKey::Value(Cow::Owned(value.to_string())),
@@ -179,7 +179,7 @@ impl<'a> ResourceKey<'a> {
     pub fn value(&self) -> Option<&str> {
         match self {
             Self::Value(value) => Some(value.as_ref()),
-            _ => None,
+            Self::Position(_) => None,
         }
     }
 
@@ -196,7 +196,7 @@ impl<'a> ResourceKey<'a> {
     pub fn position(&self) -> Option<usize> {
         match self {
             Self::Position(position) => Some(*position),
-            _ => None,
+            Self::Value(_) => None,
         }
     }
 }
@@ -220,7 +220,7 @@ impl<'a> From<&'a str> for ResourceKey<'a> {
     }
 }
 
-impl<'a> From<usize> for ResourceKey<'a> {
+impl From<usize> for ResourceKey<'_> {
     fn from(value: usize) -> Self {
         Self::Position(value)
     }
@@ -235,7 +235,7 @@ impl<'a> From<&'a Self> for ResourceKey<'a> {
     }
 }
 
-/// The kind of [`resource`](Resource) contained within an ebook, based on
+/// The kind of [`resource`](Resource) contained within an ebook based on
 /// [`MIME`](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/MIME_types),
 /// useful for inferring if a resource is an `XHTML` file, `PNG` image, etc.
 ///
@@ -668,9 +668,9 @@ impl PartialEq for ResourceKind<'_> {
     fn eq(&self, other: &Self) -> bool {
         fn extract_type<'a>(kind: &'a ResourceKind) -> (&'a str, bool) {
             let mut split = kind.0.split(';');
-            let _type = split.next().unwrap().trim(); // Split guarantees at least one entry
+            let full_type = split.next().unwrap().trim(); // Split guarantees at least one entry
             let has_params = split.next().is_some();
-            (_type, has_params)
+            (full_type, has_params)
         }
 
         let (self_type, self_has_params) = extract_type(self);

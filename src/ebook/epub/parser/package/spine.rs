@@ -9,9 +9,9 @@ use quick_xml::events::BytesStart;
 
 impl EpubParser<'_> {
     pub(super) fn parse_spine(
-        &mut self,
+        &self,
         ctx: &mut PackageContext,
-        spine: BytesStart,
+        spine: &BytesStart,
     ) -> ParserResult<EpubSpineData> {
         let mut entries = Vec::new();
         let page_direction = spine

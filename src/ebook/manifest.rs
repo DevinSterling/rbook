@@ -1,9 +1,10 @@
 //! Format-agnostic [`Manifest`]-related content.
 
+use crate::ebook::errors::{ArchiveError, EbookResult};
 use crate::ebook::resource::{Resource, ResourceKind};
 
 /// The manifest of an [`Ebook`](super::Ebook)
-/// encompassing all internal [`resources`](Resource) (e.g., images, files, etc.).
+/// encompassing internal [`resources`](Resource) (e.g., images, files, etc.).
 ///
 /// # Examples
 /// - Retrieving the cover image from the manifest:
@@ -152,6 +153,10 @@ pub trait ManifestEntry<'ebook> {
 
     /// The underlying [`Resource`] a manifest entry points to.
     ///
+    /// # See Also
+    /// - [`Self::read_str`]
+    /// - [`Self::read_bytes`]
+    ///
     /// # Examples
     /// - Reading a resource provided by the manifest:
     /// ```
@@ -193,4 +198,81 @@ pub trait ManifestEntry<'ebook> {
     /// # }
     /// ```
     fn resource_kind(&self) -> ResourceKind<'ebook>;
+
+    /// Returns the associated content in the form of a string.
+    ///
+    /// This method is equivalent to calling
+    /// [`Ebook::read_resource_str`](super::Ebook::read_resource_str) and passing
+    /// [`Self::resource`] as the argument.
+    ///
+    /// # Errors
+    /// [`ArchiveError`]: When retrieval of the requested content fails.
+    ///
+    /// # Examples
+    /// - Retrieving the string content associated with a manifest entry:
+    /// ```
+    /// # use rbook::ebook::errors::EbookResult;
+    /// # use rbook::ebook::manifest::{Manifest, ManifestEntry};
+    /// # use rbook::{Ebook, Epub};
+    /// # fn main() -> EbookResult<()> {
+    /// let epub = Epub::open("tests/ebooks/example_epub")?;
+    /// let chapter_1 = epub.manifest().by_id("c1").unwrap();
+    ///
+    /// let xhtml_a = chapter_1.read_str()?;
+    /// let xhtml_b = epub.read_resource_str(chapter_1.resource())?;
+    ///
+    /// assert_eq!(xhtml_a, xhtml_b);
+    /// # Ok(())
+    /// # }
+    /// ```
+    fn read_str(&self) -> EbookResult<String> {
+        default_placeholder(self.resource())
+    }
+
+    /// Returns the associated content in the form of bytes.
+    ///
+    /// This method is equivalent to calling
+    /// [`Ebook::read_resource_bytes`](super::Ebook::read_resource_bytes) and passing
+    /// [`Self::resource`] as the argument.
+    ///
+    /// # Errors
+    /// [`ArchiveError`]: When retrieval of the requested content fails.
+    ///
+    /// # Examples
+    /// - Retrieving the byte contents of a [cover image](Manifest::cover_image):
+    /// ```
+    /// # use rbook::ebook::errors::EbookResult;
+    /// # use rbook::ebook::manifest::{Manifest, ManifestEntry};
+    /// # use rbook::{Ebook, Epub};
+    /// # fn main() -> EbookResult<()> {
+    /// let epub = Epub::open("tests/ebooks/example_epub")?;
+    /// let cover_image = epub.manifest().cover_image().unwrap();
+    ///
+    /// let bytes_a = cover_image.read_bytes()?;
+    /// let bytes_b = epub.read_resource_bytes(cover_image.resource())?;
+    ///
+    /// assert_eq!(bytes_a, bytes_b);
+    /// # Ok(())
+    /// # }
+    /// ```
+    fn read_bytes(&self) -> EbookResult<Vec<u8>> {
+        default_placeholder(self.resource())
+    }
+}
+
+/// Placeholder introduced in rbook v0.6.3 for backwards-compatibility.
+/// This will be removed in v0.7.0 where
+/// [`ManifestEntry::read_str`] and [`ManifestEntry::read_bytes`] will not be default methods.
+///
+/// This method is only invoked if [`ManifestEntry`] is implemented
+/// outside `rbook`.
+fn default_placeholder<T>(resource: Resource) -> EbookResult<T> {
+    Err(ArchiveError::InvalidResource {
+        source: std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            "The default implementation of `read_str/bytes` will always return this error.",
+        ),
+        resource: resource.as_static(),
+    }
+    .into())
 }
