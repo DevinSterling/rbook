@@ -158,11 +158,52 @@ pub struct Properties<'a>(&'a PropertiesData);
 
 impl<'a> Properties<'a> {
     /// The number of property entries contained within.
+    ///
+    /// # Examples
+    /// - Retrieving the number of properties:
+    /// ```
+    /// # use rbook::{Ebook, Epub};
+    /// # use rbook::ebook::errors::EbookResult;
+    /// # use rbook::ebook::manifest::Manifest;
+    /// # fn main() -> EbookResult<()> {
+    /// let epub = Epub::open("tests/ebooks/example_epub")?;
+    /// let nav_xhtml = epub.manifest().by_property("nav").next().unwrap();
+    /// let properties = nav_xhtml.properties();
+    ///
+    /// assert_eq!("scripted nav", properties.as_str());
+    /// assert_eq!(2, properties.len());
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn len(&self) -> usize {
         self.iter().count()
     }
 
     /// Returns `true` if there are no properties.
+    ///
+    /// # Examples
+    /// - Retrieving the number of properties:
+    /// ```
+    /// # use rbook::{Ebook, Epub};
+    /// # use rbook::ebook::errors::EbookResult;
+    /// # use rbook::ebook::manifest::Manifest;
+    /// # fn main() -> EbookResult<()> {
+    /// let epub = Epub::open("tests/ebooks/example_epub")?;
+    ///
+    /// let nav_xhtml = epub.manifest().by_property("nav").next().unwrap();
+    /// let nav_xhtml_properties = nav_xhtml.properties();
+    ///
+    /// assert_eq!("scripted nav", nav_xhtml_properties.as_str());
+    /// assert_eq!(false, nav_xhtml_properties.is_empty());
+    ///
+    /// let chapter_1 = epub.manifest().by_id("c1").unwrap();
+    /// let chapter_1_properties = chapter_1.properties();
+    ///
+    /// assert_eq!("", chapter_1_properties.as_str());
+    /// assert_eq!(true, chapter_1_properties.is_empty());
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn is_empty(&self) -> bool {
         self.as_str().trim().is_empty()
     }
@@ -174,16 +215,71 @@ impl<'a> Properties<'a> {
     }
 
     /// Returns an iterator over **all** properties.
+    ///
+    /// # Examples
+    /// - Iterating over each property:
+    /// ```
+    /// # use rbook::{Ebook, Epub};
+    /// # use rbook::ebook::errors::EbookResult;
+    /// # use rbook::ebook::manifest::Manifest;
+    /// # fn main() -> EbookResult<()> {
+    /// let epub = Epub::open("tests/ebooks/example_epub")?;
+    /// let nav_xhtml = epub.manifest().by_property("nav").next().unwrap();
+    /// let properties = nav_xhtml.properties();
+    /// let mut iterator = properties.iter();
+    ///
+    /// assert_eq!("scripted nav", properties.as_str());
+    /// assert_eq!(Some("scripted"), iterator.next());
+    /// assert_eq!(Some("nav"), iterator.next());
+    /// assert_eq!(None, iterator.next());
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn iter(&self) -> PropertiesIter<'a> {
         self.into_iter()
     }
 
     /// Returns `true` if the provided property is present.
+    ///
+    /// # Examples
+    /// - Assessing if the provided properties are present:
+    /// ```
+    /// # use rbook::{Ebook, Epub};
+    /// # use rbook::ebook::errors::EbookResult;
+    /// # use rbook::ebook::manifest::Manifest;
+    /// # fn main() -> EbookResult<()> {
+    /// let epub = Epub::open("tests/ebooks/example_epub")?;
+    /// let nav_xhtml = epub.manifest().by_property("nav").next().unwrap();
+    /// let properties = nav_xhtml.properties();
+    ///
+    /// assert_eq!("scripted nav", properties.as_str());
+    /// assert_eq!(true, properties.has_property("scripted"));
+    /// assert_eq!(true, properties.has_property("nav"));
+    /// assert_eq!(false, properties.has_property("other"));
+    /// assert_eq!(false, properties.has_property(" "));
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn has_property(&self, property: &str) -> bool {
-        self.0.has_property(property)
+        self.0.has_property(property.trim())
     }
 
     /// The underlying raw properties.
+    ///
+    /// - Retrieving the number of properties:
+    /// ```
+    /// # use rbook::{Ebook, Epub};
+    /// # use rbook::ebook::errors::EbookResult;
+    /// # use rbook::ebook::manifest::Manifest;
+    /// # fn main() -> EbookResult<()> {
+    /// let epub = Epub::open("tests/ebooks/example_epub")?;
+    /// let nav_xhtml = epub.manifest().by_property("nav").next().unwrap();
+    /// let properties = nav_xhtml.properties();
+    ///
+    /// assert_eq!("scripted nav", properties.as_str());
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn as_str(&self) -> &'a str {
         self.0.0.as_str()
     }

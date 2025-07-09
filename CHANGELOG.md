@@ -1,5 +1,17 @@
 # Changelog
 
+## 0.6.4 (2025-07-09)
+### Additions　**＋**
+- New `max_depth` and `total_len` methods for `TocEntry`.
+- Regarding EPUB, when a `title-type` of `main` is absent, rbook now infers the main `Title`
+  by selecting the `<dc:title>` with the highest precedence (lowest display order).
+
+  This guarantees consistent main title identification across all EPUBs.
+
+### Changes　**⟳**
+- Update `quick-xml` dependency: 0.37.5 → 0.38.0
+- Refine documentation for enhanced clarity.
+
 ## 0.6.3 (2025-07-04)
 ### Additions　**＋**
 - New `read_str` and `read_bytes` methods for resource retrieval directly from `ManifestEntry` instances.

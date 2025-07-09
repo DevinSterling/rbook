@@ -29,14 +29,14 @@
 //!
 //! | Feature                                   | Overview                                                                                    |
 //! |-------------------------------------------|---------------------------------------------------------------------------------------------|
-//! | [**EPUB 2 and 3**](epub)                  | Read-only (for now) view of EPUB `2` and `3` formats                                        |
+//! | [**EPUB 2 and 3**](epub)                  | Read-only (for now) view of EPUB `2` and `3` formats.                                       |
 //! | [**Streaming Reader**](reader)            | Random‐access or sequential iteration over readable content.                                |
 //! | **Detailed Types**                        | Abstractions built on expressive traits and types.                                          |
 //! | [**Metadata**](ebook::metadata)           | Typed access to titles, creators, publishers, languages, tags, roles, attributes, and more. |
 //! | [**Manifest**](ebook::manifest)           | Lookup and traverse contained resources such as readable content (XHTML) and images.        |
-//! | [**Spine**](ebook::spine)                 | Chronological reading order and preferred page direction                                    |
+//! | [**Spine**](ebook::spine)                 | Chronological reading order and preferred page direction.                                   |
 //! | [**Table of Contents (ToC)**](ebook::toc) | Navigation points, including the EPUB 2 guide and EPUB 3 landmarks.                         |
-//! | [**Resources**](ebook::resource)          | Retrieve bytes or UTF-8 strings for any manifest resource                                   |
+//! | [**Resources**](ebook::resource)          | Retrieve bytes or UTF-8 strings for any manifest resource.                                  |
 //!
 //! Default crate features:
 //! - `prelude`: Convenience prelude ***only*** including common traits.

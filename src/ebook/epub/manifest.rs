@@ -171,9 +171,9 @@ impl<'ebook> Manifest<'ebook> for EpubManifest<'ebook> {
 
     /// Returns an iterator over **all** [`entries`](ManifestEntry) in the manifest.
     ///
-    /// # Note
-    /// Manifest entries are stored in a `HashMap` with the `id` as key,
-    /// so iteration order is arbitrary and ***not*** guaranteed to be consistent.
+    /// # Order
+    /// As manifest entries are stored in a hash map with `id` as the key,
+    /// iteration order is arbitrary; non-deterministic.
     fn entries(&self) -> EpubManifestIter<'ebook> {
         self.into_iter()
     }
@@ -502,7 +502,7 @@ impl Debug for EpubManifestEntry<'_> {
         f.debug_struct("EpubManifestEntry")
             .field("id", &self.id)
             .field("data", self.data)
-            .finish()
+            .finish_non_exhaustive()
     }
 }
 

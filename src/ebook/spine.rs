@@ -82,7 +82,7 @@ pub trait Spine<'ebook> {
     /// assert_eq!(4, spine_entry.order());
     /// assert_eq!("c2", spine_entry.idref());
     ///
-    /// // Attempting to retrieve a non-existent entry; out-of-bounds
+    /// // Attempting to retrieve a non-existent out-of-bounds entry.
     /// // Since `len` is 5, the retrievable range is `[0, 4]`.
     /// assert_eq!(5, spine.len());
     /// assert_eq!(None, spine.by_order(5));

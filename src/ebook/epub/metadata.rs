@@ -193,7 +193,7 @@ impl<'ebook> EpubMetadata<'ebook> {
     /// For more information regarding EPUB metadata see:
     /// <https://www.w3.org/TR/epub/#sec-pkg-metadata>
     ///
-    /// # Note
+    /// # Excluded Entries
     /// Refining entries, `<meta>` elements with a `refines` field, are excluded:
     /// ```xhtml
     /// <meta refines="#parent-id">...</meta>
@@ -205,7 +205,7 @@ impl<'ebook> EpubMetadata<'ebook> {
         &self,
         property: &str,
     ) -> impl Iterator<Item = EpubMetaEntry<'ebook>> + 'ebook {
-        self.data_by_property(property).map(EpubMetaEntry)
+        self.data_by_property(property).map(EpubMetaEntry::new)
     }
 
     /// The [`Epub`](super::Epub) version (e.g., `2.0`, `3.2`, etc.).
@@ -259,13 +259,13 @@ impl<'ebook> Metadata<'ebook> for EpubMetadata<'ebook> {
             group
                 .iter()
                 .find(|data| data.id.as_ref() == Some(&self.data.primary_identifier))
-                .map(EpubIdentifier)
+                .map(EpubIdentifier::new)
         })
     }
 
     fn identifiers(&self) -> impl Iterator<Item = EpubIdentifier<'ebook>> + 'ebook {
         self.data_by_property(consts::IDENTIFIER)
-            .map(EpubIdentifier)
+            .map(EpubIdentifier::new)
     }
 
     /// The main [`language`](EpubLanguage) of an [`Epub`](super::Epub).
@@ -277,7 +277,8 @@ impl<'ebook> Metadata<'ebook> for EpubMetadata<'ebook> {
     }
 
     fn languages(&self) -> impl Iterator<Item = EpubLanguage<'ebook>> + 'ebook {
-        self.data_by_property(consts::LANGUAGE).map(EpubLanguage)
+        self.data_by_property(consts::LANGUAGE)
+            .map(EpubLanguage::new)
     }
 
     /// The main [`title`](EpubTitle) of an [`Epub`](super::Epub).
@@ -285,20 +286,30 @@ impl<'ebook> Metadata<'ebook> for EpubMetadata<'ebook> {
     /// Returns [`None`] if there is no title specified when
     /// [`EpubSettings::strict`](super::EpubSettings::strict) is disabled.
     fn title(&self) -> Option<EpubTitle<'ebook>> {
-        self.data_by_property(consts::TITLE)
-            // First try to find if a `main` title exists
-            .find(|title| {
+        self.titles().find(|title| title.is_main_title)
+    }
+
+    fn titles(&self) -> impl Iterator<Item = EpubTitle<'ebook>> + 'ebook {
+        // Although caching the inferred main title is possible,
+        // this is generally inexpensive (nearly all publications only have one title),
+        // and caching would complicate future write-back of EPUB metadata.
+        let inferred_main_title_index = self
+            .data_by_property(consts::TITLE)
+            .enumerate()
+            // First, try to find if a main `title-type` exists
+            .find_map(|(i, title)| {
                 title
                     .refinements
                     .by_refinement(consts::TITLE_TYPE)
                     .is_some_and(|title_type| title_type.value == consts::MAIN_TITLE_TYPE)
+                    .then_some(i)
             })
             // If not, retrieve the first title
-            .map_or_else(|| self.titles().next(), |data| Some(EpubTitle(data)))
-    }
+            .unwrap_or(0);
 
-    fn titles(&self) -> impl Iterator<Item = EpubTitle<'ebook>> + 'ebook {
-        self.data_by_property(consts::TITLE).map(EpubTitle)
+        self.data_by_property(consts::TITLE)
+            .enumerate()
+            .map(move |(i, data)| EpubTitle::new(data, i == inferred_main_title_index))
     }
 
     fn description(&self) -> Option<EpubMetaEntry<'ebook>> {
@@ -307,30 +318,36 @@ impl<'ebook> Metadata<'ebook> for EpubMetadata<'ebook> {
 
     fn descriptions(&self) -> impl Iterator<Item = EpubMetaEntry<'ebook>> + 'ebook {
         self.data_by_property(consts::DESCRIPTION)
-            .map(EpubMetaEntry)
+            .map(EpubMetaEntry::new)
     }
 
     fn creators(&self) -> impl Iterator<Item = EpubContributor<'ebook>> + 'ebook {
-        self.data_by_property(consts::CREATOR).map(EpubContributor)
+        self.data_by_property(consts::CREATOR)
+            .map(EpubContributor::new)
     }
 
     fn contributors(&self) -> impl Iterator<Item = EpubContributor<'ebook>> + 'ebook {
         self.data_by_property(consts::CONTRIBUTOR)
-            .map(EpubContributor)
+            .map(EpubContributor::new)
     }
 
     fn publishers(&self) -> impl Iterator<Item = EpubContributor<'ebook>> + 'ebook {
         self.data_by_property(consts::PUBLISHER)
-            .map(EpubContributor)
+            .map(EpubContributor::new)
     }
 
     fn tags(&self) -> impl Iterator<Item = EpubTag<'ebook>> + 'ebook {
-        self.data_by_property(consts::SUBJECT).map(EpubTag)
+        self.data_by_property(consts::SUBJECT).map(EpubTag::new)
     }
 
     /// Returns an iterator over the top-level (non-refining) metadata entries.
     ///
-    /// # Note
+    /// Each entry is first grouped by its [`property`](Self::by_property) then
+    /// [`order`](MetaEntry::order), before being flattened into a single iterator.
+    /// As grouping by property relies on a hash map, the order in which property groups appear
+    /// is arbitrary; non-deterministic.
+    ///
+    /// # Excluded Entries
     /// Refining entries, `<meta>` elements with a `refines` field, are excluded:
     /// ```xhtml
     /// <meta refines="#parent-id">...</meta>
@@ -363,7 +380,7 @@ impl<'ebook> Metadata<'ebook> for EpubMetadata<'ebook> {
     /// # }
     /// ```
     fn entries(&self) -> impl Iterator<Item = EpubMetaEntry<'ebook>> + 'ebook {
-        self.data.entries.values().flatten().map(EpubMetaEntry)
+        self.data.entries.values().flatten().map(EpubMetaEntry::new)
     }
 }
 
@@ -398,7 +415,7 @@ impl<'ebook> EpubRefinements<'ebook> {
     /// Returns the associated [`EpubMetaEntry`] if the provided `index` is less than
     /// [`Self::len`], otherwise [`None`].
     pub fn get(&self, index: usize) -> Option<EpubMetaEntry<'ebook>> {
-        self.0.get(index).map(EpubMetaEntry)
+        self.0.get(index).map(EpubMetaEntry::new)
     }
 
     /// Returns an iterator over **all** refining [`EpubMetaEntry`] entries.
@@ -427,7 +444,7 @@ impl<'ebook> EpubRefinements<'ebook> {
         &self,
         property: &'ebook str,
     ) -> impl Iterator<Item = EpubMetaEntry<'ebook>> + 'ebook {
-        self.0.by_refinements(property).map(EpubMetaEntry)
+        self.0.by_refinements(property).map(EpubMetaEntry::new)
     }
 
     /// Returns `true` if the `property` is present.
@@ -502,27 +519,33 @@ impl<'ebook> Iterator for EpubRefinementsIter<'ebook> {
     type Item = EpubMetaEntry<'ebook>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.0.next().map(EpubMetaEntry)
+        self.0.next().map(EpubMetaEntry::new)
     }
 }
 
 /// A [`MetaEntry`] within [`EpubMetadata`].
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub struct EpubMetaEntry<'ebook>(&'ebook EpubMetaEntryData);
+pub struct EpubMetaEntry<'ebook> {
+    data: &'ebook EpubMetaEntryData,
+}
 
 impl_meta_entry!(EpubMetaEntry);
 
 impl<'ebook> EpubMetaEntry<'ebook> {
+    fn new(data: &'ebook EpubMetaEntryData) -> Self {
+        Self { data }
+    }
+
     /// The unique `id` of a metadata entry.
     pub fn id(&self) -> Option<&'ebook str> {
-        self.0.id.as_deref()
+        self.data.id.as_deref()
     }
 
     /// The `id` a metadata entry refines.
     ///
     /// Returns [`Some`] if an entry is refining another, otherwise [`None`].
     pub fn refines(&self) -> Option<&'ebook str> {
-        self.0.refines.as_deref()
+        self.data.refines.as_deref()
     }
 
     /// The `property`, such as `dc:title`, `media:duration`, `file-as`, etc.
@@ -537,7 +560,7 @@ impl<'ebook> EpubMetaEntry<'ebook> {
     /// | EPUB 2 `<meta>`      | `name` attribute (`<meta name="cover" content="..."/>`)            |
     /// | EPUB 3 `<meta>`      | `property` attribute (`<meta property="media:duration">...</meta>`)|
     pub fn property(&self) -> Name<'ebook> {
-        self.0.property.as_str().into()
+        self.data.property.as_str().into()
     }
 
     /// The [`Scheme`] of an entry.
@@ -620,7 +643,7 @@ impl<'ebook> EpubMetaEntry<'ebook> {
     /// # }
     /// ```
     pub fn scheme(&self) -> Scheme<'ebook> {
-        let attributes = self.0.attributes();
+        let attributes = self.data.attributes();
 
         if let Some(attribute) = attributes.by_name(consts::OPF_SCHEME) {
             return Scheme::new(None, attribute.value());
@@ -638,7 +661,7 @@ impl<'ebook> EpubMetaEntry<'ebook> {
     ///
     /// [`None`] is returned if the `<package>` element contains no `xml:lang` attribute.
     pub fn language(&self) -> Option<LanguageTag<'ebook>> {
-        self.0
+        self.data
             .language()
             .map(|code| LanguageTag::new(code, LanguageKind::Bcp47))
     }
@@ -648,7 +671,7 @@ impl<'ebook> EpubMetaEntry<'ebook> {
     /// [`TextDirection::Auto`] is returned if the `<package>` and specified element
     /// contains no `dir` attribute.
     pub fn text_direction(&self) -> TextDirection {
-        self.0.text_direction
+        self.data.text_direction
     }
 
     /// All additional `XML` [`Attributes`].
@@ -663,12 +686,12 @@ impl<'ebook> EpubMetaEntry<'ebook> {
     /// - [`name`](Self::property) (EPUB 2; legacy)
     /// - [`content`](Self::value) (EPUB 2; legacy)
     pub fn attributes(&self) -> Attributes<'ebook> {
-        (&self.0.attributes).into()
+        (&self.data.attributes).into()
     }
 
     /// Complementary refinement metadata entries.
     pub fn refinements(&self) -> EpubRefinements<'ebook> {
-        (&self.0.refinements).into()
+        (&self.data.refinements).into()
     }
 }
 
@@ -710,6 +733,16 @@ impl EpubVersion {
     ///
     /// If the contained [`Version`] is `3.3`, then the returned [`EpubVersion`]
     /// will have a contained value of `3.0`.
+    ///
+    /// # Examples
+    /// - Retrieving the major:
+    /// ```
+    /// # use rbook::ebook::metadata::Version;
+    /// # use rbook::ebook::epub::metadata::EpubVersion;
+    /// let epub_version = EpubVersion::from(Version(3, 3));
+    ///
+    /// assert_eq!(Version(3, 0), epub_version.as_major().version());
+    /// ```
     pub fn as_major(&self) -> Self {
         match self {
             Self::Epub2(_) => Self::EPUB2,
@@ -761,21 +794,32 @@ impl Display for EpubVersion {
     }
 }
 
-impl_meta_entry_abstraction! {
-    impl Identifier as EpubIdentifier;
+/// Implementation of [`Identifier`] for [`EpubIdentifier`].
+///
+/// # See Also
+/// - [`Self::as_meta`] to access finer details such as attributes and refinements.
+#[derive(Copy, Clone, Debug)]
+pub struct EpubIdentifier<'ebook> {
+    data: &'ebook EpubMetaEntryData,
 }
 
+impl_meta_entry_abstraction!(EpubIdentifier);
+
 impl<'ebook> EpubIdentifier<'ebook> {
+    fn new(data: &'ebook EpubMetaEntryData) -> Self {
+        Self { data }
+    }
+
     /// Fallback when [`Self::get_modern_identifier_type`] is not available.
     fn get_legacy_identifier_type(&self) -> Option<Scheme<'ebook>> {
-        self.0
+        self.data
             .refinements
             .get_schemes(consts::IDENTIFIER_TYPE)
             .next()
     }
 
     fn get_modern_identifier_type(&self) -> Option<Scheme<'ebook>> {
-        self.0
+        self.data
             .attributes()
             .by_name(consts::OPF_SCHEME)
             .map(|identifier_type| Scheme::new(None, identifier_type.value()))
@@ -804,55 +848,82 @@ impl Hash for EpubIdentifier<'_> {
     }
 }
 
-impl_meta_entry_abstraction! {
-    #[derive(PartialEq)]
-    impl Title as EpubTitle;
+/// Implementation of [`Title`] for [`EpubTitle`].
+///
+/// # See Also
+/// - [`Self::as_meta`] to access finer details such as attributes and refinements.
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct EpubTitle<'ebook> {
+    data: &'ebook EpubMetaEntryData,
+    /// Whether the title is inferred as the main title.
+    ///
+    /// Based on the logic contained within [`Metadata::titles`],
+    /// when a `title-type` of `main` is absent, infers the main `Title`
+    /// by selecting the `<dc:title>` with the highest precedence (lowest display order).
+    ///
+    /// This guarantees consistent [`TitleKind::Main`] identification across all EPUBs via
+    /// [`Title::kind`].
+    is_main_title: bool,
+}
+
+impl_meta_entry_abstraction!(EpubTitle);
+
+impl<'ebook> EpubTitle<'ebook> {
+    fn new(data: &'ebook EpubMetaEntryData, is_main_title: bool) -> Self {
+        Self {
+            data,
+            is_main_title,
+        }
+    }
 }
 
 impl<'ebook> Title<'ebook> for EpubTitle<'ebook> {
     fn scheme(&self) -> Option<Scheme<'ebook>> {
-        self.0
+        self.data
             .refinements
             .by_refinement(consts::TITLE_TYPE)
             .map(|title_type| Scheme::new(None, &title_type.value))
     }
 
     fn kind(&self) -> TitleKind {
-        self.0.refinements.by_refinement(consts::TITLE_TYPE).map_or(
-            TitleKind::Unknown,
-            |title_type| match title_type.value.as_str() {
-                // There is no From<&str> method for TitleKind because
-                // other ebook formats may have different
-                // (and potentially conflicting) mappings
-                // (i.e., main-title, primary, etc.)
-                "main" => TitleKind::Main,
-                "subtitle" => TitleKind::Subtitle,
-                "short" => TitleKind::Short,
-                "collection" => TitleKind::Collection,
-                "edition" => TitleKind::Edition,
-                "expanded" => TitleKind::Expanded,
-                _ => TitleKind::Unknown,
-            },
-        )
+        if self.is_main_title {
+            return TitleKind::Main;
+        }
+        self.data
+            .refinements
+            .by_refinement(consts::TITLE_TYPE)
+            .map_or(TitleKind::Unknown, |title_type| {
+                TitleKind::from(&title_type.value)
+            })
     }
 }
 
-impl_meta_entry_abstraction! {
-    #[derive(PartialEq)]
-    impl Tag as EpubTag;
+/// Implementation of [`Tag`] for [`EpubTag`].
+///
+/// # See Also
+/// - [`Self::as_meta`] to access finer details such as attributes and refinements.
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct EpubTag<'ebook> {
+    data: &'ebook EpubMetaEntryData,
 }
 
+impl_meta_entry_abstraction!(EpubTag);
+
 impl<'ebook> EpubTag<'ebook> {
+    fn new(data: &'ebook EpubMetaEntryData) -> Self {
+        Self { data }
+    }
+
     /// Fallback when [`Self::get_modern_scheme`] is not available.
     fn get_legacy_scheme(&self) -> Option<Scheme<'ebook>> {
-        let refinements = &self.0.refinements;
+        let refinements = &self.data.refinements;
         let auth = refinements.by_refinement(consts::AUTHORITY)?;
         let term = refinements.by_refinement(consts::TERM)?;
         Some(Scheme::new(Some(&auth.value), &term.value))
     }
 
     fn get_modern_scheme(&self) -> Option<Scheme<'ebook>> {
-        let attributes = self.0.attributes();
+        let attributes = self.data.attributes();
         let authority = attributes.by_name(consts::OPF_AUTHORITY)?;
         let term = attributes.by_name(consts::OPF_TERM)?;
         Some(Scheme::new(Some(authority.value()), term.value()))
@@ -868,22 +939,32 @@ impl<'ebook> Tag<'ebook> for EpubTag<'ebook> {
     }
 }
 
-impl_meta_entry_abstraction! {
-    #[derive(PartialEq)]
-    impl Contributor as EpubContributor;
+/// Implementation of [`Contributor`] for [`EpubContributor`].
+///
+/// # See Also
+/// - [`Self::as_meta`] to access finer details such as attributes and refinements.
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct EpubContributor<'ebook> {
+    data: &'ebook EpubMetaEntryData,
 }
 
+impl_meta_entry_abstraction!(EpubContributor);
+
 impl<'ebook> EpubContributor<'ebook> {
+    fn new(data: &'ebook EpubMetaEntryData) -> Self {
+        Self { data }
+    }
+
     /// Fallback when [`Self::get_modern_roles`] is not available.
     fn get_legacy_role(&self) -> Option<Scheme<'ebook>> {
-        self.0
+        self.data
             .attributes()
             .by_name(consts::OPF_ROLE)
             .map(|role| Scheme::new(None, role.value()))
     }
 
     fn get_modern_roles(&self) -> impl Iterator<Item = Scheme<'ebook>> + 'ebook {
-        self.0.refinements.get_schemes(consts::ROLE)
+        self.data.refinements.get_schemes(consts::ROLE)
     }
 }
 
@@ -903,17 +984,30 @@ impl<'ebook> Contributor<'ebook> for EpubContributor<'ebook> {
     }
 }
 
-impl_meta_entry_abstraction! {
-    /// EPUB language tags are always treated as `BCP 47` (EPUB 3),
-    /// even when originating from `RFC 3066` (EPUB 2).
-    ///
-    /// - EPUB 3 requires the language scheme as BCP 47.
-    /// - EPUB 2 requires a subset of BCP 47, RFC 3066.
-    /// - For simplicity, `rbook` normalizes RFC 3066 ***into*** BCP 47.
-    ///   Both [`EpubLanguage::scheme`] and [`EpubLanguage::kind`]
-    ///   will always report `BCP 47`.
-    #[derive(PartialEq)]
-    impl Language as EpubLanguage;
+/// Implementation of [`Language`] for [`EpubMetadata`].
+///
+/// EPUB language tags are always treated as `BCP 47` (EPUB 3),
+/// even when originating from `RFC 3066` (EPUB 2).
+///
+/// - EPUB 3 requires the language scheme as BCP 47.
+/// - EPUB 2 requires a subset of BCP 47, RFC 3066.
+/// - For simplicity, `rbook` normalizes RFC 3066 ***into*** BCP 47.
+///   Both [`EpubLanguage::scheme`] and [`EpubLanguage::kind`]
+///   will always report `BCP 47`.
+///
+/// # See Also
+/// - [`Self::as_meta`] to access finer details such as attributes and refinements.
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub struct EpubLanguage<'ebook> {
+    data: &'ebook EpubMetaEntryData,
+}
+
+impl_meta_entry_abstraction!(EpubLanguage);
+
+impl<'ebook> EpubLanguage<'ebook> {
+    fn new(data: &'ebook EpubMetaEntryData) -> Self {
+        Self { data }
+    }
 }
 
 impl<'ebook> Language<'ebook> for EpubLanguage<'ebook> {
@@ -924,7 +1018,7 @@ impl<'ebook> Language<'ebook> for EpubLanguage<'ebook> {
     /// # See Also
     /// - [`Language::scheme`]
     fn scheme(&self) -> Scheme<'ebook> {
-        Scheme::new(Some(LanguageKind::Bcp47.as_str()), &self.0.value)
+        Scheme::new(Some(LanguageKind::Bcp47.as_str()), &self.data.value)
     }
 
     /// Always returns [`LanguageKind::Bcp47`].
@@ -943,29 +1037,17 @@ impl<'ebook> Language<'ebook> for EpubLanguage<'ebook> {
 
 mod macros {
     macro_rules! impl_meta_entry_abstraction {
-        { $(#[$attr:meta])* impl $_trait:path as $implementation:ident; } => {
-            /// Implementation of
-            #[doc = concat!("[`", stringify!($_trait), "`]")]
-            /// for [`EpubMetadata`].
-            ///
-            /// For access to finer details such as attributes, and refinements,
-            /// this struct may be observed in the form of an [`EpubMetaEntry`]
-            /// through [`Self::as_meta`].
-            ///
-            $(#[$attr])*
-            #[derive(Copy, Clone, Debug)]
-            pub struct $implementation<'ebook>(&'ebook EpubMetaEntryData);
-
+        ($implementation:ident) => {
             impl<'ebook> $implementation<'ebook> {
-                /// Returns the [`EpubMetaEntry`] form of this instance to access additional
+                /// Returns the [`EpubMetaEntry`] form to access additional
                 /// meta details, such as attributes and refinements.
                 pub fn as_meta(&self) -> EpubMetaEntry<'ebook> {
-                    EpubMetaEntry(self.0)
+                    EpubMetaEntry::new(self.data)
                 }
             }
 
             impl_meta_entry!($implementation);
-        }
+        };
     }
 
     /// Implements [`MetaEntry`](super::MetaEntry) for the specified type.
@@ -975,7 +1057,7 @@ mod macros {
                 fn get_modern_alt_script(
                     &self,
                 ) -> impl Iterator<Item = AlternateScript<'ebook>> + 'ebook {
-                    self.0
+                    self.data
                         .refinements
                         .by_refinements(consts::ALTERNATE_SCRIPT)
                         .map(|script| {
@@ -990,7 +1072,7 @@ mod macros {
                 }
 
                 fn get_legacy_alt_script(&self) -> Option<AlternateScript<'ebook>> {
-                    let attributes = self.0.attributes();
+                    let attributes = self.data.attributes();
                     let script = attributes.by_name(consts::OPF_ALT_REP)?.value();
                     let code = attributes.by_name(consts::OPF_ALT_REP_LANG)?.value();
                     Some(AlternateScript::new(
@@ -1002,21 +1084,21 @@ mod macros {
 
             impl<'ebook> MetaEntry<'ebook> for $implementation<'ebook> {
                 fn value(&self) -> &'ebook str {
-                    &self.0.value
+                    &self.data.value
                 }
 
                 fn order(&self) -> usize {
-                    self.0.order
+                    self.data.order
                 }
 
                 fn file_as(&self) -> Option<&'ebook str> {
-                    self.0
+                    self.data
                         .refinements
                         .by_refinement(consts::FILE_AS)
                         .map(|refinement| refinement.value.as_str())
                         // Fallback to legacy `opf:file-as` attribute
                         .or_else(|| {
-                            self.0
+                            self.data
                                 .attributes()
                                 .by_name(consts::OPF_FILE_AS)
                                 .map(|attribute| attribute.value())

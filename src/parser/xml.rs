@@ -3,13 +3,27 @@ use crate::ebook::errors::FormatError;
 use crate::parser::ParserResult;
 use crate::util::StringExt;
 use quick_xml::Reader;
+use quick_xml::encoding::EncodingError;
+use quick_xml::escape::resolve_xml_entity;
 use quick_xml::events::attributes::Attribute;
-use quick_xml::events::{BytesCData, BytesStart, BytesText, Event};
+use quick_xml::events::{BytesCData, BytesRef, BytesStart, BytesText, Event};
 use std::borrow::Cow;
 use std::str;
 use std::string::FromUtf8Error;
 
 pub(crate) type ByteReader<'a> = Reader<&'a [u8]>;
+
+impl From<quick_xml::Error> for FormatError {
+    fn from(error: quick_xml::Error) -> Self {
+        Self::Unparsable(Box::new(error))
+    }
+}
+
+impl From<EncodingError> for FormatError {
+    fn from(error: EncodingError) -> Self {
+        Self::Unparsable(Box::new(error))
+    }
+}
 
 pub(crate) trait XmlReader<'a> {
     /// Iterator-like method to read the next [`Event`].
@@ -32,21 +46,22 @@ pub(crate) trait XmlReader<'a> {
     fn get_text(
         &mut self,
         last_event: &mut Option<Event<'a>>,
-        mut stop: impl FnMut(&Event) -> bool,
+        mut is_stop: impl FnMut(&Event) -> bool,
     ) -> ParserResult<String> {
         let mut value = String::new();
 
         while let Some(result) = self.next() {
             let event = result?;
 
-            if stop(&event) {
+            if is_stop(&event) {
                 value.trim_in_place();
                 last_event.replace(event);
                 break;
             }
             match event {
-                Event::Text(mut text) => text_to_str(&mut value, &mut text),
-                Event::CData(cdata) => cdata_to_str(&mut value, &cdata),
+                Event::Text(mut text) => handle_text(&mut value, &mut text)?,
+                Event::CData(cdata) => handle_cdata(&mut value, &cdata)?,
+                Event::GeneralRef(general_ref) => handle_general_ref(&mut value, &general_ref)?,
                 _ => {}
             }
         }
@@ -204,15 +219,31 @@ impl TryFrom<Attribute<'_>> for AttributeData {
 }
 
 // Helper methods
-fn cdata_to_str(value: &mut String, cdata: &BytesCData) {
-    let text = cdata
-        .decode()
-        .unwrap_or_else(|_| String::from_utf8_lossy(cdata.as_ref()));
+fn handle_general_ref(value: &mut String, general_ref: &BytesRef) -> ParserResult<()> {
+    if general_ref.is_char_ref() {
+        if let Some(resolved) = general_ref.resolve_char_ref()? {
+            value.push(resolved);
+        }
+    } else {
+        let decoded = general_ref.decode()?;
 
-    value.push_str(text.trim());
+        if let Some(resolved) = resolve_xml_entity(decoded.as_ref()) {
+            value.push_str(resolved.as_ref());
+        } else {
+            // Unsupported entity
+            value.push_str(format!("&{decoded};").as_ref());
+        }
+    }
+
+    Ok(())
 }
 
-fn text_to_str(value: &mut String, text: &mut BytesText) {
+fn handle_cdata(value: &mut String, cdata: &BytesCData) -> ParserResult<()> {
+    value.push_str(cdata.decode()?.trim());
+    Ok(())
+}
+
+fn handle_text(value: &mut String, text: &mut BytesText) -> ParserResult<()> {
     // Determine when to add spacing
     let has_padding_start = text.try_trim_start();
     let has_padding_end = text.try_trim_end();
@@ -222,28 +253,27 @@ fn text_to_str(value: &mut String, text: &mut BytesText) {
     if (text.is_empty() || has_padding_start) && last_char != ' ' {
         // Only add spacing if there's content
         if !value.is_empty() {
-            // Add a space to ensure that text doesn't squeeze together
+            // Add a space to ensure all text doesn't squeeze together
             value.push(' ');
         }
         // Return early if there is no text to process
         if text.is_empty() {
-            return;
+            return Ok(());
         }
     }
-    let text = text
-        .unescape()
-        .unwrap_or_else(|_| String::from_utf8_lossy(text.as_ref()));
+    let text = text.decode()?;
 
     // Consolidate into a single paragraph
     for text in text.lines().map(str::trim).filter(|s| !s.is_empty()) {
         value.push_str(text);
         value.push(' ');
     }
-    // If there should be no end spacing,
-    // get rid of the last space from loop
+    // If there should be no end spacing, remove the last space added by the loop
     if !has_padding_end {
         value.pop();
     }
+
+    Ok(())
 }
 
 #[cfg(test)]
@@ -253,20 +283,21 @@ mod tests {
     #[test]
     fn test_text_to_str() {
         let mut s = String::new();
-        super::text_to_str(
+        super::handle_text(
             &mut s,
             &mut BytesText::from_escaped(" \n \t \r  data1 &amp; data2  \n\r \n  \t "),
-        );
+        )
+        .unwrap();
         // If there is whitespace at the end, a single `space` must replace it all.
-        assert_eq!("data1 & data2 ", s);
+        assert_eq!("data1 &amp; data2 ", s);
 
-        super::text_to_str(&mut s, &mut BytesText::from_escaped("data3 "));
-        assert_eq!("data1 & data2 data3 ", s);
+        super::handle_text(&mut s, &mut BytesText::from_escaped("data3 ")).unwrap();
+        assert_eq!("data1 &amp; data2 data3 ", s);
 
-        super::text_to_str(&mut s, &mut BytesText::from_escaped("  data4"));
-        assert_eq!("data1 & data2 data3 data4", s);
+        super::handle_text(&mut s, &mut BytesText::from_escaped("  data4")).unwrap();
+        assert_eq!("data1 &amp; data2 data3 data4", s);
 
-        super::text_to_str(&mut s, &mut BytesText::from_escaped("data5"));
-        assert_eq!("data1 & data2 data3 data4data5", s);
+        super::handle_text(&mut s, &mut BytesText::from_escaped("data5")).unwrap();
+        assert_eq!("data1 &amp; data2 data3 data4data5", s);
     }
 }

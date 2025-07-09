@@ -377,7 +377,7 @@ impl<'ebook> TocEntry<'ebook> for EpubTocEntry<'ebook> {
         &self.data.label
     }
 
-    fn kind(&self) -> &'ebook TocEntryKind {
+    fn kind(&self) -> &'ebook TocEntryKind<'ebook> {
         &self.data.kind
     }
 

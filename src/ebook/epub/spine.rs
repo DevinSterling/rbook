@@ -204,7 +204,7 @@ impl<'ebook> EpubSpineEntry<'ebook> {
         self.data.id.as_deref()
     }
 
-    /// The unique id reference to a [`EpubManifestEntry`] in the
+    /// The unique id reference to an [`EpubManifestEntry`] in the
     /// [`EpubManifest`](super::EpubManifest).
     ///
     /// For direct access to the resource, [`Self::resource`] or

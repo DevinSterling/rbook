@@ -404,7 +404,7 @@ impl EpubParser<'_> {
                 .refinements
                 .by_refinement(consts::DISPLAY_SEQ)
                 .and_then(|refinement| refinement.value.parse().ok())
-                // Typically EPUB `display-seq` starts from `1` (1-based index).
+                // Typically, EPUB `display-seq` starts from `1` (1-based index).
                 // However, to ensure consistency with the rest of rbook API, use 0-based.
                 // * An order of MAX indicates no explicitly set display-seq by the author
                 .map_or(usize::MAX, |mut seq: usize| {

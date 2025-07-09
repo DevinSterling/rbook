@@ -11,20 +11,20 @@ A fast, format-agnostic, ergonomic ebook library with a focus on EPUB.
 ## Features
 | Feature                     | Overview                                                                                    | Documentation                                                        |
 |-----------------------------|---------------------------------------------------------------------------------------------|----------------------------------------------------------------------|
-| **EPUB 2 and 3**            | Read-only (for now) view of EPUB `2` and `3` formats                                        | [epub module](https://docs.rs/rbook/latest/rbook/ebook/epub)         |
+| **EPUB 2 and 3**            | Read-only (for now) view of EPUB `2` and `3` formats.                                       | [epub module](https://docs.rs/rbook/latest/rbook/ebook/epub)         |
 | **Reader**                  | Random‐access or sequential iteration over readable content.                                | [reader module](https://docs.rs/rbook/latest/rbook/reader)           |
 | **Detailed Types**          | Abstractions built on expressive traits and types.                                          |                                                                      |
 | **Metadata**                | Typed access to titles, creators, publishers, languages, tags, roles, attributes, and more. | [metadata module](https://docs.rs/rbook/latest/rbook/ebook/metadata) |
 | **Manifest**                | Lookup and traverse contained resources such as readable content (XHTML) and images.        | [manifest module](https://docs.rs/rbook/latest/rbook/ebook/manifest) |
-| **Spine**                   | Chronological reading order and preferred page direction                                    | [spine module](https://docs.rs/rbook/latest/rbook/ebook/spine)       |
+| **Spine**                   | Chronological reading order and preferred page direction.                                   | [spine module](https://docs.rs/rbook/latest/rbook/ebook/spine)       |
 | **Table of Contents (ToC)** | Navigation points, including the EPUB 2 guide and EPUB 3 landmarks.                         | [toc module](https://docs.rs/rbook/latest/rbook/ebook/toc)           |
-| **Resources**               | Retrieve bytes or UTF-8 strings for any manifest resource                                   | [resource module](https://docs.rs/rbook/latest/rbook/ebook/resource) |
+| **Resources**               | Retrieve bytes or UTF-8 strings for any manifest resource.                                  | [resource module](https://docs.rs/rbook/latest/rbook/ebook/resource) |
 
 ## Usage
 ```toml
 [dependencies]
-rbook = "0.6.3"                                           # with default features
-# rbook = { version = "0.6.3", default-features = false } # excluding default features
+rbook = "0.6.4"                                           # with default features
+# rbook = { version = "0.6.4", default-features = false } # excluding default features
 ```
 
 Default crate features:
@@ -38,6 +38,7 @@ The `wasm32-unknown-unknown` target is supported by default.
 - Opening and reading an EPUB file:
   ```rust
   use rbook::epub::{Epub, EpubSettings};
+  use rbook::ebook::metadata::TitleKind;
   use rbook::prelude::*; // Prelude for traits
   
   fn main() {
@@ -48,9 +49,12 @@ The `wasm32-unknown-unknown` target is supported by default.
          EpubSettings::builder().strict(false),
       ).unwrap();
   
-      // Retrieving the title
-      assert_eq!("Example EPUB", epub.metadata().title().unwrap().value());
-      
+      // Retrieving the title 
+      // `titles()` can be called alternatively to retrieve subtitles, etc.
+      let title = epub.metadata().title().unwrap();
+      assert_eq!("Example EPUB", title.value());
+      assert_eq!(TitleKind::Main, title.kind());
+
       // Creating a reader instance:
       let mut reader = epub.reader(); // or `epub.reader_with(EpubReaderSettings)`
       // Printing the epub contents

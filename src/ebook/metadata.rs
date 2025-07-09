@@ -83,14 +83,22 @@ pub trait Metadata<'ebook> {
     /// - [`Self::publication_date`]
     fn modified_date(&self) -> Option<DateTime<'ebook>>;
 
-    /// The primary unique [`Identifier`] tied to an [`Ebook`](super::Ebook).
+    /// The main unique [`Identifier`] of an [`Ebook`](super::Ebook).
     fn identifier(&self) -> Option<impl Identifier<'ebook> + 'ebook>;
 
     /// Returns an iterator over **all** [`Identifiers`](Identifier)
     /// by [`order`](MetaEntry::order).
+    ///
+    /// Note that the first entry may not be the main [`Identifier`],
+    /// as depending on the ebook, the order of the main identifier may be greater than `0`.
+    /// Generally, such a scenario is rare, although possible.
+    ///
+    /// # See Also
+    /// - [`Self::identifier`] to get the main identifier, disregarding
+    ///   [`order`](MetaEntry::order).
     fn identifiers(&self) -> impl Iterator<Item = impl Identifier<'ebook> + 'ebook> + 'ebook;
 
-    /// The main [`Language`].
+    /// The main [`Language`] with an [`order`](MetaEntry::order) of `0`.
     fn language(&self) -> Option<impl Language<'ebook> + 'ebook>;
 
     /// Returns an iterator over **all** [`Languages`](Language)
@@ -101,18 +109,60 @@ pub trait Metadata<'ebook> {
     ///
     /// # See Also
     /// - [`Self::titles`] to retrieve all titles by [`order`](MetaEntry::order).
+    ///
+    /// # Examples
+    /// - Retrieving the main title:
+    /// ```
+    /// # use rbook::{Ebook, Epub};
+    /// # use rbook::ebook::metadata::{Metadata, MetaEntry, Title, TitleKind};
+    /// # use rbook::ebook::errors::EbookResult;
+    /// # fn main() -> EbookResult<()> {
+    /// let epub = Epub::open("tests/ebooks/example_epub")?;
+    /// let title = epub.metadata().title().unwrap();
+    ///
+    /// assert_eq!("Example EPUB", title.value());
+    /// assert_eq!(TitleKind::Main, title.kind());
+    /// assert_eq!(0, title.order());
+    /// # Ok(())
+    /// # }
+    /// ```
     fn title(&self) -> Option<impl Title<'ebook> + 'ebook>;
 
     /// Returns an iterator over **all** [`Titles`](Title)
     /// by [`order`](MetaEntry::order).
     ///
     /// Note that the first entry may not be the main [`Title`],
-    /// as depending on the ebook, it could have a display order greater than `1`.
+    /// as depending on the ebook, the order of the main title may be greater than `0`.
+    /// Generally, such a scenario is rare, although possible.
     ///
-    /// To get the main title, disregarding display order, use [`Self::title`].
+    /// # See Also
+    /// - [`Self::title`] to get the main title, disregarding [`order`](MetaEntry::order).
+    ///
+    /// # Examples
+    /// - Retrieving the titles of an ebook:
+    /// ```
+    /// # use rbook::{Ebook, Epub};
+    /// # use rbook::ebook::metadata::{Metadata, MetaEntry, Title, TitleKind};
+    /// # use rbook::ebook::errors::EbookResult;
+    /// # fn main() -> EbookResult<()> {
+    /// let epub = Epub::open("tests/ebooks/example_epub")?;
+    /// let mut titles = epub.metadata().titles();
+    ///
+    /// let first = titles.next().unwrap();
+    /// assert_eq!("Example EPUB", first.value());
+    /// assert_eq!(TitleKind::Main, first.kind());
+    /// assert_eq!(0, first.order());
+    ///
+    /// let second = titles.next().unwrap();
+    /// assert_eq!("A subtitle", second.value());
+    /// assert_eq!(TitleKind::Subtitle, second.kind());
+    /// assert_eq!(1, second.order());
+    /// # Ok(())
+    /// # }
+    /// ```
     fn titles(&self) -> impl Iterator<Item = impl Title<'ebook> + 'ebook> + 'ebook;
 
-    /// The main description of an [`Ebook`](super::Ebook).
+    /// The main description with an [`order`](MetaEntry::order) of `0`.
     fn description(&self) -> Option<impl MetaEntry<'ebook> + 'ebook>;
 
     /// Returns an iterator over **all** descriptions by [`order`](MetaEntry::order).
@@ -390,7 +440,7 @@ pub trait Language<'ebook>: MetaEntry<'ebook> {
 /// A unique identifier for an [`Ebook`](super::Ebook), such as `ISBN`, `DOI`, and `URL`.
 ///
 /// # Examples
-/// - Retrieving an identifier:
+/// - Retrieving the main identifier:
 /// ```
 /// # use rbook::ebook::errors::EbookResult;
 /// # use rbook::ebook::metadata::{Metadata, MetaEntry, Identifier};
@@ -437,7 +487,7 @@ pub trait Identifier<'ebook>: MetaEntry<'ebook> + Eq + Hash {
 pub trait Title<'ebook>: MetaEntry<'ebook> {
     /// The title’s scheme or [`None`] if unspecified.
     ///
-    /// This is a lower-level call than [`Self::kind`] to retrieve the raw string value.
+    /// This is a lower-level call than [`Self::kind`] to retrieve the raw string value, if any.
     fn scheme(&self) -> Option<Scheme<'ebook>>;
 
     /// The title kind enum.
@@ -558,7 +608,7 @@ pub enum TitleKind {
     Subtitle,
     /// A shortened version of the main title.
     Short,
-    /// An expanded more detailed version of the main title.
+    /// An expanded detailed version of the main title.
     Expanded,
     /// The title of a collection that an [`Ebook`](super::Ebook) belongs.
     Collection,
@@ -566,6 +616,23 @@ pub enum TitleKind {
     Edition,
     /// An unrecognized title kind.
     Unknown,
+}
+
+impl TitleKind {
+    // **For now**, there is no public From<&str> method for TitleKind because
+    // other ebook formats may have different (and potentially conflicting)
+    // mappings (i.e., main-title, primary, etc.)
+    pub(super) fn from(kind: &str) -> Self {
+        match kind {
+            "main" => TitleKind::Main,
+            "subtitle" => TitleKind::Subtitle,
+            "short" => TitleKind::Short,
+            "collection" => TitleKind::Collection,
+            "edition" => TitleKind::Edition,
+            "expanded" => TitleKind::Expanded,
+            _ => TitleKind::Unknown,
+        }
+    }
 }
 
 /// The version of an [`Ebook`](super::Ebook) format (e.g. `3.3`).

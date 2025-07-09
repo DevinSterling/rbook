@@ -93,7 +93,7 @@ pub trait TocEntry<'ebook> {
     ///
     /// For example, an entry may point to the
     /// [`appendix`](TocEntryKind::Appendix) or [`cover page`](TocEntryKind::Cover).
-    fn kind(&self) -> &'ebook TocEntryKind;
+    fn kind(&self) -> &'ebook TocEntryKind<'ebook>;
 
     /// The nested children (toc entries) associated with an entry.
     fn children(&self) -> impl TocChildren<'ebook> + 'ebook;
@@ -110,7 +110,7 @@ pub trait TocEntry<'ebook> {
     /// - Retrieving the resource associated with an entry:
     /// ```
     /// # use rbook::ebook::errors::EbookResult;
-    /// # use rbook::ebook::toc::{Toc, TocEntry, TocEntryKind, TocChildren};
+    /// # use rbook::ebook::toc::{Toc, TocEntry};
     /// # use rbook::{Ebook, Epub};
     /// # fn main() -> EbookResult<()> {
     /// let epub = Epub::open("tests/ebooks/example_epub")?;
@@ -139,7 +139,7 @@ pub trait TocEntry<'ebook> {
     /// - Assessing if an entry is a root:
     /// ```
     /// # use rbook::ebook::errors::EbookResult;
-    /// # use rbook::ebook::toc::{Toc, TocEntry, TocEntryKind};
+    /// # use rbook::ebook::toc::{Toc, TocEntry};
     /// # use rbook::{Ebook, Epub};
     /// # fn main() -> EbookResult<()> {
     /// let epub = Epub::open("tests/ebooks/example_epub")?;
@@ -156,6 +156,95 @@ pub trait TocEntry<'ebook> {
     /// ```
     fn is_root(&self) -> bool {
         self.depth() == 0
+    }
+
+    /// Calculates and returns the **maximum** depth relative to an entry.
+    /// In other words, how many levels deep is the most-nested child?
+    ///
+    /// Child [`entries`](TocEntry) have a maximum depth less than the parent.
+    /// For example, if an entry has a maximum depth of `5`,
+    /// then its immediate children will have a maximum depth of **at most** `4`.
+    ///
+    /// # Scenarios
+    /// The maximum depth indicates the following:
+    ///
+    /// | Max Depth | Indication                                                         |
+    /// |-----------|--------------------------------------------------------------------|
+    /// | 0         | No immediate children (Equivalent to [`TocChildren::is_empty`]).   |
+    /// | 1         | Only immediate children (Children do not contain nested children). |
+    /// | \>1       | At least one immediate child contains nested children.             |
+    ///
+    /// # See Also
+    /// - [`Self::depth`] for the pre-computed depth relative to the root.
+    ///
+    /// # Examples
+    /// - Comparing the calculated maximum depth with [`Self::depth`]:
+    /// ```
+    /// # use rbook::ebook::errors::EbookResult;
+    /// # use rbook::ebook::toc::{Toc, TocEntry, TocChildren};
+    /// # use rbook::{Ebook, Epub};
+    /// # fn main() -> EbookResult<()> {
+    /// let epub = Epub::open("tests/ebooks/example_epub")?;
+    /// let main_toc_root = epub.toc().contents().unwrap();
+    ///
+    /// // Current depth relative to the root
+    /// assert_eq!(0, main_toc_root.depth());
+    /// // Calculated maximum depth - deepest child entry within the hierarchy
+    /// assert_eq!(2, main_toc_root.max_depth());
+    ///
+    /// let child = main_toc_root.children().get(0).unwrap();
+    ///
+    /// // Current depth relative to the root
+    /// assert_eq!(1, child.depth());
+    /// // Calculated maximum depth - `child` entry has no children
+    /// assert_eq!(0, child.max_depth());
+    /// # Ok(())
+    /// # }
+    /// ```
+    fn max_depth(&self) -> usize {
+        self.children()
+            .iter()
+            .fold(0, |depth, child| depth.max(1 + child.max_depth()))
+    }
+
+    /// Calculates and returns the **total** number of all (immediate and nested)
+    /// children relative to an entry.
+    ///
+    /// # Scenarios
+    /// The total number of children indicates the following:
+    ///
+    /// | Total Children         | Indication                                                         |
+    /// |------------------------|--------------------------------------------------------------------|
+    /// | 0                      | No immediate children (Equivalent to [`TocChildren::is_empty`]).   |
+    /// | [`TocChildren::len`]   | Only immediate children (Children do not contain nested children). |
+    /// | \>[`TocChildren::len`] | At least one immediate child contains nested children.             |
+    ///
+    /// # Examples
+    /// - Comparing the calculated total length with [`TocChildren::len`]:
+    /// ```
+    /// # use rbook::ebook::errors::EbookResult;
+    /// # use rbook::ebook::toc::{Toc, TocEntry, TocChildren};
+    /// # use rbook::{Ebook, Epub};
+    /// # fn main() -> EbookResult<()> {
+    /// let epub = Epub::open("tests/ebooks/example_epub")?;
+    /// let main_toc_root = epub.toc().contents().unwrap();
+    ///
+    /// assert_eq!(3, main_toc_root.children().len());
+    /// // The `4` indicates that there is a single nested
+    /// // child that's not an immediate child of the root.
+    /// assert_eq!(4, main_toc_root.total_len());
+    ///
+    /// let child = main_toc_root.children().get(1).unwrap();
+    ///
+    /// assert_eq!(1, child.children().len());
+    /// assert_eq!(1, child.total_len());
+    /// # Ok(())
+    /// # }
+    /// ```
+    fn total_len(&self) -> usize {
+        self.children()
+            .iter()
+            .fold(0, |total, child| total + child.total_len() + 1)
     }
 }
 
