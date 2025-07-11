@@ -118,7 +118,7 @@ impl EpubParser<'_> {
     ) -> Option<String> {
         if type_key == consts::PROPERTIES {
             // EPUB 3 ONLY: This type of attribute value is a collection of properties
-            // seperated by whitespace, as a result, split and search for the target
+            // separated by whitespace, as a result, split and search for the target
             entry.properties.has_property(target_type)
         } else {
             entry.media_type == target_type

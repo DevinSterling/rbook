@@ -122,7 +122,7 @@ impl EpubParser<'_> {
                 .take_attribute_value(consts::REFINES)?
                 .map(Self::normalize_refines);
 
-            // Attributes where if not specified, inherit from the package
+            // These attributes are inherited from the package if not specified here
             let language = attributes
                 .take_attribute_value(consts::LANG)?
                 .map(Shared::new)
@@ -327,7 +327,7 @@ impl EpubParser<'_> {
                 let parent_id = child.refines.as_deref().expect("`refines` should be Some");
 
                 // Find the parent metadata element. If none, malformed meta
-                // The numbers of parents at N depth is generally small (< 10);
+                // The number of parents at N depth is generally small (< 10);
                 // the overhead of using a hashmap is not needed.
                 if let Some(parent) = parents
                     .iter_mut()

@@ -1,5 +1,19 @@
 # Changelog
 
+## 0.6.5 (2025-07-11)
+### Additions　**＋**
+- New `by_id` method for `EpubMetadata` and `EpubSpine`.
+- Implement `PartialEq<EpubMetaEntry>` for:
+  - `EpubIdentifier`
+  - `EpubTitle`
+  - `EpubTag`
+  - `EpubContributor`
+  - `EpubLanguage`
+
+### Changes　**⟳**
+- Update `zip` dependency: 4.2.0 → 4.3.0
+- Refine documentation for enhanced clarity.
+
 ## 0.6.4 (2025-07-09)
 ### Additions　**＋**
 - New `max_depth` and `total_len` methods for `TocEntry`.

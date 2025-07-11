@@ -33,11 +33,10 @@ use crate::ebook::resource::{Resource, ResourceKind};
 /// let epub = Epub::open("tests/ebooks/example_epub")?;
 ///
 /// let chapter_2 = epub.manifest().by_id("c2").unwrap();
-/// let resource = chapter_2.resource();
 ///
-/// assert_eq!("application/xhtml+xml", resource.kind().as_str());
+/// assert_eq!("application/xhtml+xml", chapter_2.media_type());
 ///
-/// let str_1 = epub.read_resource_str(resource)?;
+/// let str_1 = chapter_2.read_str()?;
 /// // Content can also be retrieved by string:
 /// let str_2 = epub.read_resource_str("c2.xhtml")?;
 ///
@@ -143,7 +142,7 @@ pub trait Manifest<'ebook> {
     }
 }
 
-/// An entry contained within a [`Manifest`], encompassing associated metadata.
+/// An entry contained within a [`Manifest`], encompassing resource-related metadata.
 ///
 /// An entry corresponds to a single [`Resource`] (e.g., an `XHTML` file,
 /// a `JPEG` image, a `CSS` stylesheet), providing access to that resource.

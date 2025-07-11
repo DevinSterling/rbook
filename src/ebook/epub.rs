@@ -141,7 +141,7 @@ impl Epub {
         path: impl AsRef<Path>,
         settings: impl Into<EpubSettings>,
     ) -> EbookResult<Self> {
-        Self::new(
+        Self::parse(
             settings.into(),
             archive::get_archive(path.as_ref()).map_err(EbookError::Archive)?,
         )
@@ -186,7 +186,7 @@ impl Epub {
         reader: R,
         settings: impl Into<EpubSettings>,
     ) -> EbookResult<Self> {
-        Self::new(settings.into(), Box::new(ZipArchive::new(reader, None)?))
+        Self::parse(settings.into(), Box::new(ZipArchive::new(reader, None)?))
     }
 
     /// Returns a new [`EpubReader`] to sequentially read over the [`EpubSpine`]
@@ -268,7 +268,7 @@ impl Epub {
     }
 
     // For now, `EpubSettings` are not stored within the `Epub` struct.
-    fn new(settings: EpubSettings, archive: Box<dyn Archive>) -> EbookResult<Self> {
+    fn parse(settings: EpubSettings, archive: Box<dyn Archive>) -> EbookResult<Self> {
         let mut parser = EpubParser::new(&settings, archive.as_ref());
         let data = parser.parse()?;
 
@@ -285,6 +285,11 @@ impl Epub {
 
 #[allow(refining_impl_trait)]
 impl Ebook for Epub {
+    /// Returns a new [`EpubReader`] to sequentially read over the [`EpubSpine`]
+    /// contents of an ebook.
+    ///
+    /// # See Also
+    /// - [`Self::reader_with`] to alter the behavior of an [`EpubReader`].
     fn reader(&self) -> EpubReader {
         EpubReader::new(self, EpubReaderSettings::default())
     }

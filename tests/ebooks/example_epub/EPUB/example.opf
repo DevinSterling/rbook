@@ -6,6 +6,7 @@
         <meta property="authority" refines="#tag">LCSH</meta>
         <meta property="term" refines="#tag">sh2008110314</meta>
 
+        <meta refines="#author" property="alternate-script" xml:lang="ja">山田太郎</meta>
         <meta property="role" refines="#author" scheme="marc:relators">aut</meta>
         <meta property="display-seq" refines="#author">1</meta>
         <!-- slightly malformed here for testing purposes (missing `#` in `refines` will still work) -->

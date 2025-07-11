@@ -289,7 +289,8 @@ impl<'ebook> Iterator for EpubManifestIter<'ebook> {
     }
 }
 
-/// An entry contained within an [`EpubManifest`], encompassing associated metadata.
+/// A [`ManifestEntry`] contained within an [`EpubManifest`], encompassing
+/// resource-related metadata.
 #[derive(Copy, Clone)]
 pub struct EpubManifestEntry<'ebook> {
     id: &'ebook str,

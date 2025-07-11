@@ -69,8 +69,40 @@ impl<'ebook> EpubSpine<'ebook> {
             .map(|data| EpubSpineEntry::new(self.provider, data))
     }
 
+    /// Returns the [`EpubSpineEntry`] that matches the given `id` if present,
+    /// otherwise [`None`].
+    ///
+    /// # See Also
+    /// - [`Self::by_idref`] to retrieve a spine entry by the [`id`](EpubManifestEntry::id)
+    ///   of an [`EpubManifestEntry`].
+    ///
+    /// # Examples
+    /// - Retrieving a spine entry by its id:
+    /// ```
+    /// # use rbook::ebook::errors::EbookResult;
+    /// # use rbook::ebook::spine::SpineEntry;
+    /// # use rbook::{Ebook, Epub};
+    /// # fn main() -> EbookResult<()> {
+    /// let epub = Epub::open("tests/ebooks/example_epub")?;
+    ///
+    /// let spine_entry = epub.spine().by_id("supplementary").unwrap();
+    /// assert_eq!(Some("supplementary"), spine_entry.id());
+    /// assert_eq!(3, spine_entry.order());
+    ///
+    /// // Attempt to retrieve a non-existent entry
+    /// assert_eq!(None, epub.spine().by_id("end"));
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn by_id(&self, id: &str) -> Option<EpubSpineEntry<'ebook>> {
+        self.by_predicate(|data| data.id.as_deref() == Some(id))
+    }
+
     /// Returns the [`EpubSpineEntry`] that matches the given `idref` if present,
     /// otherwise [`None`].
+    ///
+    /// An [`idref`](EpubSpineEntry::idref) is the [`id`](EpubManifestEntry::id) of a
+    /// [`EpubManifestEntry`] referenced by a spine entry.
     ///
     /// # Examples
     /// - Retrieving a spine entry by its idref:
@@ -88,6 +120,9 @@ impl<'ebook> EpubSpine<'ebook> {
     /// let spine_entry = epub.spine().by_idref("c2").unwrap();
     /// assert_eq!("c2", spine_entry.idref());
     /// assert_eq!(4, spine_entry.order());
+    ///
+    /// // Attempt to retrieve a non-existent entry
+    /// assert_eq!(None, epub.spine().by_idref("c999"));
     /// # Ok(())
     /// # }
     /// ```

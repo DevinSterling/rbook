@@ -5,7 +5,7 @@
 //!
 //! A fast, format-agnostic, ergonomic ebook library with a current focus on EPUB.
 //!
-//! The primary goal of `rbook` is to provide an ease-of-use high-level API for handling ebooks.
+//! The primary goal of `rbook` is to provide an easy-to-use high-level API for handling ebooks.
 //! Most importantly, this library is designed with future formats in mind
 //! (`CBZ`, `FB2`, `MOBI`, etc.) via core traits defined within the [`ebook`] and [`reader`]
 //! module, allowing all formats to share the same "base" API.
@@ -63,7 +63,7 @@
 //!   let epub = Epub::read(cursor, EpubSettings::default());
 //!   ```
 //!
-//! Aside from how the contents of an ebook are stored, settings may also be provided
+//! Aside from how the contents of an ebook are stored, settings can also be provided
 //! to control parser behavior, such as [strictness](epub::EpubSettings::strict):
 //! ```
 //! // Import traits
@@ -72,34 +72,41 @@
 //!
 //! use rbook::epub::{Epub, EpubSettings};
 //!
-//! // Opening an epub (file or directory)
 //! let epub = Epub::open_with(
 //!     "tests/ebooks/example_epub",
-//!     // Toggle strict EPUB checks (`true` by default)
-//!     EpubSettings::builder().strict(false),
+//!     EpubSettings::builder().strict(false), // Disable strict checks (`true` by default)
 //! ).unwrap();
 //! ```
 //! # Reading an [`Ebook`]
 //! Reading the contents of an ebook is handled by a [`Reader`](reader::Reader),
-//! which traverses end-user-readable resources in canonical order.
-//! Similar to how an ebook can receive settings, a reader may also too:
+//! which traverses end-user-readable resources in canonical order:
 //! ```
 //! # use rbook::{Ebook, Epub};
 //! use rbook::reader::{Reader, ReaderContent};
 //! # let epub = Epub::open("tests/ebooks/example_epub").unwrap();
 //!
-//! // Creating a reader instance:
-//! let mut reader = epub.reader(); // or `epub.reader_with(EpubReaderSettings)`
+//! // Create a reader instance
+//! let mut reader = epub.reader();
 //!
-//! // Printing the epub contents
+//! // Print the readable content
 //! while let Some(Ok(data)) = reader.read_next() {
-//!     let media_type = data.manifest_entry().media_type();
-//!     assert_eq!("application/xhtml+xml", media_type);
+//!     assert_eq!("application/xhtml+xml", data.manifest_entry().media_type());
 //!     println!("{}", data.content());
 //! }
-//!
-//! assert_eq!(Some(4), reader.current_position());
 //! ```
+//! As with an ebook, a reader can receive settings to control behavior,
+//! such as [linearity](epub::reader::EpubReaderSettings::linear_behavior):
+//! ```
+//! # use rbook::{Ebook, Epub};
+//! use rbook::epub::reader::{EpubReaderSettings, LinearBehavior};
+//!
+//! # let epub = Epub::open("tests/ebooks/example_epub").unwrap();
+//! let mut reader = epub.reader_with(
+//!     // Make a reader omit non-linear content
+//!     EpubReaderSettings::builder().linear_behavior(LinearBehavior::LinearOnly)
+//! );
+//! ```
+//!
 //! # Resource retrieval from an [`Ebook`]
 //! All files such as text, images, and video are accessible within an ebook programmatically.
 //!
@@ -141,26 +148,50 @@
 //! # }
 //! ```
 //!
-//! All resource retrieval methods are fallible and attempts to access malformed or missing
+//! All resource retrieval methods are fallible, and attempts to access malformed or missing
 //! resources will return an [`EbookError::Archive`](ebook::errors::EbookError::Archive) error.
 //!
 //! ## See Also
 //! - [`Epub`] documentation of `read_resource_*` methods for normalization details.
 //!
 //! # Examples
-//! ## Accessing [`Metadata`](ebook::metadata::Metadata)
+//! ## Accessing [`Metadata`](ebook::metadata::Metadata): Retrieving the main title
 //! ```
 //! # use rbook::{Ebook, Epub};
-//! # use rbook::ebook::metadata::{Metadata, MetaEntry, Contributor};
+//! # use rbook::ebook::metadata::{Metadata, MetaEntry, Title, TitleKind, LanguageKind};
 //! # let epub = Epub::open("tests/ebooks/example_epub").unwrap();
+//! // Retrieve the main title (all titles retrievable via `titles()`)
+//! let title = epub.metadata().title().unwrap();
+//! assert_eq!("Example EPUB", title.value());
+//! assert_eq!(TitleKind::Main, title.kind());
+//!
+//! // Retrieve the first alternate script of a title
+//! let alternate_script = title.alternate_scripts().next().unwrap();
+//! assert_eq!("サンプルEPUB", alternate_script.value());
+//! assert_eq!("ja", alternate_script.language().scheme().code());
+//! assert_eq!(LanguageKind::Bcp47, alternate_script.language().kind());
+//! ```
+//! ## Accessing [`Metadata`](ebook::metadata::Metadata): Retrieving the first creator
+//! ```
+//! # use rbook::{Ebook, Epub};
+//! # use rbook::ebook::metadata::{Metadata, MetaEntry, Contributor, LanguageKind};
+//! # let epub = Epub::open("tests/ebooks/example_epub").unwrap();
+//! // Retrieve the first creator
 //! let creator = epub.metadata().creators().next().unwrap();
 //! assert_eq!("John Doe", creator.value());
 //! assert_eq!(Some("Doe, John"), creator.file_as());
 //! assert_eq!(0, creator.order());
 //!
+//! // Retrieve the main role of a creator (all roles retrievable via `roles()`)
 //! let role = creator.main_role().unwrap();
 //! assert_eq!("aut", role.code());
 //! assert_eq!(Some("marc:relators"), role.source());
+//!
+//! // Retrieve the first alternate script of a creator
+//! let alternate_script = creator.alternate_scripts().next().unwrap();
+//! assert_eq!("山田太郎", alternate_script.value());
+//! assert_eq!("ja", alternate_script.language().scheme().code());
+//! assert_eq!(LanguageKind::Bcp47, alternate_script.language().kind());
 //! ```
 //! ## Extracting images from the [`Manifest`](ebook::manifest::Manifest)
 //! ```no_run
@@ -171,37 +202,28 @@
 //! # use rbook::ebook::manifest::{Manifest, ManifestEntry};
 //! # let epub = Epub::open("example.epub").unwrap();
 //!
-//! // Creating a new directory to store the extracted images
+//! // Create an output directory for the extracted images
 //! let dir = Path::new("extracted_images");
 //! fs::create_dir(&dir).unwrap();
 //!
 //! for image in epub.manifest().images() {
-//!     let img_href = image.href().as_str();
-//!
-//!     // Retrieving the raw image data
+//!     // Retrieve the raw image bytes
 //!     let img_data = image.read_bytes().unwrap();
 //!
-//!     // Retrieving the file name from the image href
+//!     // Extract the filename from the href and write to disk
+//!     let img_href = image.href().as_str();
 //!     let file_name = Path::new(img_href).file_name().unwrap();
-//!
-//!     // Creating a new file to store the image data
-//!     let mut file = File::create(dir.join(file_name)).unwrap();
+//!     let mut file = fs::File::create(dir.join(file_name)).unwrap();
 //!     file.write_all(&img_data).unwrap();
 //! }
 //! ```
-//! ## Accessing [`EpubManifest`](epub::manifest::EpubManifest) media overlays and fallbacks
+//! ## Accessing [`EpubManifest`](epub::manifest::EpubManifest) fallbacks
 //! ```
 //! # use rbook::{Ebook, Epub};
 //! # use rbook::ebook::errors::EbookResult;
 //! # use rbook::ebook::manifest::{Manifest, ManifestEntry};
 //! # use rbook::ebook::metadata::MetaEntry;
 //! # let epub = Epub::open("tests/ebooks/example_epub").unwrap();
-//! // Media overlay
-//! let chapter_1 = epub.manifest().by_id("c1").unwrap();
-//! let media_overlay = chapter_1.media_overlay().unwrap();
-//! let duration = media_overlay.refinements().by_property("media:duration").next().unwrap().value();
-//! assert_eq!("0:32:29", duration);
-//!
 //! // Fallbacks
 //! let webm_cover = epub.manifest().cover_image().unwrap();
 //! let kind = webm_cover.resource_kind();

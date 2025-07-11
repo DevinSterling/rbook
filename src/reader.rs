@@ -81,12 +81,12 @@ pub trait Reader<'ebook> {
     ///
     /// assert_eq!(0, reader.remaining());
     ///
-    /// // Resetting the cursor to **before** the first element
+    /// // Resetting the cursor, so it's **before** the first element
     /// reader.reset();
     /// assert_eq!(None, reader.current_position());
     /// assert_eq!(5, reader.remaining());
     ///
-    /// // Setting cursor **at** the first element.
+    /// // Setting the cursor **at** the first element.
     /// reader.read(0)?;
     /// assert_eq!(Some(0), reader.current_position());
     /// assert_eq!(4, reader.remaining());
@@ -119,7 +119,7 @@ pub trait Reader<'ebook> {
     /// while let Some(Ok(content)) = reader.read_next() {
     ///     // process content //
     /// }
-    /// // Current cursor position at the end
+    /// // The current cursor position is now at the end
     /// assert_eq!(Some(4), reader.current_position());
     ///
     /// // No more next content

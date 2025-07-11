@@ -127,6 +127,20 @@ impl EpubMetaEntryData {
     fn attributes(&self) -> Attributes {
         (&self.attributes).into()
     }
+
+    /// Recursively search for an entry with the specified id
+    fn by_id(&self, id: &str) -> Option<&Self> {
+        if self.id.as_deref() == Some(id) {
+            return Some(self);
+        }
+
+        for refinement in &self.refinements.0 {
+            if let Some(found) = refinement.by_id(id) {
+                return Some(found);
+            }
+        }
+        None
+    }
 }
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -177,7 +191,7 @@ impl<'ebook> EpubMetadata<'ebook> {
             .iter()
     }
 
-    /// Returns an iterator over **all** non-refining [`entries`](EpubMetaEntry) whose
+    /// Returns an iterator over non-refining [`entries`](EpubMetaEntry) whose
     /// [`property`](EpubMetaEntry::property) matches the given one.
     ///
     /// This method is especially useful for retrieving metadata
@@ -206,6 +220,48 @@ impl<'ebook> EpubMetadata<'ebook> {
         property: &str,
     ) -> impl Iterator<Item = EpubMetaEntry<'ebook>> + 'ebook {
         self.data_by_property(property).map(EpubMetaEntry::new)
+    }
+
+    /// Searches the entire metadata hierarchy, including refinements, and returns the
+    /// [`EpubMetaEntry`] that matches the given `id` if present, otherwise [`None`].
+    ///
+    /// # Performance Implications
+    /// This is a linear operation (`O(N)`) as the underlying source
+    /// is ***not*** a hashmap with `id` as the key.
+    /// Generally, the number of metadata entries is small (<20).
+    /// However, for larger sets, frequent lookups can impede performance.
+    ///
+    /// # Examples
+    /// - Retrieving a creator by id:
+    /// ```
+    /// # use rbook::ebook::errors::EbookResult;
+    /// # use rbook::ebook::toc::{Toc, TocEntryKind};
+    /// # use rbook::ebook::metadata::Metadata;
+    /// # use rbook::{Ebook, Epub};
+    /// # fn main() -> EbookResult<()> {
+    /// let epub = Epub::open("tests/ebooks/example_epub")?;
+    /// let metadata = epub.metadata();
+    ///
+    /// // Retrieve the author
+    /// let author = metadata.creators().next().unwrap();
+    /// // Retrieve the same entry by id
+    /// let author_by_id = metadata.by_id("author").unwrap();
+    ///
+    /// assert_eq!(author, author_by_id);
+    /// assert_eq!(Some("author"), author_by_id.id());
+    ///
+    /// // Attempt to retrieve a non-existent author
+    /// assert_eq!(None, metadata.by_id("other-author"));
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn by_id(&self, id: &str) -> Option<EpubMetaEntry<'ebook>> {
+        self.data
+            .entries
+            .values()
+            .flatten()
+            .find_map(|data| data.by_id(id))
+            .map(EpubMetaEntry::new)
     }
 
     /// The [`Epub`](super::Epub) version (e.g., `2.0`, `3.2`, etc.).
@@ -340,7 +396,7 @@ impl<'ebook> Metadata<'ebook> for EpubMetadata<'ebook> {
         self.data_by_property(consts::SUBJECT).map(EpubTag::new)
     }
 
-    /// Returns an iterator over the top-level (non-refining) metadata entries.
+    /// Returns an iterator over non-refining metadata entries.
     ///
     /// Each entry is first grouped by its [`property`](Self::by_property) then
     /// [`order`](MetaEntry::order), before being flattened into a single iterator.
@@ -794,7 +850,7 @@ impl Display for EpubVersion {
     }
 }
 
-/// Implementation of [`Identifier`] for [`EpubIdentifier`].
+/// Implementation of [`Identifier`].
 ///
 /// # See Also
 /// - [`Self::as_meta`] to access finer details such as attributes and refinements.
@@ -848,7 +904,7 @@ impl Hash for EpubIdentifier<'_> {
     }
 }
 
-/// Implementation of [`Title`] for [`EpubTitle`].
+/// Implementation of [`Title`].
 ///
 /// # See Also
 /// - [`Self::as_meta`] to access finer details such as attributes and refinements.
@@ -898,7 +954,7 @@ impl<'ebook> Title<'ebook> for EpubTitle<'ebook> {
     }
 }
 
-/// Implementation of [`Tag`] for [`EpubTag`].
+/// Implementation of [`Tag`].
 ///
 /// # See Also
 /// - [`Self::as_meta`] to access finer details such as attributes and refinements.
@@ -939,7 +995,13 @@ impl<'ebook> Tag<'ebook> for EpubTag<'ebook> {
     }
 }
 
-/// Implementation of [`Contributor`] for [`EpubContributor`].
+/// Implementation of [`Contributor`].
+///
+/// # marc:relators
+/// While not guaranteed, if a [`role`](Contributor::roles)
+/// has a [`Scheme::source`] of [`None`],
+/// the value of [`Scheme::code`] may originate from `marc:relators` as the source.
+/// This is typically the case for EPUB 2.
 ///
 /// # See Also
 /// - [`Self::as_meta`] to access finer details such as attributes and refinements.
@@ -984,16 +1046,16 @@ impl<'ebook> Contributor<'ebook> for EpubContributor<'ebook> {
     }
 }
 
-/// Implementation of [`Language`] for [`EpubMetadata`].
+/// Implementation of [`Language`].
 ///
 /// EPUB language tags are always treated as `BCP 47` (EPUB 3),
-/// even when originating from `RFC 3066` (EPUB 2).
+/// even when originating from `RFC 3066` (EPUB 2) as:
+/// 1. EPUB 3 requires the language scheme as BCP 47.
+/// 2. EPUB 2 requires a subset of BCP 47, RFC 3066.
 ///
-/// - EPUB 3 requires the language scheme as BCP 47.
-/// - EPUB 2 requires a subset of BCP 47, RFC 3066.
-/// - For simplicity, `rbook` normalizes RFC 3066 ***into*** BCP 47.
-///   Both [`EpubLanguage::scheme`] and [`EpubLanguage::kind`]
-///   will always report `BCP 47`.
+/// For simplicity, `rbook` treats RFC 3066 ***as*** BCP 47.
+/// Both [`EpubLanguage::scheme`] and [`EpubLanguage::kind`]
+/// will always report `BCP 47`.
 ///
 /// # See Also
 /// - [`Self::as_meta`] to access finer details such as attributes and refinements.
@@ -1043,6 +1105,12 @@ mod macros {
                 /// meta details, such as attributes and refinements.
                 pub fn as_meta(&self) -> EpubMetaEntry<'ebook> {
                     EpubMetaEntry::new(self.data)
+                }
+            }
+
+            impl PartialEq<EpubMetaEntry<'_>> for $implementation<'_> {
+                fn eq(&self, _: &EpubMetaEntry<'_>) -> bool {
+                    &self.data == &self.data
                 }
             }
 
