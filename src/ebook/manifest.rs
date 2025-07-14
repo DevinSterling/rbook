@@ -45,7 +45,7 @@ use crate::ebook::resource::{Resource, ResourceKind};
 /// # }
 /// ```
 pub trait Manifest<'ebook> {
-    /// The total number of [`entries`](ManifestEntry) that make up the manifest.
+    /// The total number of [`entries`](ManifestEntry) that makes up the manifest.
     fn len(&self) -> usize;
 
     /// Returns an iterator over all [`entries`](ManifestEntry) in the manifest.
@@ -153,8 +153,8 @@ pub trait ManifestEntry<'ebook> {
     /// The underlying [`Resource`] a manifest entry points to.
     ///
     /// # See Also
-    /// - [`Self::read_str`]
-    /// - [`Self::read_bytes`]
+    /// - [`Self::read_str`] to retrieve the string content of a manifest entry.
+    /// - [`Self::read_bytes`] to retrieve the raw byte content of a manifest entry.
     ///
     /// # Examples
     /// - Reading a resource provided by the manifest:
@@ -200,7 +200,7 @@ pub trait ManifestEntry<'ebook> {
 
     /// Returns the associated content in the form of a string.
     ///
-    /// This method is equivalent to calling
+    /// This method is similar to calling
     /// [`Ebook::read_resource_str`](super::Ebook::read_resource_str) and passing
     /// [`Self::resource`] as the argument.
     ///
@@ -230,7 +230,7 @@ pub trait ManifestEntry<'ebook> {
 
     /// Returns the associated content in the form of bytes.
     ///
-    /// This method is equivalent to calling
+    /// This method is similar to calling
     /// [`Ebook::read_resource_bytes`](super::Ebook::read_resource_bytes) and passing
     /// [`Self::resource`] as the argument.
     ///

@@ -1,8 +1,17 @@
 # Changelog
 
+## 0.6.6 (2025-07-13)
+### Additions　**＋**
+- New `name` method for `Href` to retrieve the encapsulated filename.
+- Implement `From<String>` and `From<Cow<'a, str>>` for `ResourceKey`.
+- Implement `From<Cow<'a, str>>` for `ResourceKind`.
+
+### Changes　**⟳**
+- Refine documentation for enhanced clarity.
+
 ## 0.6.5 (2025-07-11)
 ### Additions　**＋**
-- New `by_id` method for `EpubMetadata` and `EpubSpine`.
+- New `by_id` method for `EpubMetadata` and `EpubSpine` to retrieve entries by their id.
 - Implement `PartialEq<EpubMetaEntry>` for:
   - `EpubIdentifier`
   - `EpubTitle`

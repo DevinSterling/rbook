@@ -216,7 +216,19 @@ impl<'a> From<&'a Path> for ResourceKey<'a> {
 
 impl<'a> From<&'a str> for ResourceKey<'a> {
     fn from(value: &'a str) -> Self {
-        Self::Value(Cow::Borrowed(value))
+        Self::Value(value.into())
+    }
+}
+
+impl<'a> From<String> for ResourceKey<'a> {
+    fn from(value: String) -> Self {
+        Self::Value(value.into())
+    }
+}
+
+impl<'a> From<Cow<'a, str>> for ResourceKey<'a> {
+    fn from(value: Cow<'a, str>) -> Self {
+        Self::Value(value)
     }
 }
 
@@ -724,10 +736,19 @@ impl<'a> From<&'a str> for ResourceKind<'a> {
     }
 }
 
-impl From<String> for ResourceKind<'static> {
+impl From<String> for ResourceKind<'_> {
     fn from(mut value: String) -> Self {
         value.trim_in_place();
         Self(value.into())
+    }
+}
+
+impl<'a> From<Cow<'a, str>> for ResourceKind<'a> {
+    fn from(value: Cow<'a, str>) -> Self {
+        match value {
+            Cow::Borrowed(borrowed) => Self::from(borrowed),
+            Cow::Owned(owned) => Self::from(owned),
+        }
     }
 }
 

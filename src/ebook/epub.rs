@@ -202,7 +202,8 @@ impl Epub {
     /// and ***is*** percent encoded (e.g., `/my%20dir/my%20pkg.opf`).
     ///
     /// # See Also
-    /// - [`Href::decode`]
+    /// - [`Href::decode`] to retrieve the percent-decoded form.
+    /// - [`Href::name`] to retrieve the filename.
     ///
     /// # Examples
     /// - Retrieving the package file:
@@ -230,7 +231,7 @@ impl Epub {
     /// package directory.
     ///
     /// # See Also
-    /// - [`Href::decode`]
+    /// - [`Href::decode`] to retrieve the percent-decoded form.
     ///
     /// # Examples
     /// - Retrieving the package file and directory:
@@ -299,7 +300,7 @@ impl Ebook for Epub {
     }
 
     fn manifest(&self) -> EpubManifest {
-        EpubManifest::new(&self.manifest, EpubResourceProvider(self))
+        EpubManifest::new(&self.manifest, EpubResourceProvider(self.archive.as_ref()))
     }
 
     fn spine(&self) -> EpubSpine {
@@ -454,7 +455,7 @@ pub struct EpubSettings {
     /// - Has a **title**.
     /// - Has a primary **language**.
     /// - Has a **version** where `2.0 <= version < 4.0`.
-    /// - Has a **table of contents**
+    /// - Has a **table of contents**.
     /// - Elements (i.e., `item`, `itemref`) have their required attributes present.
     ///
     /// If any of the conditions are not met,
@@ -553,14 +554,16 @@ impl EpubSettingsBuilder {
 }
 
 #[derive(Copy, Clone)]
-pub(super) struct EpubResourceProvider<'ebook>(&'ebook Epub);
+pub(super) struct EpubResourceProvider<'ebook>(&'ebook dyn Archive);
 
+/// These methods don't delegate to [`Epub::transform_resource`]
+/// as the data provided as
 impl EpubResourceProvider<'_> {
     pub(crate) fn read_str(&self, resource: Resource) -> EbookResult<String> {
-        self.0.read_resource_str(resource)
+        self.0.read_resource_str(&resource).map_err(Into::into)
     }
 
     pub(crate) fn read_bytes(&self, resource: Resource) -> EbookResult<Vec<u8>> {
-        self.0.read_resource_bytes(resource)
+        self.0.read_resource_bytes(&resource).map_err(Into::into)
     }
 }

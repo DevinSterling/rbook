@@ -490,11 +490,13 @@ impl<'ebook> ManifestEntry<'ebook> for EpubManifestEntry<'ebook> {
     }
 
     fn read_str(&self) -> EbookResult<String> {
-        self.context.resource.read_str(self.resource())
+        self.context.resource.read_str(self.href().decode().into())
     }
 
     fn read_bytes(&self) -> EbookResult<Vec<u8>> {
-        self.context.resource.read_bytes(self.resource())
+        self.context
+            .resource
+            .read_bytes(self.href().decode().into())
     }
 }
 

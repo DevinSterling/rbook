@@ -39,6 +39,11 @@ impl<'a> Href<'a> {
     ///
     /// An href such as `s04.xhtml#pgepubid00588` will become `s04.xhtml`.
     ///
+    /// # Percent Encoding
+    /// Paths **may** be percent-encoded.
+    /// [`Self::decode`] can be called directly after invoking this method
+    /// to retrieve the percent-decoded form.
+    ///
     /// # See Also
     /// - [`Self::fragment`]
     /// - [`Self::query`]
@@ -65,6 +70,35 @@ impl<'a> Href<'a> {
             .find(['#', '?'])
             .map_or(self.0, |index| &self.0[..index])
             .into()
+    }
+
+    /// The filename of an href.
+    ///
+    /// # Percent Encoding
+    /// Filenames **may** be percent-encoded.
+    /// [`Self::decode`] can be called directly after invoking this method
+    /// to retrieve the percent-decoded form.
+    ///
+    /// # Examples
+    /// - Retrieving the filename:
+    /// ```
+    /// # use rbook::{Ebook, Epub};
+    /// # use rbook::ebook::errors::EbookResult;
+    /// # use rbook::ebook::toc::{Toc, TocChildren, TocEntry};
+    /// # fn main() -> EbookResult<()> {
+    /// let epub = Epub::open("tests/ebooks/example_epub")?;
+    /// let contents = epub.toc().contents().unwrap();
+    /// let toc_entry = contents.children().get(1).unwrap();
+    /// let href = toc_entry.href().unwrap();
+    ///
+    /// assert_eq!("/EPUB/c1.xhtml?q=1#start", href.as_str());
+    /// assert_eq!("c1.xhtml", href.name().as_str());
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn name(&self) -> Self {
+        // rsplit guarantees at least one entry; `unwrap` is safe here
+        self.path().0.rsplit('/').next().unwrap().into()
     }
 
     /// The content of a fragment (`#`) within an href.
@@ -637,6 +671,22 @@ mod tests {
 
         for (path, href) in expected {
             assert_eq!(Href(path), Href(href).path())
+        }
+    }
+
+    #[test]
+    fn test_href_name() {
+        let expected = [
+            ("s04.xhtml", "s04.xhtml#pgepubid00588"),
+            ("c1.xhtml", "/EPUB/c1.xhtml?q=1#start"),
+            ("c", "a/b/c"),
+            ("", ""),
+            ("", "/"),
+            ("", "?q=1#start"),
+        ];
+
+        for (path, href) in expected {
+            assert_eq!(Href(path), Href(href).name())
         }
     }
 

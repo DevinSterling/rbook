@@ -1,14 +1,14 @@
 # rbook
 
 [![Crates.io](https://img.shields.io/crates/v/rbook.svg?logo=rust&style=flat-square)](https://crates.io/crates/rbook)
-[![Documentation](https://img.shields.io/badge/documentation-latest%20release-19e.svg?style=flat-square)](https://docs.rs/rbook)
-[![License](https://img.shields.io/badge/license-Apache%202.0-maroon?style=flat-square)](LICENSE)
+[![Documentation](https://img.shields.io/badge/documentation-latest%20release-19e.svg?logo=docs.rs&style=flat-square)](https://docs.rs/rbook)
+[![License](https://img.shields.io/badge/license-Apache%202.0-maroon?logo=apache&style=flat-square)](LICENSE)
 
 ![rbook](https://raw.githubusercontent.com/DevinSterling/devinsterling-com/master/public/images/rbook/rbook.png)
 
 A fast, format-agnostic, ergonomic ebook library with a focus on EPUB.
 
-The primary goal of `rbook` is to provide a lightweight easy-to-use high-level API for handling ebooks.
+The primary goal of `rbook` is to provide an easy-to-use high-level API for handling ebooks.
 Most importantly, this library is designed with future formats in mind
 (`CBZ`, `FB2`, `MOBI`, etc.) via core traits defined within the [ebook](https://docs.rs/rbook/latest/rbook/ebook) 
 and [reader](https://docs.rs/rbook/latest/rbook/reader) module, allowing all formats to share the same "base" API.
@@ -33,8 +33,8 @@ and [reader](https://docs.rs/rbook/latest/rbook/reader) module, allowing all for
 `rbook` can be used by adding it as a dependency in a project's `cargo.toml` file:
 ```toml
 [dependencies]
-rbook = "0.6.5"                                           # with default features
-# rbook = { version = "0.6.5", default-features = false } # excluding default features
+rbook = "0.6.6"                                           # with default features
+# rbook = { version = "0.6.6", default-features = false } # excluding default features
 ```
 
 Default crate features:
@@ -133,13 +133,12 @@ fn main() {
     
     for image in epub.manifest().images() {
         // Retrieve the raw image bytes
-        let img_data = image.read_bytes().unwrap();
+        let bytes = image.read_bytes().unwrap();
 
         // Extract the filename from the href and write to disk
-        let img_href = image.href().as_str();
-        let file_name = Path::new(img_href).file_name().unwrap();
-        let mut file = fs::File::create(dir.join(file_name)).unwrap();
-        file.write_all(&img_data).unwrap();
+        let filename = image.href().name().decode(); // Decode as EPUB hrefs may be URL-encoded
+        let mut file = File::create(dir.join(&*filename)).unwrap();
+        file.write_all(&bytes).unwrap();
     }
 }
 ```

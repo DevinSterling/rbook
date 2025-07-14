@@ -128,14 +128,14 @@ impl EpubMetaEntryData {
         (&self.attributes).into()
     }
 
-    /// Recursively search for an entry with the specified id
-    fn by_id(&self, id: &str) -> Option<&Self> {
-        if self.id.as_deref() == Some(id) {
+    /// Recursively search for an entry based on a predicate.
+    fn by_predicate(&self, predicate: impl Copy + Fn(&Self) -> bool) -> Option<&Self> {
+        if predicate(self) {
             return Some(self);
         }
 
         for refinement in &self.refinements.0 {
-            if let Some(found) = refinement.by_id(id) {
+            if let Some(found) = refinement.by_predicate(predicate) {
                 return Some(found);
             }
         }
@@ -260,7 +260,7 @@ impl<'ebook> EpubMetadata<'ebook> {
             .entries
             .values()
             .flatten()
-            .find_map(|data| data.by_id(id))
+            .find_map(|parent| parent.by_predicate(|data| data.id.as_deref() == Some(id)))
             .map(EpubMetaEntry::new)
     }
 
@@ -769,12 +769,14 @@ pub enum EpubVersion {
     ///
     /// Epubs with this version may be backwards compatible with version 2,
     /// `rbook` handles such scenarios behind-the-scenes.
-    /// See [`EpubSettings`](super::EpubSettings) for preferences between versions 2 and 3.
-    Epub3(Version),
-    /// Unknown [`Epub`](super::Epub) version
     ///
-    /// An [`Epub`](super::Epub) may contain this version if
-    /// [`EpubSettings::strict`](super::EpubSettings::strict) is disabled.
+    /// # See Also
+    /// - [`EpubSettings`](super::EpubSettings) for preferences between versions 2 and 3.
+    Epub3(Version),
+    /// An unknown [`Epub`](super::Epub) version
+    ///
+    /// An [`Epub`](super::Epub) may contain this version when
+    /// [`EpubSettings::strict`](super::EpubSettings::strict) is set to `false`.
     Unknown(Version),
 }
 

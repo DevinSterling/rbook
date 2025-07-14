@@ -1,5 +1,4 @@
 #![warn(missing_docs)]
-//! # rbook
 //! - Repository: <https://github.com/DevinSterling/rbook>
 //! - Documentation: <https://docs.rs/rbook>
 //!
@@ -38,9 +37,21 @@
 //! | [**Table of Contents (ToC)**](ebook::toc) | Navigation points, including the EPUB 2 guide and EPUB 3 landmarks.                         |
 //! | [**Resources**](ebook::resource)          | Retrieve bytes or UTF-8 strings for any manifest resource.                                  |
 //!
-//! Default crate features:
-//! - `prelude`: Convenience prelude ***only*** including common traits.
-//! - `threadsafe`: Enables constraint and support for `Send + Sync`.
+//! ## Default crate features
+//! These are toggleable features for `rbook` that are
+//! enabled by default in a project's `cargo.toml` file:
+//!
+//! | Feature        | Description                                                 |
+//! |----------------|-------------------------------------------------------------|
+//! | **prelude**    | Convenience [`prelude`] ***only*** including common traits. |
+//! | **threadsafe** | Enables constraint and support for [`Send`] + [`Sync`].     |
+//!
+//! Default features can be disabled and toggled selectively.
+//! For example, omitting the `prelude` while retaining the `threadsafe` feature:
+//! ```toml
+//! [dependencies]
+//! rbook = { version = "0.6.6", default-features = false, features = ["threadsafe"] }
+//! ```
 //!
 //! # Opening an [`Ebook`]
 //! `rbook` supports several methods to open an ebook ([`Epub`]):
@@ -154,6 +165,40 @@
 //! ## See Also
 //! - [`Epub`] documentation of `read_resource_*` methods for normalization details.
 //!
+//! # The [`prelude`]
+//! `rbook` provides a prelude consisting **only** of traits for convenience.
+//! It circumvents manually importing each trait and helps keep imports lean:
+//! ```no_run
+//! // Without the prelude (Verbose; manually importing each trait):
+//! /*1*/ use rbook::Ebook;
+//! /*2*/ use rbook::ebook::manifest::ManifestEntry;
+//! /*3*/ use rbook::ebook::spine::{Spine, SpineEntry};
+//! # use rbook::ebook::errors::EbookResult;
+//!
+//! // With the prelude, lines 1, 2, and 3 can be consolidated into `use rbook::prelude::*;`
+//!
+//! # fn main() -> EbookResult<()> {
+//! # use rbook::ebook::errors::EbookResult;
+//! // Retrieve the manifest entry associated with a spine entry:
+//! let epub = rbook::Epub::open("tests/ebooks/example_epub")?;
+//! let spine_entry = epub.spine().by_order(2).unwrap();
+//! let manifest_entry_a = spine_entry.manifest_entry().unwrap();
+//!
+//! assert_eq!("c1", spine_entry.idref());
+//! assert_eq!("c1", manifest_entry_a.id());
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! The idea of libraries providing a prelude is subjective and may not be desirable.
+//! As such, it is set as a default crate feature that can be disabled inside a
+//! project's `cargo.toml` file.
+//! For example, omitting the `prelude` while retaining the `threadsafe` feature:
+//! ```toml
+//! [dependencies]
+//! rbook = { version = "0.6.6", default-features = false, features = ["threadsafe"] }
+//! ```
+//!
 //! # Examples
 //! ## Accessing [`Metadata`](ebook::metadata::Metadata): Retrieving the main title
 //! ```
@@ -208,13 +253,12 @@
 //!
 //! for image in epub.manifest().images() {
 //!     // Retrieve the raw image bytes
-//!     let img_data = image.read_bytes().unwrap();
+//!     let bytes = image.read_bytes().unwrap();
 //!
 //!     // Extract the filename from the href and write to disk
-//!     let img_href = image.href().as_str();
-//!     let file_name = Path::new(img_href).file_name().unwrap();
-//!     let mut file = fs::File::create(dir.join(file_name)).unwrap();
-//!     file.write_all(&img_data).unwrap();
+//!     let filename = image.href().name().decode(); // Decode as EPUB hrefs may be URL-encoded
+//!     let mut file = File::create(dir.join(&*filename)).unwrap();
+//!     file.write_all(&bytes).unwrap();
 //! }
 //! ```
 //! ## Accessing [`EpubManifest`](epub::manifest::EpubManifest) fallbacks

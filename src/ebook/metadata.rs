@@ -80,7 +80,7 @@ pub trait Metadata<'ebook> {
     /// The last modified date; when an [`Ebook`](super::Ebook) was last modified.
     ///
     /// # See Also
-    /// - [`Self::publication_date`]
+    /// - [`Self::publication_date`] to retrieve the data en ebook was published.
     fn modified_date(&self) -> Option<DateTime<'ebook>>;
 
     /// The main unique [`Identifier`] of an [`Ebook`](super::Ebook).
