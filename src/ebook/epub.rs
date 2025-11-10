@@ -14,18 +14,20 @@ pub mod reader;
 pub mod spine;
 pub mod toc;
 
-use crate::ebook::Ebook;
 use crate::ebook::archive::zip::ZipArchive;
 use crate::ebook::archive::{self, Archive};
 use crate::ebook::element::Href;
-use crate::ebook::epub::manifest::{EpubManifest, EpubManifestData};
+use crate::ebook::epub::manifest::{EpubManifest, EpubManifestData, EpubManifestEntry};
 use crate::ebook::epub::metadata::{EpubMetadata, EpubMetadataData, EpubVersion};
 use crate::ebook::epub::parser::EpubParser;
 use crate::ebook::epub::reader::{EpubReader, EpubReaderSettings};
 use crate::ebook::epub::spine::{EpubSpine, EpubSpineData};
 use crate::ebook::epub::toc::{EpubToc, EpubTocData};
 use crate::ebook::errors::{EbookError, EbookResult};
+use crate::ebook::manifest::{Manifest, ManifestEntry};
+use crate::ebook::metadata::MetaEntry;
 use crate::ebook::resource::{Resource, ResourceKey};
+use crate::ebook::Ebook;
 use crate::util::uri;
 use std::fmt::{Debug, Formatter};
 use std::io::{Read, Seek};
@@ -250,6 +252,22 @@ impl Epub {
     /// ```
     pub fn package_directory(&self) -> Href {
         uri::parent(&self.package_file).into()
+    }
+
+    /// Returns the cover image manifest entry, if available.
+    pub fn cover_image(&self) -> Option<EpubManifestEntry<'_>> {
+        let manifest = self.manifest();
+        manifest.cover_image().or_else(|| {
+            // fallback to epub2 convention
+            self.metadata()
+                .by_property("cover")
+                .next()
+                .map(|entry| {
+                    let cover_id = entry.value();
+                    manifest.by_id(&cover_id)
+                })
+                .flatten()
+        })
     }
 
     fn transform_resource<'b>(&self, resource: Resource<'b>) -> Resource<'b> {

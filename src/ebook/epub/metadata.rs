@@ -7,7 +7,7 @@ use crate::ebook::metadata::{AlternateScript, DateTime, Scheme, Version};
 use crate::ebook::metadata::{
     Contributor, Identifier, Language, LanguageKind, LanguageTag, MetaEntry, Tag, Title, TitleKind,
 };
-use crate::ebook::{Metadata, element};
+use crate::ebook::{element, Metadata};
 use crate::util::sync::Shared;
 use std::collections::HashMap;
 use std::fmt::{Display, Formatter};
