@@ -1,22 +1,57 @@
 # Changelog
+## 0.6.8 (2025-11-28)
+### Additions　**＋**
+- New associated function `Epub::options` to open an `Epub` with specific options (Inspired by `std::fs::File::options`).
+- New method `Epub::reader_builder` to build an `EpubReader` with specific options.
+- Improve robustness of `EpubMetadata::modified_date` and `EpubMetadata::publication_date`.
+  These methods now support inferring from the `opf:event` attributes on `<dc:date>` elements.
+- Implement `Display` for `TextDirection`.
+
+### Changes　**⟳**
+- Refine documentation for enhanced clarity.
+- Rename `EpubSettings` to `EpubOpenOptions`. (`EpubSettings` is now a deprecated type alias)
+- Rename `EpubReaderSettings` to `EpubReaderOptions`. (`EpubReaderSettings` is now a deprecated type alias)
+
+### Fixes　**✓**
+- Fix EPUB 2 cover images not conveniently retrievable from `EpubManifest::cover_image`.
+- Fix `preferred_page_list` incorrectly set in `EpubOpenOptions::preferred_page_list`.
+- Fix `preferred_landmarks` and `preferred_page_list` from `EpubOpenOptions` 
+  not being correctly applied in `EpubToc`.
+- Fix `IndexCursor` (for `EpubReader`) incorrectly incrementing to index `0` when `len` is `0`.
+
+### Deprecations　**−**
+- All public fields of `EpubSettings` and `EpubReaderSettings` 
+  are now deprecated in favor of their respective builder methods.
+- Deprecated as `Epub::options` is now preferred:
+  - `EpubSettingsBuilder`
+  - `EpubSettingsBuilder::build`
+  - `EpubSettings::builder`
+  - `Epub::open_with`
+  - `Epub::read`
+- Deprecated as `Epub::reader_builder` is now preferred:
+  - `EpubReaderSettingsBuilder`
+  - `EpubReaderSettingsBuilder::build`
+  - `EpubReaderSettings::builder`
+  - `Epub::reader_with`
 
 ## 0.6.7 (2025-11-27)
 ### Additions　**＋**
 - Add support for EPUB 3 metadata `<link/>` elements.
-- New *non-exhaustive* enum `EpubMetaEntryKind` to determine type of metadata entries (e.g., `<dc:*>` (Dublin Core), `<meta>`, `<link>`).
+- New *non-exhaustive* enum `EpubMetaEntryKind` to determine type of metadata entries 
+  (e.g., `<dc:*>` (Dublin Core), `<meta>`, `<link>`).
 - New struct `EpubLink` to access `<link>`-associated fields conveniently (e.g., `href`, `rel`, `properties`).
-- New method `EpubMetadata#links` to retrieve all non-refining links.
-- New method `EpubMetaEntry#kind` to determine the `EpubMetaEntryKind` of a metadata entry.
-- New method `EpubMetaEntry#as_link` to retrieve an `EpubLink` view.
+- New method `EpubMetadata::links` to retrieve all non-refining links.
+- New method `EpubMetaEntry::kind` to determine the `EpubMetaEntryKind` of a metadata entry.
+- New method `EpubMetaEntry::as_link` to retrieve an `EpubLink` view.
 - New enum variant `EpubFormatError::MissingValue` to indicate if the required inner text of an element is absent.
-- `Href` now implements `Display`.
+- Implement `Display` for `Href`.
 
 ### Changes　**⟳**
 - Update `zip` dependency: 4.3.0 → 6.0.0
 - Refine documentation for enhanced clarity.
 
 ### Fixes　**✓**
-- Fix bug where authors explicitly set refining metadata elements with duplicate `display-seq` 
+- Fix where authors explicitly set refining metadata elements with duplicate `display-seq` 
   (Display Sequence) values.
 
 ## 0.6.6 (2025-07-13)

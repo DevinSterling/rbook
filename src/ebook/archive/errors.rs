@@ -41,7 +41,7 @@ pub enum ArchiveError {
     ///
     /// Path *is* [`None`] when an improper reader `R: Read + Seek`,
     /// is supplied during ebook instantiation from a method such as
-    /// [`Epub::read`](crate::Epub::read).
+    /// [`EpubOpenOptions::read`](crate::epub::EpubOpenOptions::read).
     #[error("[UnreadableArchive - `{path:?}`]: {source}")]
     UnreadableArchive {
         /// The root cause of this error.

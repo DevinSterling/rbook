@@ -62,7 +62,7 @@ pub trait Spine<'ebook> {
     /// ```
     fn len(&self) -> usize;
 
-    /// Returns the associated [`SpineEntry`] if the provided `order` is less than
+    /// Returns the associated [`SpineEntry`] if the given `order` is less than
     /// [`Self::len`], otherwise [`None`].
     ///
     /// # Examples

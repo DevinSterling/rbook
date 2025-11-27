@@ -21,7 +21,7 @@ use crate::ebook::element::Href;
 use crate::ebook::epub::manifest::{EpubManifest, EpubManifestData};
 use crate::ebook::epub::metadata::{EpubMetadata, EpubMetadataData, EpubVersion};
 use crate::ebook::epub::parser::EpubParser;
-use crate::ebook::epub::reader::{EpubReader, EpubReaderSettings};
+use crate::ebook::epub::reader::{EpubReader, EpubReaderBuilder, EpubReaderOptions};
 use crate::ebook::epub::spine::{EpubSpine, EpubSpineData};
 use crate::ebook::epub::toc::{EpubToc, EpubTocData};
 use crate::ebook::errors::{EbookError, EbookResult};
@@ -40,7 +40,7 @@ use std::path::Path;
 /// - [`EpubToc`]: Table of contents, Guide and Landmarks
 ///
 /// # Configuration
-/// Parsing can be configured using [`EpubSettings`].
+/// Parsing can be configured using [`EpubOpenOptions`].
 ///
 /// Enabling `threadsafe` makes [`Epub`] implement `Send + Sync`:
 /// ```toml
@@ -86,18 +86,48 @@ pub struct Epub {
 }
 
 impl Epub {
-    /// Opens an [`Epub`] from the given [`Path`] with default [`EpubSettings`].
+    //////////////////////////////////
+    // PUBLIC API
+    //////////////////////////////////
+
+    /// Returns a builder to open an [`Epub`] with specific options.
     ///
-    /// The provided path may be an EPUB **file** or **directory** containing the
+    /// # Examples
+    /// - Opening an EPUB with specific options:
+    /// ```
+    /// # use rbook::ebook::errors::EbookResult;
+    /// # use rbook::epub::Epub;
+    /// # use rbook::epub::metadata::EpubVersion;
+    /// # fn main() -> EbookResult<()> {
+    /// let epub = Epub::options()
+    ///     .store_all(true)
+    ///     .strict(false)
+    ///     .preferred_page_list(EpubVersion::EPUB2)
+    ///     .preferred_landmarks(EpubVersion::EPUB2)
+    ///     .preferred_toc(EpubVersion::EPUB3)
+    ///     .open("tests/ebooks/example_epub")?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn options() -> EpubOpenOptions {
+        EpubOpenOptions::new()
+    }
+
+    /// Opens an [`Epub`] from the given [`Path`] with default [`EpubOpenOptions`].
+    ///
+    /// The given path may be an EPUB **file** or **directory** containing the
     /// contents of an unzipped EPUB.
+    ///
+    /// # Note
+    /// [`EpubOpenOptions::strict`] is set to `true` by default.
     ///
     /// # Errors
     /// - [`ArchiveError`](EbookError::Archive): Missing or invalid EPUB files.
     /// - [`FormatError`](EbookError::Format): Malformed EPUB content.
     ///
     /// # See Also
-    /// - [`Self::open_with`] to specify settings.
-    /// - [`Self::read`] to open from a byte buffer.
+    /// - [`Self::options`] to specify options.
+    /// - [`EpubOpenOptions::read`] to read from a byte buffer.
     ///
     /// # Examples
     /// - Opening from an EPUB file:
@@ -111,88 +141,33 @@ impl Epub {
     ///   let epub = Epub::open("/ebooks/unzipped_epub_dir");
     ///   ```
     pub fn open(path: impl AsRef<Path>) -> EbookResult<Self> {
-        Self::open_with(path, EpubSettings::default())
+        Self::options().open(path)
     }
 
-    /// Opens an [`Epub`] from the given [`Path`] with the specified [`EpubSettings`].
-    ///
-    /// See [`Self::open`] for more details.
+    /// Returns a builder to create an [`EpubReader`] with specific options.
     ///
     /// # Examples
-    /// - Opening an EPUB with settings:
+    /// - Retrieving a new EPUB reader instance with configuration:
     /// ```
-    /// # use rbook::ebook::errors::EbookResult;
-    /// # use rbook::epub::{Epub, EpubSettings};
-    /// # use rbook::epub::metadata::EpubVersion;
-    /// # fn main() -> EbookResult<()> {
-    /// let epub = Epub::open_with(
-    ///     "tests/ebooks/example_epub",
-    ///     EpubSettings::builder()
-    ///         .store_all(true)
-    ///         .strict(false)
-    ///         .preferred_page_list(EpubVersion::EPUB2)
-    ///         .preferred_landmarks(EpubVersion::EPUB2)
-    ///         .preferred_toc(EpubVersion::EPUB3)
-    /// )?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn open_with(
-        path: impl AsRef<Path>,
-        settings: impl Into<EpubSettings>,
-    ) -> EbookResult<Self> {
-        Self::parse(
-            settings.into(),
-            archive::get_archive(path.as_ref()).map_err(EbookError::Archive)?,
-        )
-    }
-
-    /// With the specified [`EpubSettings`],
-    /// opens an EPUB from any implementation of [`Read`] + [`Seek`]
-    /// (and [`Send`] + [`Sync`] if the `threadsafe` feature is enabled).
-    ///
-    /// # Errors
-    /// - [`ArchiveError`](EbookError::Archive): Missing or invalid EPUB files.
-    /// - [`FormatError`](EbookError::Format): Malformed EPUB content.
-    ///
-    /// # Examples
-    /// - Opening from a [`Cursor`](std::io::Cursor) with an underlying [`Vec`] containing bytes:
-    /// ```no_run
-    /// # use rbook::ebook::errors::EbookResult;
-    /// # use rbook::epub::{Epub, EpubSettings};
-    /// # use std::error::Error;
-    /// # fn main() -> EbookResult<()> {
-    /// # let epub_bytes = b"";
-    /// let bytes_vec: Vec<u8> = Vec::from(epub_bytes);
-    /// let cursor = std::io::Cursor::new(bytes_vec);
-    /// let epub = Epub::read(cursor, EpubSettings::default())?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    /// - Opening from a [`File`](std::fs::File) directly:
-    /// ```no_run
-    /// # use rbook::epub::{Epub, EpubSettings};
+    /// # use rbook::{Ebook, Epub};
+    /// # use rbook::epub::reader::LinearBehavior;
+    /// # use rbook::reader::{Reader, ReaderContent};
     /// # use std::error::Error;
     /// # fn main() -> Result<(), Box<dyn Error>> {
-    /// let epub_file = std::fs::File::open("tests/ebooks/example.epub")?;
-    /// let epub = Epub::read(epub_file, EpubSettings::default())?;
+    /// let epub = Epub::open("tests/ebooks/epub2")?;
+    /// let mut epub_reader = epub.reader_builder()
+    ///     // Omit linear readable entries
+    ///     .linear_behavior(LinearBehavior::NonLinearOnly)
+    ///     .create();
+    ///
+    /// for entry in epub_reader {
+    ///     // handle non-linear entry
+    /// }
     /// # Ok(())
     /// # }
     /// ```
-    pub fn read<
-        #[cfg(feature = "threadsafe")] R: 'static + Read + Seek + Send + Sync,
-        #[cfg(not(feature = "threadsafe"))] R: 'static + Read + Seek,
-    >(
-        reader: R,
-        settings: impl Into<EpubSettings>,
-    ) -> EbookResult<Self> {
-        Self::parse(settings.into(), Box::new(ZipArchive::new(reader, None)?))
-    }
-
-    /// Returns a new [`EpubReader`] to sequentially read over the [`EpubSpine`]
-    /// contents of an ebook with the specified [`EpubReaderSettings`].
-    pub fn reader_with(&self, settings: impl Into<EpubReaderSettings>) -> EpubReader<'_> {
-        EpubReader::new(self, settings.into())
+    pub fn reader_builder(&self) -> EpubReaderBuilder<'_> {
+        EpubReaderBuilder::new(self)
     }
 
     /// The absolute percent-encoded location of the package `.opf` file.
@@ -252,6 +227,49 @@ impl Epub {
         uri::parent(&self.package_file).into()
     }
 
+    /// Opens an [`Epub`] from the given [`Path`] with the specified [`EpubOpenOptions`].
+    #[deprecated(
+        since = "0.6.8",
+        note = "Use `Epub::options`, then call `EpubOpenOptions::open` instead."
+    )]
+    pub fn open_with(
+        path: impl AsRef<Path>,
+        options: impl Into<EpubOpenOptions>,
+    ) -> EbookResult<Self> {
+        options.into().open(path)
+    }
+
+    /// With the specified [`EpubOpenOptions`],
+    /// opens an EPUB from any implementation of [`Read`] + [`Seek`]
+    /// (and [`Send`] + [`Sync`] if the `threadsafe` feature is enabled).
+    #[deprecated(
+        since = "0.6.8",
+        note = "Use `Epub::options`, then call `EpubOpenOptions::read` instead."
+    )]
+    pub fn read<
+        #[cfg(feature = "threadsafe")] R: 'static + Read + Seek + Send + Sync,
+        #[cfg(not(feature = "threadsafe"))] R: 'static + Read + Seek,
+    >(
+        reader: R,
+        options: impl Into<EpubOpenOptions>,
+    ) -> EbookResult<Self> {
+        options.into().read(reader)
+    }
+
+    /// Returns a new [`EpubReader`] to sequentially read over the [`EpubSpine`]
+    /// contents of an ebook with the specified [`EpubReaderOptions`].
+    #[deprecated(
+        since = "0.6.8",
+        note = "Use `Epub::reader_builder` or `EpubReaderOptions::create` instead."
+    )]
+    pub fn reader_with(&self, options: impl Into<EpubReaderOptions>) -> EpubReader<'_> {
+        options.into().create(self)
+    }
+
+    //////////////////////////////////
+    // PRIVATE API
+    //////////////////////////////////
+
     fn transform_resource<'b>(&self, resource: Resource<'b>) -> Resource<'b> {
         let href = match resource.key() {
             ResourceKey::Value(value) => uri::decode(value.as_ref()),
@@ -268,9 +286,9 @@ impl Epub {
         resource.swap_value(modified_href)
     }
 
-    // For now, `EpubSettings` are not stored within the `Epub` struct.
-    fn parse(settings: EpubSettings, archive: Box<dyn Archive>) -> EbookResult<Self> {
-        let mut parser = EpubParser::new(&settings, archive.as_ref());
+    // For now, the preferences from `config` are not stored within the `Epub` struct.
+    fn parse(config: EpubConfig, archive: Box<dyn Archive>) -> EbookResult<Self> {
+        let mut parser = EpubParser::new(&config, archive.as_ref());
         let data = parser.parse()?;
 
         Ok(Self {
@@ -290,9 +308,9 @@ impl Ebook for Epub {
     /// contents of an ebook.
     ///
     /// # See Also
-    /// - [`Self::reader_with`] to alter the behavior of an [`EpubReader`].
+    /// - [`Self::reader_builder`] to alter the behavior of an [`EpubReader`].
     fn reader(&self) -> EpubReader<'_> {
-        EpubReader::new(self, EpubReaderSettings::default())
+        self.reader_builder().create()
     }
 
     fn metadata(&self) -> EpubMetadata<'_> {
@@ -388,13 +406,170 @@ impl PartialEq for Epub {
     }
 }
 
-/// EPUB-specific settings upon parsing an [`Epub`].
+#[derive(Clone, Debug)]
+pub(crate) struct EpubConfig {
+    /// See [`EpubOpenOptions::preferred_toc`].
+    pub(crate) preferred_toc: EpubVersion,
+    /// See [`EpubOpenOptions::preferred_landmarks`].
+    pub(crate) preferred_landmarks: EpubVersion,
+    /// See [`EpubOpenOptions::preferred_page_list`].
+    pub(crate) preferred_page_list: EpubVersion,
+    /// See [`EpubOpenOptions::store_all`].
+    pub(crate) store_all: bool,
+    /// See [`EpubOpenOptions::strict`].
+    pub(crate) strict: bool,
+}
+
+// Temporary placeholder for now until 0.7.0
+#[allow(deprecated)]
+impl From<EpubOpenOptions> for EpubConfig {
+    fn from(value: EpubOpenOptions) -> Self {
+        Self {
+            preferred_toc: value.preferred_toc,
+            preferred_landmarks: value.preferred_landmarks,
+            preferred_page_list: value.preferred_page_list,
+            store_all: value.store_all,
+            strict: value.strict,
+        }
+    }
+}
+
+// BACKWARD COMPATIBILITY (Renamed)
+/// Deprecated; prefer [`EpubOpenOptions`] instead.
+#[deprecated(since = "0.6.8", note = "Use `EpubOpenOptions` instead.")]
+pub type EpubSettingsBuilder = EpubOpenOptions;
+/// Deprecated; prefer [`EpubOpenOptions`] instead.
+#[deprecated(since = "0.6.8", note = "Use `EpubOpenOptions` instead.")]
+pub type EpubSettings = EpubOpenOptions;
+
+/// Builder to open an [`Epub`].
 ///
-/// To create a mutable settings instance, see
-/// [`EpubSettings::builder`] or [`EpubSettings::default`].
+/// Configurable options:
+/// - [`preferred_toc`](EpubOpenOptions::preferred_toc)
+/// - [`preferred_landmarks`](EpubOpenOptions::preferred_landmarks)
+/// - [`preferred_page_list`](EpubOpenOptions::preferred_page_list)
+/// - [`store_all`](EpubOpenOptions::store_all)
+/// - [`strict`](EpubOpenOptions::strict)
+///
+/// # Examples
+/// - Supplying specific options to open an [`Epub`] with:
+/// ```
+/// # use rbook::ebook::errors::EbookResult;
+/// # use rbook::epub::metadata::EpubVersion;
+/// # use rbook::{Ebook, Epub};
+/// # fn main() -> EbookResult<()> {
+/// let epub = Epub::options() // returns `EpubOpenOptions`
+///     .store_all(true)
+///     .strict(false)
+///     .preferred_landmarks(EpubVersion::EPUB2)
+///     .open("tests/ebooks/example_epub")?;
+/// # Ok(())
+/// # }
+/// ```
 #[non_exhaustive]
 #[derive(Clone, Debug)]
-pub struct EpubSettings {
+pub struct EpubOpenOptions /*(EpubConfig)*/ {
+    /// See [`EpubOpenOptions::preferred_toc`].
+    #[deprecated(since = "0.6.8", note = "Use `preferred_toc` method instead.")]
+    pub preferred_toc: EpubVersion,
+    /// See [`EpubOpenOptions::preferred_landmarks`].
+    #[deprecated(since = "0.6.8", note = "Use `preferred_landmarks` method instead.")]
+    pub preferred_landmarks: EpubVersion,
+    /// See [`EpubOpenOptions::preferred_page_list`].
+    #[deprecated(since = "0.6.8", note = "Use `preferred_page_list` method instead.")]
+    pub preferred_page_list: EpubVersion,
+    /// See [`EpubOpenOptions::store_all`].
+    #[deprecated(since = "0.6.8", note = "Use `store_all` method instead.")]
+    pub store_all: bool,
+    /// See [`EpubOpenOptions::strict`].
+    #[deprecated(since = "0.6.8", note = "Use `strict` method instead.")]
+    pub strict: bool,
+}
+
+#[allow(deprecated)]
+impl EpubOpenOptions {
+    /// Creates a new builder with default values.
+    ///
+    /// # See Also
+    /// - [`Epub::options`]
+    pub fn new() -> Self {
+        Self {
+            preferred_toc: EpubVersion::EPUB3,
+            preferred_landmarks: EpubVersion::EPUB3,
+            preferred_page_list: EpubVersion::EPUB3,
+            store_all: false,
+            strict: true,
+        }
+    }
+
+    /// Opens an [`Epub`] from the given [`Path`] with the specified [options](EpubOpenOptions).
+    ///
+    /// The given path may be an EPUB **file** or **directory** containing the
+    /// contents of an unzipped EPUB.
+    ///
+    /// # Errors
+    /// - [`ArchiveError`](EbookError::Archive): Missing or invalid EPUB files.
+    /// - [`FormatError`](EbookError::Format): Malformed EPUB content.
+    ///
+    /// # See Also
+    /// - [`Self::read`] to open from a byte buffer.
+    /// - [`Epub::open`] to open an [`Epub`] with default options applied.
+    pub fn open(self, path: impl AsRef<Path>) -> EbookResult<Epub> {
+        Epub::parse(
+            self.into(),
+            archive::get_archive(path.as_ref()).map_err(EbookError::Archive)?,
+        )
+    }
+
+    /// Opens an EPUB from any implementation of [`Read`] + [`Seek`]
+    /// (and [`Send`] + [`Sync`] if the `threadsafe` feature is enabled)
+    /// with the specified [options](EpubOpenOptions).
+    ///
+    /// # Errors
+    /// - [`ArchiveError`](EbookError::Archive): Missing or invalid EPUB files.
+    /// - [`FormatError`](EbookError::Format): Malformed EPUB content.
+    ///
+    /// # See Also
+    /// - [`Self::open`] to open from a path (file or directory).
+    ///
+    /// # Examples
+    /// - Opening from a [`Cursor`](std::io::Cursor) with an underlying [`Vec`] containing bytes:
+    /// ```no_run
+    /// # use rbook::ebook::errors::EbookResult;
+    /// # use rbook::epub::Epub;
+    /// # use std::error::Error;
+    /// # fn main() -> EbookResult<()> {
+    /// # let epub_bytes = b"";
+    /// let bytes_vec: Vec<u8> = Vec::from(epub_bytes);
+    /// let cursor = std::io::Cursor::new(bytes_vec);
+    /// let epub = Epub::options().read(cursor)?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    /// - Opening from a [`File`](std::fs::File) directly:
+    /// ```no_run
+    /// # use rbook::epub::Epub;
+    /// # use std::error::Error;
+    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// let epub_file = std::fs::File::open("tests/ebooks/example.epub")?;
+    /// let epub = Epub::options().read(epub_file)?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn read<
+        #[cfg(feature = "threadsafe")] R: 'static + Read + Seek + Send + Sync,
+        #[cfg(not(feature = "threadsafe"))] R: 'static + Read + Seek,
+    >(
+        self,
+        reader: R,
+    ) -> EbookResult<Epub> {
+        Epub::parse(self.into(), Box::new(ZipArchive::new(reader, None)?))
+    }
+
+    //////////////////////////////////
+    // BUILDING
+    //////////////////////////////////
+
     /// Prefer a table of contents (toc) format over another as the default
     /// from [`Toc::contents`](super::Toc::contents).
     ///
@@ -409,7 +584,10 @@ pub struct EpubSettings {
     /// are backwards-compatible with EPUB2.**
     ///
     /// Default: [`EpubVersion::Epub3`]
-    pub preferred_toc: EpubVersion,
+    pub fn preferred_toc(mut self, version: EpubVersion) -> Self {
+        self.preferred_toc = version;
+        self
+    }
 
     /// Prefer a landmark format over another as the default
     /// from [`EpubToc::landmarks`].
@@ -425,7 +603,10 @@ pub struct EpubSettings {
     /// are backwards-compatible with EPUB2.**
     ///
     /// Default: [`EpubVersion::Epub3`]
-    pub preferred_landmarks: EpubVersion,
+    pub fn preferred_landmarks(mut self, version: EpubVersion) -> Self {
+        self.preferred_landmarks = version;
+        self
+    }
 
     /// Prefer a page list format over another as the default
     /// from [`EpubToc::page_list`].
@@ -441,7 +622,10 @@ pub struct EpubSettings {
     /// are backwards-compatible with EPUB2.**
     ///
     /// Default: [`EpubVersion::Epub3`]
-    pub preferred_page_list: EpubVersion,
+    pub fn preferred_page_list(mut self, version: EpubVersion) -> Self {
+        self.preferred_page_list = version;
+        self
+    }
 
     /// Store **both** EPUB 2 and 3-specific information.
     ///
@@ -452,7 +636,10 @@ pub struct EpubSettings {
     /// added to [`EpubToc`].
     ///
     /// Default: `false`
-    pub store_all: bool,
+    pub fn store_all(mut self, store_all: bool) -> Self {
+        self.store_all = store_all;
+        self
+    }
 
     /// When set to `true`, ensures an EPUB conforms to the following:
     /// - Has an **identifier**.
@@ -469,91 +656,33 @@ pub struct EpubSettings {
     /// However, it will refuse further processing if malformations are found.**
     ///
     /// Default: `true`
-    pub strict: bool,
-}
-
-impl EpubSettings {
-    /// Returns a builder to create an [`EpubSettings`] instance.
-    pub fn builder() -> EpubSettingsBuilder {
-        EpubSettingsBuilder(Self::default())
-    }
-}
-
-impl Default for EpubSettings {
-    fn default() -> Self {
-        Self {
-            preferred_toc: EpubVersion::EPUB3,
-            preferred_landmarks: EpubVersion::EPUB3,
-            preferred_page_list: EpubVersion::EPUB3,
-            store_all: false,
-            strict: true,
-        }
-    }
-}
-
-impl From<EpubSettingsBuilder> for EpubSettings {
-    fn from(value: EpubSettingsBuilder) -> Self {
-        value.build()
-    }
-}
-
-/// Builder to construct an [`EpubSettings`] instance.
-///
-/// # Examples
-/// - Passing a builder to open an [`Epub`] with:
-/// ```
-/// # use rbook::ebook::errors::EbookResult;
-/// # use rbook::epub::EpubSettings;
-/// # use rbook::epub::metadata::EpubVersion;
-/// # use rbook::{Ebook, Epub};
-/// # fn main() -> EbookResult<()> {
-/// let epub = Epub::open_with(
-///     "tests/ebooks/example_epub",
-///     EpubSettings::builder()
-///         .store_all(true)
-///         .strict(false)
-///         .preferred_landmarks(EpubVersion::EPUB2)
-/// )?;
-/// # Ok(())
-/// # }
-/// ```
-#[derive(Debug, Clone)]
-pub struct EpubSettingsBuilder(EpubSettings);
-
-impl EpubSettingsBuilder {
-    /// Turn this builder into an [`EpubSettings`] instance.
-    pub fn build(self) -> EpubSettings {
-        self.0
-    }
-
-    /// See [`EpubSettings::preferred_toc`].
-    pub fn preferred_toc(mut self, version: EpubVersion) -> Self {
-        self.0.preferred_toc = version;
-        self
-    }
-
-    /// See [`EpubSettings::preferred_landmarks`].
-    pub fn preferred_landmarks(mut self, version: EpubVersion) -> Self {
-        self.0.preferred_landmarks = version;
-        self
-    }
-
-    /// See [`EpubSettings::preferred_page_list`].
-    pub fn preferred_page_list(mut self, version: EpubVersion) -> Self {
-        self.0.preferred_landmarks = version;
-        self
-    }
-
-    /// See [`EpubSettings::store_all`].
-    pub fn store_all(mut self, store_all: bool) -> Self {
-        self.0.store_all = store_all;
-        self
-    }
-
-    /// See [`EpubSettings::strict`].
     pub fn strict(mut self, strict: bool) -> Self {
-        self.0.strict = strict;
+        self.strict = strict;
         self
+    }
+
+    /// Turn this instance into an [`EpubOpenOptions`] instance.
+    #[deprecated(
+        since = "0.6.8",
+        note = "Use `EpubOpenOptions::open` or `EpubOpenOptions::read` instead."
+    )]
+    pub fn build(self) -> EpubOpenOptions {
+        self
+    }
+
+    /// Deprecated; prefer [`Epub::options`] instead.
+    #[deprecated(
+        since = "0.6.8",
+        note = "Use `Epub::options` or `EpubOpenOptions::new` instead."
+    )]
+    pub fn builder() -> Self {
+        Self::new()
+    }
+}
+
+impl Default for EpubOpenOptions {
+    fn default() -> Self {
+        Self::new()
     }
 }
 
@@ -561,7 +690,7 @@ impl EpubSettingsBuilder {
 pub(super) struct EpubResourceProvider<'ebook>(&'ebook dyn Archive);
 
 /// These methods don't delegate to [`Epub::transform_resource`]
-/// as the data provided as
+/// as the input (`resource`) is **trusted**.
 impl EpubResourceProvider<'_> {
     pub(crate) fn read_str(&self, resource: Resource) -> EbookResult<String> {
         self.0.read_resource_str(&resource).map_err(Into::into)

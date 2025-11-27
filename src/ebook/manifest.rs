@@ -27,7 +27,7 @@ use crate::ebook::resource::{Resource, ResourceKind};
 /// # Ok(())
 /// # }
 /// ```
-/// - Reading a resource provided by the manifest:
+/// - Reading a resource from the manifest:
 /// ```
 /// # use rbook::ebook::errors::EbookResult;
 /// # use rbook::ebook::manifest::{Manifest, ManifestEntry};
@@ -62,6 +62,28 @@ pub trait Manifest<'ebook> {
     ///
     /// # See Also
     /// - [`ManifestEntry::resource_kind`] to inspect the kind of image format.
+    ///
+    /// # Examples
+    /// - Retrieving cover image hrefs from the manifest:
+    /// ```
+    /// # use rbook::epub::metadata::EpubVersion;
+    /// # use rbook::ebook::errors::EbookResult;
+    /// # use rbook::ebook::manifest::{Manifest, ManifestEntry};
+    /// # use rbook::{Ebook, Epub};
+    /// # fn main() -> EbookResult<()> {
+    /// let epub2 = Epub::open("tests/ebooks/epub2")?;
+    /// let epub3 = Epub::open("tests/ebooks/example_epub")?;
+    ///
+    /// let epub2_cover = epub2.manifest().cover_image().unwrap();
+    /// assert_eq!(epub2_cover.href().as_ref(), "/cover.jpg" );
+    /// # assert_eq!(epub2.metadata().version(), EpubVersion::EPUB2);
+    ///
+    /// let epub3_cover = epub3.manifest().cover_image().unwrap();
+    /// assert_eq!(epub3_cover.href().as_ref(), "/EPUB/img/cover.webm");
+    /// # assert_eq!(epub3.metadata().version(), EpubVersion::EPUB3);
+    /// # Ok(())
+    /// # }
+    /// ```
     fn cover_image(&self) -> Option<impl ManifestEntry<'ebook> + 'ebook>;
 
     /// Returns an iterator over all image [`entries`](ManifestEntry) in the manifest.
@@ -139,7 +161,7 @@ pub trait Manifest<'ebook> {
     ///
     /// Generally, manifests are not empty as ebooks *should* have content.
     /// However, this is possible if a feature such as
-    /// [`EpubSettings::strict`](crate::epub::EpubSettings::strict) is set to `false`.
+    /// [`EpubOpenOptions::strict`](crate::epub::EpubOpenOptions::strict) is set to `false`.
     fn is_empty(&self) -> bool {
         self.len() == 0
     }
@@ -164,7 +186,7 @@ pub trait ManifestEntry<'ebook> {
     /// - [`Self::read_bytes`] to retrieve the raw byte content of a manifest entry.
     ///
     /// # Examples
-    /// - Reading a resource provided by the manifest:
+    /// - Reading a resource from the manifest:
     /// ```
     /// # use rbook::ebook::errors::EbookResult;
     /// # use rbook::ebook::manifest::{Manifest, ManifestEntry};

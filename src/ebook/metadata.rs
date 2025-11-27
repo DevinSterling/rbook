@@ -31,6 +31,10 @@ use std::hash::Hash;
 /// assert_eq!("A subtitle", title.value());
 /// assert_eq!(TitleKind::Subtitle, title.kind());
 /// assert_eq!(1, title.order());
+///
+/// // Retrieving the last modified date:
+/// let modified = epub.metadata().modified_date().unwrap();
+/// assert_eq!(modified.as_str(), "2023-01-25T10:11:35Z");
 /// # Ok(())
 /// # }
 /// ```
@@ -78,12 +82,42 @@ pub trait Metadata<'ebook> {
     fn version(&self) -> Option<Version>;
 
     /// The publication date; when an [`Ebook`](super::Ebook) was published.
+    ///
+    /// # Examples
+    /// - Retrieving the publication date:
+    /// ```
+    /// # use rbook::ebook::errors::EbookResult;
+    /// # use rbook::ebook::metadata::{Metadata};
+    /// # use rbook::{Ebook, Epub};
+    /// # fn main() -> EbookResult<()> {
+    /// let epub = Epub::open("tests/ebooks/epub2")?;
+    /// let publication_date = epub.metadata().publication_date().unwrap();
+    ///
+    /// assert_eq!(publication_date.as_str(), "2023-01-25");
+    /// # Ok(())
+    /// # }
+    /// ```
     fn publication_date(&self) -> Option<DateTime<'ebook>>;
 
     /// The last modified date; when an [`Ebook`](super::Ebook) was last modified.
     ///
     /// # See Also
     /// - [`Self::publication_date`] to retrieve the data en ebook was published.
+    ///
+    /// # Examples
+    /// - Retrieving the modification date:
+    /// ```
+    /// # use rbook::ebook::errors::EbookResult;
+    /// # use rbook::ebook::metadata::{Metadata};
+    /// # use rbook::{Ebook, Epub};
+    /// # fn main() -> EbookResult<()> {
+    /// let epub = Epub::open("tests/ebooks/epub2")?;
+    /// let modified_date = epub.metadata().modified_date().unwrap();
+    ///
+    /// assert_eq!(modified_date.as_str(), "2025-11-27");
+    /// # Ok(())
+    /// # }
+    /// ```
     fn modified_date(&self) -> Option<DateTime<'ebook>>;
 
     /// The main unique [`Identifier`] of an [`Ebook`](super::Ebook).
@@ -194,7 +228,7 @@ pub trait Metadata<'ebook> {
 /// The scheme of metadata entries, specifying a registry [`source`](Scheme::source)
 /// and [`code`](Scheme::code).
 ///
-/// A `source` identifies "who" (such as an authority) defines the `code`, such
+/// A `source` identifies "who" (such as an authority) that defines the code, such
 /// as `BCP 47`, `BISAC`, and `marc:relators`.
 ///
 /// Sources are optional and will not be specified if there is no known
@@ -630,13 +664,13 @@ impl TitleKind {
     // mappings (e.g., main-title, primary, etc.)
     pub(super) fn from(kind: &str) -> Self {
         match kind {
-            "main" => TitleKind::Main,
-            "subtitle" => TitleKind::Subtitle,
-            "short" => TitleKind::Short,
-            "collection" => TitleKind::Collection,
-            "edition" => TitleKind::Edition,
-            "expanded" => TitleKind::Expanded,
-            _ => TitleKind::Unknown,
+            "main" => Self::Main,
+            "subtitle" => Self::Subtitle,
+            "short" => Self::Short,
+            "collection" => Self::Collection,
+            "edition" => Self::Edition,
+            "expanded" => Self::Expanded,
+            _ => Self::Unknown,
         }
     }
 }

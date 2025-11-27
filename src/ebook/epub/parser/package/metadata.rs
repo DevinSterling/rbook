@@ -69,7 +69,7 @@ impl PendingRefinements {
         self.0
             .remove_entry(parent_id)
             .map(|(refines, mut refinements)| {
-                // There is at least one entry
+                // There is always at least one entry
                 refinements[0].refines.replace(refines);
                 EpubRefinementsData::new(refinements)
             })
@@ -78,7 +78,7 @@ impl PendingRefinements {
 
 impl EpubParser<'_> {
     pub(super) fn parse_metadata(
-        &mut self,
+        &self,
         ctx: &mut PackageContext,
         package: PackageData,
     ) -> ParserResult<EpubMetadataData> {
@@ -126,7 +126,7 @@ impl EpubParser<'_> {
             }
         }
 
-        if self.settings.strict && !id_meta.contains_key(&package.unique_id) {
+        if self.config.strict && !id_meta.contains_key(&package.unique_id) {
             return Err(EpubFormatError::MissingMeta(format!(
                 "No identifier found with id: `{}`",
                 package.unique_id
@@ -205,7 +205,7 @@ impl EpubParser<'_> {
         // Rare but can happen, attempt to recover if the epub is non-standard:
         // `<meta property="a" content="b" />`
         else if let Some(content) = attributes.take_attribute_value(consts::CONTENT)?
-            && !self.settings.strict
+            && !self.config.strict
         {
             content
         } else {
@@ -294,7 +294,7 @@ impl EpubParser<'_> {
 
         let mut grouped_meta = Self::group_metadata(root_meta);
 
-        if self.settings.strict {
+        if self.config.strict {
             Self::assert_metadata(&grouped_meta)?;
         }
 

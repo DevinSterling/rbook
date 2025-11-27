@@ -255,7 +255,7 @@ impl<'a> Properties<'a> {
         self.as_str().trim().is_empty()
     }
 
-    /// Returns the associated property if the provided `index` is less than
+    /// Returns the associated property if the given `index` is less than
     /// [`Self::len`], otherwise [`None`].
     pub fn get(&self, index: usize) -> Option<&'a str> {
         self.iter().nth(index)
@@ -286,7 +286,7 @@ impl<'a> Properties<'a> {
         PropertiesIter(self.0.split_whitespace())
     }
 
-    /// Returns `true` if the provided property is present.
+    /// Returns `true` if the given property is present.
     ///
     /// # Examples
     /// - Assessing if the provided properties are present:
@@ -413,7 +413,7 @@ impl<'a> Attributes<'a> {
         self.0.is_empty()
     }
 
-    /// Returns the associated [`Attribute`] if the provided `index` is less than
+    /// Returns the associated [`Attribute`] if the given `index` is less than
     /// [`Self::len`], otherwise [`None`].
     pub fn get(&self, index: usize) -> Option<Attribute<'a>> {
         self.0.get(index).map(Attribute)
@@ -614,6 +614,12 @@ impl TextDirection {
             Self::RightToLeft => Self::RIGHT_TO_LEFT,
             Self::Auto => Self::AUTO,
         }
+    }
+}
+
+impl Display for TextDirection {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
     }
 }
 

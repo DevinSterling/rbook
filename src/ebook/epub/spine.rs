@@ -258,7 +258,7 @@ impl<'ebook> EpubSpineEntry<'ebook> {
     /// Regarding an [`EpubReader`](super::EpubReader), linear and non-linear content
     /// is shown in the exact order as written in the spine.
     /// This behavior can be changed through
-    /// [`EpubReaderSettings::linear_behavior`](super::EpubReaderSettings::linear_behavior).
+    /// [`EpubReaderOptions::linear_behavior`](super::EpubReaderOptions::linear_behavior).
     pub fn is_linear(&self) -> bool {
         self.data.linear
     }

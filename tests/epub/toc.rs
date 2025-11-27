@@ -1,16 +1,15 @@
 use crate::epub::open_example_epub_file_with;
-use rbook::Ebook;
 use rbook::ebook::element::Attributes;
 use rbook::ebook::manifest::ManifestEntry;
 use rbook::ebook::toc::{Toc, TocChildren, TocEntry, TocEntryKind};
-use rbook::epub::EpubSettings;
 use rbook::epub::metadata::EpubVersion;
+use rbook::{Ebook, Epub};
 use wasm_bindgen_test::wasm_bindgen_test;
 
 #[test]
 #[wasm_bindgen_test]
 fn test_toc() {
-    let epub = open_example_epub_file_with(EpubSettings::builder().store_all(true));
+    let epub = open_example_epub_file_with(Epub::options().store_all(true));
     #[rustfmt::skip]
     let expected_toc = vec![
         (
@@ -82,7 +81,7 @@ fn test_preference() {
 
     for (version, integrity_check) in versions {
         let epub = open_example_epub_file_with(
-            EpubSettings::builder()
+            Epub::options()
                 .preferred_toc(version)
                 .preferred_landmarks(version),
         );

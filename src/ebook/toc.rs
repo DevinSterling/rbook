@@ -260,7 +260,7 @@ pub trait TocEntry<'ebook> {
 /// - [`TocChildren::iter`]: Immediate children (nested form).
 /// - [`TocChildren::flatten`]: All children sorted in ascending [`order`](TocEntry::order).
 pub trait TocChildren<'ebook> {
-    /// Returns the associated immediate child [`TocEntry`] if the provided `index` is less than
+    /// Returns the associated immediate child [`TocEntry`] if the given `index` is less than
     /// [`Self::len`], otherwise [`None`].
     fn get(&self, index: usize) -> Option<impl TocEntry<'ebook> + 'ebook>;
 

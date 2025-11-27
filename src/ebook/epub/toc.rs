@@ -2,14 +2,13 @@
 
 use crate::ebook::element::{AttributeData, Attributes, Href};
 use crate::ebook::epub::manifest::{EpubManifestEntry, EpubManifestEntryProvider};
-use crate::ebook::epub::{EpubSettings, EpubVersion};
+use crate::ebook::epub::{EpubConfig, EpubVersion};
 use crate::ebook::toc::{Toc, TocChildren, TocEntry, TocEntryKind};
 use std::cmp::Ordering;
 use std::collections::hash_map::Iter as HashMapIter;
 use std::collections::{BinaryHeap, HashMap};
 use std::fmt::{Debug, Formatter};
 use std::slice::Iter as SliceIter;
-
 ////////////////////////////////////////////////////////////////////////////////
 // PRIVATE API
 ////////////////////////////////////////////////////////////////////////////////
@@ -36,7 +35,7 @@ impl<'a> EpubTocKey<'a> {
 pub(super) struct EpubTocData {
     /// Despite a toc being required for EPUBs, allow
     /// leniency for those that don't if `strict` is
-    /// disabled within [`EpubSettings`].
+    /// disabled within [`EpubOpenOptions`](super::EpubOpenOptions).
     preferred_toc: Option<EpubVersion>,
     preferred_landmarks: Option<EpubVersion>,
     preferred_page_list: Option<EpubVersion>,
@@ -70,22 +69,24 @@ impl EpubTocData {
         self.toc_map.extend(data.toc_map);
     }
 
-    pub(super) fn set_preferences(&mut self, settings: &EpubSettings) {
-        self.preferred_toc = self.get_preferred_kind(TocEntryKind::Toc, settings);
-        self.preferred_landmarks = self.get_preferred_kind(TocEntryKind::Landmarks, settings);
-        self.preferred_page_list = self.get_preferred_kind(TocEntryKind::PageList, settings);
+    pub(super) fn set_preferences(&mut self, config: &EpubConfig) {
+        self.preferred_toc = self.get_preferred_kind(TocEntryKind::Toc, config.preferred_toc);
+        self.preferred_landmarks =
+            self.get_preferred_kind(TocEntryKind::Landmarks, config.preferred_landmarks);
+        self.preferred_page_list =
+            self.get_preferred_kind(TocEntryKind::PageList, config.preferred_page_list);
     }
 
-    /// Gets the id of the first available preference, otherwise returns [None].
+    /// Gets the id of the first available preference, otherwise returns [`None`].
     fn get_preferred_kind(
         &self,
         kind: TocEntryKind<'static>,
-        settings: &EpubSettings,
+        preferred_version: EpubVersion,
     ) -> Option<EpubVersion> {
-        let versions: [EpubVersion; 2] = match settings.preferred_toc {
-            // Retrieve the EPUB2 navMap with EPUB3 as a fallback.
+        let versions: [EpubVersion; 2] = match preferred_version {
+            // Retrieve the EPUB2 variant with EPUB3 as a fallback.
             EpubVersion::Epub2(_) => [EpubVersion::EPUB2, EpubVersion::EPUB3],
-            // Retrieve the EPUB3 nav with EPUB2 as a fallback.
+            // Retrieve the EPUB3 variant with EPUB2 as a fallback.
             _ => [EpubVersion::EPUB3, EpubVersion::EPUB2],
         };
 
@@ -116,7 +117,7 @@ pub(super) struct EpubTocEntryData {
 /// An EPUB table of contents, see [`Toc`] for additional details.
 ///
 /// For EPUB 3 ebooks backwards compatible with EPUB2,
-/// the preferred toc formats are configurable via [`EpubSettings`].
+/// the preferred toc formats are configurable via [`EpubOpenOptions`](super::EpubOpenOptions).
 /// Methods regarding preferred format:
 /// - [`EpubToc::contents`] (`toc`)
 /// - [`EpubToc::page_list`] (`page-list`)
@@ -150,7 +151,7 @@ impl<'ebook> EpubToc<'ebook> {
     /// The preferred **page list** format, mapping to the EPUB 2 or EPUB 3
     /// [`TocEntryKind::PageList`] format, if present.
     ///
-    /// The default preferred format (EPUB 3) is configurable via [`EpubSettings`].
+    /// The default preferred format (EPUB 3) is configurable via [`EpubOpenOptions`](super::EpubOpenOptions).
     pub fn page_list(&self) -> Option<EpubTocEntry<'ebook>> {
         self.by_toc_key(TocEntryKind::PageList, self.data.preferred_page_list)
     }
@@ -158,7 +159,7 @@ impl<'ebook> EpubToc<'ebook> {
     /// The preferred **guide/landmarks** format, mapping to the EPUB 2 (Guide) or EPUB 3
     /// [`TocEntryKind::Landmarks`] format, if present.
     ///
-    /// The default preferred format (EPUB 3) is configurable via [`EpubSettings`].
+    /// The default preferred format (EPUB 3) is configurable via [`EpubOpenOptions`](super::EpubOpenOptions).
     pub fn landmarks(&self) -> Option<EpubTocEntry<'ebook>> {
         self.by_toc_key(TocEntryKind::Landmarks, self.data.preferred_landmarks)
     }
@@ -166,7 +167,7 @@ impl<'ebook> EpubToc<'ebook> {
     /// Returns the **root** toc entry for a given [`TocEntryKind`],
     /// using the specified [`EpubVersion`].
     ///
-    /// **This method is useful when [`EpubSettings::store_all`] is set to `true`.**
+    /// **This method is useful when [`EpubOpenOptions::store_all`](super::EpubOpenOptions::store_all) is set to `true`.**
     ///
     /// An example:
     /// - [`TocEntryKind::PageList`] + [`EpubVersion::Epub2`] = Legacy EPUB 2 NCX page list.
@@ -309,7 +310,7 @@ impl<'ebook> EpubTocEntry<'ebook> {
     /// ```
     ///
     /// # See Also
-    /// - [`Href::path`] for retrieving the href value without the query and fragment.
+    /// - [`Href::path`] to retrieve the href value without the query and fragment.
     /// - [`Self::resource`] as the primary means for retrieving ebook content.
     pub fn href(&self) -> Option<Href<'ebook>> {
         self.data.href.as_deref().map(Into::into)
@@ -334,7 +335,7 @@ impl<'ebook> EpubTocEntry<'ebook> {
     ///
     /// # See Also
     /// - [`Epub`](super::Epub) documentation of `read_resource_bytes` for normalization details.
-    /// - [`Href::path`] for retrieving the href value without the query and fragment.
+    /// - [`Href::path`] to retrieve the href value without the query and fragment.
     pub fn href_raw(&self) -> Option<Href<'ebook>> {
         self.data.href_raw.as_deref().map(Into::into)
     }

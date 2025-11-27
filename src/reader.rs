@@ -52,7 +52,7 @@ use crate::reader::errors::ReaderResult;
 /// # }
 /// ```
 pub trait Reader<'ebook> {
-    /// Resets a reader's cursor to its initial state; **before** the first entry.
+    /// Resets the reader's cursor to its initial state; **before** the first entry.
     ///
     /// After calling this method:
     /// - [`Self::current_position`] = [`None`]
@@ -95,7 +95,7 @@ pub trait Reader<'ebook> {
     /// ```
     fn reset(&mut self);
 
-    /// Returns the next [`ReaderContent`] and increments a reader's cursor by one.
+    /// Returns the next [`ReaderContent`] and increments the reader's cursor by one.
     ///
     /// # Cases
     /// - `Some(Ok(content))`: Entry exists and reading it succeeded.  
@@ -132,7 +132,7 @@ pub trait Reader<'ebook> {
     /// ```
     fn read_next(&mut self) -> Option<ReaderResult<impl ReaderContent<'ebook> + 'ebook>>;
 
-    /// Returns the previous [`ReaderContent`] and decrements a reader's cursor by one.
+    /// Returns the previous [`ReaderContent`] and decrements the reader's cursor by one.
     ///
     /// # Cases
     /// - `Some(Ok(content))`: Entry exists and reading it succeeded.  
@@ -171,7 +171,7 @@ pub trait Reader<'ebook> {
     /// ```
     fn read_prev(&mut self) -> Option<ReaderResult<impl ReaderContent<'ebook> + 'ebook>>;
 
-    /// Returns the [`ReaderContent`] that a reader's cursor is currently positioned at.
+    /// Returns the [`ReaderContent`] that the reader's cursor is currently positioned at.
     ///
     /// # Cases
     /// - `Some(Ok(content))`: Entry exists and reading it succeeded.  
@@ -180,33 +180,42 @@ pub trait Reader<'ebook> {
     /// - `None`: No current entry ([`Self::current_position`] is [`None`]).
     fn read_current(&self) -> Option<ReaderResult<impl ReaderContent<'ebook> + 'ebook>>;
 
-    /// Returns the [`ReaderContent`] at the provided [`ReaderKey`]
-    /// and moves the reader’s cursor at that position.
+    /// Returns the [`ReaderContent`] at the given [`ReaderKey`]
+    /// and moves the reader’s cursor to that position.
     ///
     /// Equivalent to [`Self::get`], except that this method updates the cursor.
     ///
     /// To re-iterate from the start, prefer [`Self::reset`]
     /// over `read(0)`, as `reset` puts the cursor **before** the first entry.
+    ///
+    /// # Errors
+    /// See [`ReaderError`](errors::ReaderError).
     fn read<'a>(
         &mut self,
         key: impl Into<ReaderKey<'a>>,
     ) -> ReaderResult<impl ReaderContent<'ebook> + 'ebook>;
 
-    /// Moves a reader’s cursor **at** the provided [`ReaderKey`],
-    /// returning the position the reader's cursor points to.
+    /// Moves the reader’s cursor **to** the given [`ReaderKey`]
+    /// and returns the resulting cursor position.
     ///
-    /// To re-iterate from the start, prefer [`Self::reset`]
-    /// over `seek(0)`, as `reset` puts the cursor **before** the first entry.
+    /// To iterate from the start again, prefer [`Self::reset`]
+    /// over `seek(0)`, as `reset` positions the cursor **before** the first entry.
+    ///
+    /// # Errors
+    /// See [`ReaderError`](errors::ReaderError).
     fn seek<'a>(&mut self, key: impl Into<ReaderKey<'a>>) -> ReaderResult<usize>;
 
-    /// Returns the [`ReaderContent`] at the provided [`ReaderKey`]
-    /// without updating the reader's cursor.
+    /// Returns the [`ReaderContent`] at the given [`ReaderKey`]
+    /// without moving the reader's cursor.
+    ///
+    /// # Errors
+    /// See [`ReaderError`](errors::ReaderError).
     fn get<'a>(
         &self,
         key: impl Into<ReaderKey<'a>>,
     ) -> ReaderResult<impl ReaderContent<'ebook> + 'ebook>;
 
-    /// The total number of traversable [`ReaderContent`] entries in a reader.
+    /// The total number of traversable [`ReaderContent`] entries.
     ///
     /// This method returns the same value regardless of calls to methods that mutate
     /// a reader's cursor such as [`Self::read`].
@@ -215,7 +224,7 @@ pub trait Reader<'ebook> {
     /// - [`Self::remaining`] to find out how many entries are left relative to a cursor.
     fn len(&self) -> usize;
 
-    /// The position of a reader’s cursor (current entry).
+    /// The position of the reader’s cursor (current entry).
     ///
     /// Returns [`None`] if the cursor is **before** the first entry
     /// (such as on a newly created reader or after invoking [`Self::reset`].
@@ -256,7 +265,7 @@ pub trait Reader<'ebook> {
     fn current_position(&self) -> Option<usize>;
 
     /// The total number of remaining traversable [`ReaderContent`]
-    /// until a reader's cursor reaches the end.
+    /// until the reader's cursor reaches the end.
     ///
     /// # Examples
     /// - Observing the number of contents remaining:
@@ -287,7 +296,7 @@ pub trait Reader<'ebook> {
         }
     }
 
-    /// Returns `true` if a reader has no [`ReaderContent`] to provide; a [`Reader::len`] of `0`.
+    /// Returns `true` if the reader has no [`ReaderContent`] to provide; a [`Reader::len`] of `0`.
     ///
     /// # Examples
     /// - Assessing if a reader has content:
@@ -354,16 +363,16 @@ pub trait ReaderContent<'ebook>: PartialEq + Into<String> + Into<Vec<u8>> {
     /// ```
     /// # use rbook::{Ebook, Epub};
     /// # use rbook::ebook::spine::SpineEntry;
-    /// # use rbook::epub::reader::{EpubReaderSettings, LinearBehavior};
+    /// # use rbook::epub::reader::LinearBehavior;
     /// # use rbook::reader::{Reader, ReaderContent};
     /// # use std::error::Error;
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// let epub = Epub::open("tests/ebooks/example_epub")?;
     ///
     /// // Reader with non-linear spine entries prepended at the start of its internal buffer.
-    /// let mut reader_a = epub.reader_with(
-    ///     EpubReaderSettings::builder().linear_behavior(LinearBehavior::PrependNonLinear)
-    /// );
+    /// let mut reader_a = epub.reader_builder()
+    ///     .linear_behavior(LinearBehavior::PrependNonLinear)
+    ///     .create();
     /// let content_a = reader_a.read_next().unwrap()?;
     ///
     /// assert_eq!(0, content_a.position());
@@ -371,9 +380,9 @@ pub trait ReaderContent<'ebook>: PartialEq + Into<String> + Into<Vec<u8>> {
     /// assert_eq!("cover", content_a.spine_entry().idref());
     ///
     /// // Reader with non-linear spine entries appended at the end of its internal buffer.
-    /// let mut reader_b = epub.reader_with(
-    ///     EpubReaderSettings::builder().linear_behavior(LinearBehavior::AppendNonLinear)
-    /// );
+    /// let mut reader_b = epub.reader_builder()
+    ///     .linear_behavior(LinearBehavior::AppendNonLinear)
+    ///     .create();
     /// let content_b = reader_b.read_next().unwrap()?;
     ///
     /// assert_eq!(0, content_b.position());

@@ -67,7 +67,7 @@ fn normalize_href_path(original: &mut PathBuf) {
     *original = PathBuf::from_iter(stack);
 }
 
-/// The provided `href` must not contain a `fragment`
+/// The given `href` must not contain a `fragment`
 /// and `query` when passed to this method.
 fn has_scheme(href: &str) -> bool {
     // Check if a scheme is provided

@@ -16,14 +16,14 @@ use std::default::Default;
 
 impl EpubParser<'_> {
     pub(super) fn parse_toc(
-        &mut self,
+        &self,
         resolver: &UriResolver,
         data: &[u8],
     ) -> ParserResult<EpubTocData> {
         let toc_groups = self.handle_toc(resolver, data)?;
 
         // Perform assertions
-        if self.settings.strict {
+        if self.config.strict {
             self.assert_toc(&toc_groups)?;
         }
 

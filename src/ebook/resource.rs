@@ -524,7 +524,7 @@ impl ResourceKind<'_> {
             .find_map(|(key, value)| (param_key == key).then_some(value))
     }
 
-    /// Returns `true` if the maintype or subtype is **not** provided.
+    /// Returns `true` if the maintype or subtype is **not** present.
     ///
     /// Constants which evaluate to `true` for `is_unspecified` (acting as wildcards):
     /// - [`ResourceKind::APPLICATION`]

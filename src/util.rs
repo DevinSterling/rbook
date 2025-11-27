@@ -72,7 +72,7 @@ impl IndexCursor {
     pub(crate) fn increment(&mut self) -> Option<usize> {
         self.index = Some(match self.index {
             Some(index) if index + 1 < self.len => index + 1,
-            None => 0,
+            None if self.len > 0 => 0,
             _ => return None,
         });
         self.index

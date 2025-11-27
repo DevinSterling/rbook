@@ -4,7 +4,7 @@ mod toc;
 
 use crate::ebook::EbookResult;
 use crate::ebook::archive::Archive;
-use crate::ebook::epub::EpubSettings;
+use crate::ebook::epub::EpubConfig;
 use crate::ebook::epub::consts;
 use crate::ebook::epub::errors::EpubFormatError;
 use crate::ebook::epub::manifest::EpubManifestData;
@@ -38,16 +38,17 @@ impl UriResolver<'_> {
 }
 
 pub(super) struct EpubParser<'a> {
-    settings: &'a EpubSettings,
+    config: &'a EpubConfig,
     archive: &'a dyn Archive,
     version_hint: EpubVersion,
 }
 
 impl<'a> EpubParser<'a> {
-    pub(super) fn new(settings: &'a EpubSettings, archive: &'a dyn Archive) -> Self {
+    pub(super) fn new(settings: &'a EpubConfig, archive: &'a dyn Archive) -> Self {
         Self {
-            settings,
+            config: settings,
             archive,
+            // Irrelevant default: Overridden as soon as the package start element is parsed.
             version_hint: EpubVersion::EPUB3,
         }
     }
@@ -74,7 +75,7 @@ impl<'a> EpubParser<'a> {
             toc.extend(self.parse_toc(&toc_resolver, &content_toc)?);
         }
 
-        toc.set_preferences(self.settings);
+        toc.set_preferences(self.config);
 
         Ok(ParsedContent {
             package_file,
@@ -99,7 +100,7 @@ impl<'a> EpubParser<'a> {
         option: Option<T>,
         error_message: &'static str,
     ) -> ParserResult<T> {
-        if self.settings.strict && option.is_none() {
+        if self.config.strict && option.is_none() {
             Err(EpubFormatError::MissingAttribute(String::from(error_message)).into())
         } else {
             Ok(option.unwrap_or_default())

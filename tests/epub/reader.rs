@@ -1,6 +1,6 @@
 use crate::epub::open_example_epub_file;
 use rbook::Ebook;
-use rbook::epub::reader::{EpubReaderContent, EpubReaderSettings, LinearBehavior};
+use rbook::epub::reader::{EpubReaderContent, LinearBehavior};
 use rbook::reader::errors::ReaderResult;
 use rbook::reader::{Reader, ReaderContent};
 use wasm_bindgen_test::wasm_bindgen_test;
@@ -22,8 +22,10 @@ fn test_reader_linear_behavior() {
     ];
 
     for (linear_behavior, cases) in linear_behaviors {
-        let mut reader =
-            epub.reader_with(EpubReaderSettings::builder().linear_behavior(linear_behavior));
+        let mut reader = epub
+            .reader_builder()
+            .linear_behavior(linear_behavior)
+            .create();
 
         assert_eq!(cases.len(), reader.len());
 

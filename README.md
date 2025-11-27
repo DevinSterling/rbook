@@ -44,8 +44,8 @@ enabled by default in a project's `cargo.toml` file:
 `rbook` can be used by adding it as a dependency in a project's `cargo.toml` file:
 ```toml
 [dependencies]
-rbook = "0.6.7"                                           # with default features
-# rbook = { version = "0.6.7", default-features = false } # excluding default features
+rbook = "0.6.8"                                           # with default features
+# rbook = { version = "0.6.8", default-features = false } # excluding default features
 ```
 
 ## WebAssembly
@@ -55,17 +55,17 @@ The `wasm32-unknown-unknown` target is supported by default.
 ### Opening and reading an EPUB file
 ```rust
 use rbook::{Epub, prelude::*}; // Prelude for traits
-use rbook::epub::EpubSettings;
 
 fn main() {
     // Open an epub from a file or directory
-    // * `Read + Seek` implementations supported via `epub.read(...)`
-    let epub = Epub::open_with(
-       "tests/ebooks/example_epub",
-       EpubSettings::builder().strict(false), // Disable strict validation
-    ).unwrap();
+    // * `Read + Seek` implementations supported via `read(...)`
+    let epub = Epub::options()
+        .strict(false) // Disable strict checks (`true` by default)
+        .open("tests/ebooks/example_epub")
+        .unwrap();
 
-    // Create a reader instance
+    // Create a reader instance 
+    // * Configurable via `reader_builder()`
     let mut reader = epub.reader();
     
     // Print the readable content

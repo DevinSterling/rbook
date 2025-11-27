@@ -16,31 +16,30 @@ use std::cmp::PartialEq;
 ///
 /// # Configuration
 /// Reading behavior, such as how to handle non-linear content,
-/// can be configured using [`EpubReaderSettings`].
+/// can be configured using [`EpubReaderOptions`].
 ///
 /// # Examples
 /// - Retrieving a new EPUB reader instance with configuration:
 /// ```
 /// # use rbook::{Ebook, Epub};
-/// # use rbook::epub::reader::{EpubReaderSettings, LinearBehavior};
+/// # use rbook::epub::reader::LinearBehavior;
 /// # use rbook::reader::{Reader, ReaderContent};
 /// # use std::error::Error;
 /// # fn main() -> Result<(), Box<dyn Error>> {
 /// let epub = Epub::open("tests/ebooks/example_epub")?;
-/// let mut epub_reader = epub.reader_with(
-///     // Omit non-linear readable entries
-///     EpubReaderSettings::builder().linear_behavior(LinearBehavior::LinearOnly),
-/// );
+/// let mut reader = epub.reader_builder()
+///     .linear_behavior(LinearBehavior::LinearOnly) // Omit non-linear readable entries
+///     .create();
 /// # let mut count = 0;
 ///
 /// // Stream over all linear content
-/// for content_result in &mut epub_reader {
+/// for content_result in &mut reader {
 ///     # count += 1;
 ///     let content = content_result.unwrap();
 ///     assert!(content.spine_entry().is_linear());
 /// }
 /// # assert_eq!(3, count);
-/// # assert_eq!(count, epub_reader.len());
+/// # assert_eq!(count, reader.len());
 /// # Ok(())
 /// # }
 /// ```
@@ -51,8 +50,8 @@ pub struct EpubReader<'ebook> {
 }
 
 impl<'ebook> EpubReader<'ebook> {
-    pub(super) fn new(epub: &'ebook Epub, settings: EpubReaderSettings) -> Self {
-        let entries = Self::get_entries(epub, settings.linear_behavior);
+    pub(super) fn new(epub: &'ebook Epub, config: EpubReaderConfig) -> Self {
+        let entries = Self::get_entries(epub, config.linear_behavior);
 
         EpubReader {
             cursor: IndexCursor::new(entries.len()),
@@ -111,7 +110,7 @@ impl<'ebook> EpubReader<'ebook> {
         let spine_entry = self.entries[position];
         let manifest_entry = Self::get_manifest_entry(spine_entry)?;
 
-        self.crate_reader_content(position, spine_entry, manifest_entry)
+        Self::create_reader_content(position, spine_entry, manifest_entry)
     }
 
     fn find_entry_by_str(&self, idref: &str) -> ReaderResult<(usize, EpubReaderContent<'ebook>)> {
@@ -121,12 +120,11 @@ impl<'ebook> EpubReader<'ebook> {
 
         Ok((
             position,
-            self.crate_reader_content(position, spine_entry, manifest_entry)?,
+            Self::create_reader_content(position, spine_entry, manifest_entry)?,
         ))
     }
 
-    fn crate_reader_content(
-        &self,
+    fn create_reader_content(
         position: usize,
         spine_entry: EpubSpineEntry<'ebook>,
         manifest_entry: EpubManifestEntry<'ebook>,
@@ -269,35 +267,6 @@ impl<'ebook> From<EpubReaderContent<'ebook>> for Vec<u8> {
     }
 }
 
-/// [`EpubReader`]-specific settings provided to [`Epub::reader_with`].
-///
-/// Create a mutable [`EpubReaderSettings`] instance via
-/// [`EpubReaderSettings::builder`] or [`EpubReaderSettings::default`].
-#[non_exhaustive]
-#[derive(Clone, Debug, Default)]
-pub struct EpubReaderSettings {
-    /// How `linear` and `non-linear` spine content are handled.
-    ///
-    /// Through this setting, content can be re-arranged or omitted
-    /// depending on the selected [`LinearBehavior`].
-    ///
-    /// Default: [`LinearBehavior::Original`]
-    pub linear_behavior: LinearBehavior,
-}
-
-impl EpubReaderSettings {
-    /// Returns a builder to create an [`EpubReaderSettings`] instance.
-    pub fn builder() -> EpubReaderSettingsBuilder {
-        EpubReaderSettingsBuilder(Self::default())
-    }
-}
-
-impl From<EpubReaderSettingsBuilder> for EpubReaderSettings {
-    fn from(builder: EpubReaderSettingsBuilder) -> Self {
-        builder.build()
-    }
-}
-
 /// Indicates arrangement/omission of `linear` and `non-linear` spine content
 /// within an [`Epub`].
 ///
@@ -329,35 +298,146 @@ pub enum LinearBehavior {
     AppendNonLinear,
 }
 
-/// Builder to construct an [`EpubReaderSettings`] instance.
+pub(super) struct EpubReaderConfig {
+    /// See [`EpubReaderOptions::linear_behavior`]
+    linear_behavior: LinearBehavior,
+}
+
+// Temporary placeholder for now until 0.7.0
+#[allow(deprecated)]
+impl From<EpubReaderOptions> for EpubReaderConfig {
+    fn from(settings: EpubReaderOptions) -> Self {
+        Self {
+            linear_behavior: settings.linear_behavior,
+        }
+    }
+}
+
+// BACKWARD COMPATIBILITY (Renamed)
+/// Deprecated; prefer [`EpubReaderOptions`] instead.
+#[deprecated(since = "0.6.8", note = "Use `EpubReaderOptions` instead.")]
+pub type EpubReaderSettings = EpubReaderOptions;
+/// Deprecated; prefer [`EpubReaderOptions`] instead.
+#[deprecated(since = "0.6.8", note = "Use `EpubReaderOptions` instead.")]
+pub type EpubReaderSettingsBuilder = EpubReaderOptions;
+
+/// Builder to create an [`EpubReader`].
+///
+/// Configurable options:
+/// - [`linear_behavior`](EpubReaderOptions::linear_behavior)
+///
+/// # See Also
+/// - [`Epub::reader_builder`] to create an [`EpubReader`] directly from an [`Epub`].
 ///
 /// # Examples
-/// - Passing a builder to create an [`EpubReader`] with:
+/// - Creating multiple [`EpubReader`] instances:
 /// ```
 /// # use rbook::ebook::errors::EbookResult;
-/// # use rbook::epub::EpubSettings;
-/// # use rbook::epub::reader::{EpubReaderSettings, LinearBehavior};
+/// # use rbook::epub::reader::{EpubReaderOptions, LinearBehavior};
 /// # use rbook::{Ebook, Epub};
 /// # fn main() -> EbookResult<()> {
 /// let epub = Epub::open("tests/ebooks/example_epub")?;
-/// let reader = epub.reader_with(
-///     EpubReaderSettings::builder().linear_behavior(LinearBehavior::AppendNonLinear),
-/// );
+/// let reader_options = EpubReaderOptions::new()
+///     .linear_behavior(LinearBehavior::PrependNonLinear);
+///
+/// let mut reader_a = reader_options.clone().create(&epub);
+/// let mut reader_b = reader_options.clone().create(&epub);
+/// let mut reader_c = reader_options.create(&epub);
+///
+/// // All have the same applied options and initial state
+/// assert_eq!(reader_a, reader_b);
+/// assert_eq!(reader_b, reader_c);
 /// # Ok(())
 /// # }
 /// ```
-#[derive(Clone, Debug)]
-pub struct EpubReaderSettingsBuilder(EpubReaderSettings);
+#[non_exhaustive]
+#[derive(Clone, Debug, Default)]
+pub struct EpubReaderOptions {
+    /// See [`EpubReaderOptions::linear_behavior`].
+    #[deprecated(since = "0.6.8", note = "Use `linear_behavior` method instead.")]
+    pub linear_behavior: LinearBehavior,
+}
 
-impl EpubReaderSettingsBuilder {
-    /// Turn this builder into an [`EpubReaderSettings`] instance.
-    pub fn build(self) -> EpubReaderSettings {
-        self.0
+impl EpubReaderOptions {
+    /// Creates a new builder with default values.
+    ///
+    /// # See Also
+    /// - [`Epub::reader_builder`] to build an [`EpubReader`] directly from an [`Epub`]
+    pub fn new() -> Self {
+        Self::default()
     }
 
-    /// See [`EpubReaderSettings::linear_behavior`].
+    /// How `linear` and `non-linear` spine content are handled.
+    ///
+    /// Through this setting, content can be re-arranged or omitted
+    /// depending on the selected [`LinearBehavior`].
+    ///
+    /// Default: [`LinearBehavior::Original`]
+    #[allow(deprecated)]
     pub fn linear_behavior(mut self, linear_behavior: LinearBehavior) -> Self {
-        self.0.linear_behavior = linear_behavior;
+        self.linear_behavior = linear_behavior;
+        self
+    }
+
+    /// Consume this builder and create an [`EpubReader`] associated with the given [`Epub`].
+    pub fn create(self, epub: &Epub) -> EpubReader<'_> {
+        EpubReader::new(epub, self.into())
+    }
+
+    /// Turn this builder into an [`EpubReaderOptions`] instance.
+    #[deprecated(since = "0.6.8", note = "Use `Epub::reader_builder` instead.")]
+    pub fn build(self) -> Self {
+        self
+    }
+
+    /// Returns a builder to create an [`EpubReaderOptions`] instance.
+    #[allow(deprecated)]
+    #[deprecated(since = "0.6.8", note = "Use `EpubReaderOptions::new` instead.")]
+    pub fn builder() -> Self {
+        Self::default()
+    }
+}
+
+/// Builder to create an [`EpubReader`] associated with an [`Epub`].
+///
+/// # See Also
+/// - [`EpubReaderOptions`] to create multiple [`EpubReader`] instances with identical options.
+///
+/// # Examples
+/// - Creating an [`EpubReader`]:
+/// ```
+/// # use rbook::ebook::errors::EbookResult;
+/// # use rbook::epub::reader::LinearBehavior;
+/// # use rbook::{Ebook, Epub};
+/// # fn main() -> EbookResult<()> {
+/// let epub = Epub::open("tests/ebooks/example_epub")?;
+/// let mut reader = epub.reader_builder() // returns EpubReaderBuilder
+///     .linear_behavior(LinearBehavior::AppendNonLinear)
+///     .create();
+/// # Ok(())
+/// # }
+/// ```
+pub struct EpubReaderBuilder<'ebook> {
+    epub: &'ebook Epub,
+    settings: EpubReaderOptions,
+}
+
+impl<'ebook> EpubReaderBuilder<'ebook> {
+    pub(crate) fn new(epub: &'ebook Epub) -> Self {
+        Self {
+            epub,
+            settings: EpubReaderOptions::default(),
+        }
+    }
+
+    /// Consume this builder and create an [`EpubReader`].
+    pub fn create(self) -> EpubReader<'ebook> {
+        self.settings.create(self.epub)
+    }
+
+    /// See [`EpubReaderOptions::linear_behavior`].
+    pub fn linear_behavior(mut self, linear_behavior: LinearBehavior) -> Self {
+        self.settings = self.settings.linear_behavior(linear_behavior);
         self
     }
 }

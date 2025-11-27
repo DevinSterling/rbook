@@ -160,7 +160,7 @@ impl EpubParser<'_> {
     fn handle_epub_version(&mut self, raw: String) -> ParserResult<EpubVersionData> {
         let parsed = EpubVersion::from(match Version::from_str(&raw) {
             Some(version) => version,
-            None if !self.settings.strict => Version(0, 0),
+            None if !self.config.strict => Version(0, 0),
             _ => return Err(EpubFormatError::UnknownVersion(raw).into()),
         });
 
@@ -181,8 +181,7 @@ impl EpubParser<'_> {
         if let Some(properties) = metadata
             .by_group_mut(consts::COVER)
             .and_then(|group| group.first())
-            .and_then(|cover| cover.id.as_deref())
-            .and_then(|cover_id| manifest.by_id_mut(cover_id))
+            .and_then(|cover| manifest.by_id_mut(&cover.value))
             .map(|entry| &mut entry.properties)
         {
             properties.add_property("cover-image");

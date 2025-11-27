@@ -50,8 +50,11 @@ pub(crate) const OPF_AUTHORITY: &str = "opf:authority";
 pub(crate) const OPF_TERM: &str = "opf:term";
 pub(crate) const OPF_ALT_REP: &str = "opf:alt-rep";
 pub(crate) const OPF_ALT_REP_LANG: &str = "opf:alt-rep-lang";
+pub(crate) const OPF_EVENT: &str = "opf:event";
 
 // Meta attribute value
+pub(crate) const MODIFICATION: &str = "modification";
+pub(crate) const PUBLICATION: &str = "publication";
 pub(crate) const MAIN_TITLE_TYPE: &str = "main";
 
 // Container attributes

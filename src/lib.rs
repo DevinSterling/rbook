@@ -50,7 +50,7 @@
 //! For example, omitting the `prelude` while retaining the `threadsafe` feature:
 //! ```toml
 //! [dependencies]
-//! rbook = { version = "0.6.7", default-features = false, features = ["threadsafe"] }
+//! rbook = { version = "0.6.8", default-features = false, features = ["threadsafe"] }
 //! ```
 //!
 //! # Opening an [`Ebook`]
@@ -71,22 +71,17 @@
 //!   # use rbook::epub::{Epub, EpubSettings};
 //!   # let bytes_vec = Vec::new(); // Rea
 //!   let cursor = std::io::Cursor::new(bytes_vec);
-//!   let epub = Epub::read(cursor, EpubSettings::default());
+//!   let epub = Epub::options().read(cursor);
 //!   ```
 //!
-//! Aside from how the contents of an ebook are stored, settings can also be provided
-//! to control parser behavior, such as [strictness](epub::EpubSettings::strict):
+//! Aside from how the contents of an ebook are stored, options can also be given
+//! to control parser behavior, such as [strictness](epub::EpubOpenOptions::strict):
 //! ```
-//! // Import traits
-//! use rbook::Ebook;
-//! // use rbook::prelude::*; // or the prelude for convenient trait imports
-//!
-//! use rbook::epub::{Epub, EpubSettings};
-//!
-//! let epub = Epub::open_with(
-//!     "tests/ebooks/example_epub",
-//!     EpubSettings::builder().strict(false), // Disable strict checks (`true` by default)
-//! ).unwrap();
+//! # use rbook::Epub;
+//! let epub = Epub::options()
+//!     .strict(false) // Disable strict checks (`true` by default)
+//!     .open("tests/ebooks/example_epub")
+//!     .unwrap();
 //! ```
 //! # Reading an [`Ebook`]
 //! Reading the contents of an ebook is handled by a [`Reader`](reader::Reader),
@@ -105,17 +100,17 @@
 //!     println!("{}", data.content());
 //! }
 //! ```
-//! As with an ebook, a reader can receive settings to control behavior,
-//! such as [linearity](epub::reader::EpubReaderSettings::linear_behavior):
+//! Prior to creation, a reader can receive options to control its behavior,
+//! such as [linearity](epub::reader::EpubReaderOptions::linear_behavior):
 //! ```
 //! # use rbook::{Ebook, Epub};
-//! use rbook::epub::reader::{EpubReaderSettings, LinearBehavior};
+//! use rbook::epub::reader::{LinearBehavior};
 //!
 //! # let epub = Epub::open("tests/ebooks/example_epub").unwrap();
-//! let mut reader = epub.reader_with(
-//!     // Make a reader omit non-linear content
-//!     EpubReaderSettings::builder().linear_behavior(LinearBehavior::LinearOnly)
-//! );
+//! let mut reader = epub.reader_builder()
+//!                      // Make a reader omit non-linear content
+//!                      .linear_behavior(LinearBehavior::LinearOnly)
+//!                      .create();
 //! ```
 //!
 //! # Resource retrieval from an [`Ebook`]
@@ -196,7 +191,7 @@
 //! For example, omitting the `prelude` while retaining the `threadsafe` feature:
 //! ```toml
 //! [dependencies]
-//! rbook = { version = "0.6.7", default-features = false, features = ["threadsafe"] }
+//! rbook = { version = "0.6.8", default-features = false, features = ["threadsafe"] }
 //! ```
 //!
 //! # Examples

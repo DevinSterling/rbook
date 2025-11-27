@@ -65,7 +65,7 @@ impl EpubParser<'_> {
         &self,
         manifest: &EpubManifestData,
     ) -> ParserResult<Vec<TocLocation>> {
-        let settings = self.settings;
+        let settings = self.config;
         let mut hrefs = Vec::new();
         let mut formats = vec![
             // 0: Epub version associated with the format
@@ -104,7 +104,7 @@ impl EpubParser<'_> {
                 break;
             }
         }
-        if self.settings.strict && hrefs.is_empty() {
+        if self.config.strict && hrefs.is_empty() {
             Err(EpubFormatError::NoTocReference.into())
         } else {
             Ok(hrefs)

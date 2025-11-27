@@ -6,7 +6,7 @@ mod epub {
     mod toc;
 
     use rbook::ebook::manifest::{Manifest, ManifestEntry};
-    use rbook::epub::EpubSettings;
+    use rbook::epub::EpubOpenOptions;
     use rbook::{Ebook, Epub};
     use std::io::Cursor;
     use std::path::Path;
@@ -18,13 +18,13 @@ mod epub {
     }
 
     fn open_example_epub_file() -> Epub {
-        open_example_epub_file_with(EpubSettings::default())
+        open_example_epub_file_with(EpubOpenOptions::new())
     }
 
-    fn open_example_epub_file_with(settings: impl Into<EpubSettings>) -> Epub {
+    fn open_example_epub_file_with(builder: EpubOpenOptions) -> Epub {
         let bytes = include_bytes!(concat!(env!("OUT_DIR"), "/example.epub"));
         let cursor = Cursor::new(bytes);
-        Epub::read(cursor, settings).unwrap()
+        builder.read(cursor).unwrap()
     }
 
     #[test]

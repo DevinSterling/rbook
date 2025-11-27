@@ -234,7 +234,7 @@ impl<'ebook> EpubMetadata<'ebook> {
     /// ```
     ///
     /// # See Also
-    /// - [`Self::entries`]
+    /// - [`Self::entries`] to iterate over non-refining metadata entries.
     pub fn by_property(
         &self,
         property: &str,
@@ -287,7 +287,7 @@ impl<'ebook> EpubMetadata<'ebook> {
     /// The [`Epub`](super::Epub) version (e.g., `2.0`, `3.2`, etc.).
     ///
     /// The returned version may be [`EpubVersion::Unknown`] if
-    /// [`EpubSettings::strict`](super::EpubSettings::strict) is disabled.
+    /// [`EpubOpenOptions::strict`](super::EpubOpenOptions::strict) is disabled.
     ///
     /// See [`EpubMetadata::version_str`] for the original representation.
     pub fn version(&self) -> EpubVersion {
@@ -310,7 +310,7 @@ impl<'ebook> EpubMetadata<'ebook> {
     /// ```
     ///
     /// # See Also
-    /// - [`Self::entries`] for iterating over **non-refining** metadata entries, including links.
+    /// - [`Self::entries`] to iterate over **non-refining** metadata entries, including links.
     pub fn links(&self) -> impl Iterator<Item = EpubLink<'ebook>> + 'ebook {
         self.entries().filter_map(|entry| entry.as_link())
     }
@@ -327,21 +327,43 @@ impl<'ebook> Metadata<'ebook> for EpubMetadata<'ebook> {
     }
 
     fn publication_date(&self) -> Option<DateTime<'ebook>> {
-        self.data_by_property(consts::DATE)
-            .next()
-            .map(|publication_date| DateTime::new(&publication_date.value))
+        let mut inferred_date = None;
+
+        for date in self.data_by_property(consts::DATE) {
+            match date.attributes().by_name(consts::OPF_EVENT) {
+                Some(opf_event) if opf_event.value() == consts::PUBLICATION => {
+                    return Some(DateTime::new(&date.value));
+                }
+                // If the attribute is not present, infer as the publication date for now
+                None if inferred_date.is_none() => inferred_date = Some(date),
+                _ => {}
+            }
+        }
+
+        // Fallback to `dc:date` without `opf:event=publication`
+        inferred_date.map(|d| DateTime::new(&d.value))
     }
 
     fn modified_date(&self) -> Option<DateTime<'ebook>> {
-        self.data_by_property(consts::MODIFIED)
-            .next()
-            .map(|modified_date| DateTime::new(&modified_date.value))
+        // Attempt to retrieve `dcterms:modified` first
+        if let Some(modified_date) = self.data_by_property(consts::MODIFIED).next() {
+            return Some(DateTime::new(&modified_date.value));
+        }
+
+        // Fallback to `dc:date` with `opf:event=modification`
+        self.data_by_property(consts::DATE)
+            .find(|date| {
+                date.attributes()
+                    .by_name(consts::OPF_EVENT)
+                    .is_some_and(|opf_event| opf_event.value() == consts::MODIFICATION)
+            })
+            .map(|date| DateTime::new(&date.value))
     }
 
     /// The primary unique [`identifier`](EpubIdentifier) of an [`Epub`](super::Epub).
     ///
     /// Returns [`None`] if there is no primary unique identifier when
-    /// [`EpubSettings::strict`](super::EpubSettings::strict) is disabled.
+    /// [`EpubOpenOptions::strict`](super::EpubOpenOptions::strict) is disabled.
     ///
     /// As EPUBs may include multiple identifiers (`<dc:identifier>` elements),
     /// this method is for retrieval of the primary identifier as declared in
@@ -363,7 +385,7 @@ impl<'ebook> Metadata<'ebook> for EpubMetadata<'ebook> {
     /// The main [`language`](EpubLanguage) of an [`Epub`](super::Epub).
     ///
     /// Returns [`None`] if there is no language specified when
-    /// [`EpubSettings::strict`](super::EpubSettings::strict) is disabled.
+    /// [`EpubOpenOptions::strict`](super::EpubOpenOptions::strict) is disabled.
     fn language(&self) -> Option<EpubLanguage<'ebook>> {
         self.languages().next()
     }
@@ -376,7 +398,7 @@ impl<'ebook> Metadata<'ebook> for EpubMetadata<'ebook> {
     /// The main [`title`](EpubTitle) of an [`Epub`](super::Epub).
     ///
     /// Returns [`None`] if there is no title specified when
-    /// [`EpubSettings::strict`](super::EpubSettings::strict) is disabled.
+    /// [`EpubOpenOptions::strict`](super::EpubOpenOptions::strict) is disabled.
     fn title(&self) -> Option<EpubTitle<'ebook>> {
         self.titles().find(|title| title.is_main_title)
     }
@@ -454,8 +476,8 @@ impl<'ebook> Metadata<'ebook> for EpubMetadata<'ebook> {
     /// ```
     ///
     /// # See Also
-    /// - [`Self::by_property`] for iterating over **non-refining** metadata entries by property.
-    /// - [`Self::links`] for iterating over **non-refining** link entries.
+    /// - [`Self::by_property`] to iterate over **non-refining** metadata entries by property.
+    /// - [`Self::links`] to iterate over **non-refining** link entries.
     ///
     /// # Examples
     /// - Iterating over metadata entries:
@@ -513,7 +535,7 @@ impl<'ebook> EpubRefinements<'ebook> {
         self.0.is_empty()
     }
 
-    /// Returns the associated [`EpubMetaEntry`] if the provided `index` is less than
+    /// Returns the associated [`EpubMetaEntry`] if the given `index` is less than
     /// [`Self::len`], otherwise [`None`].
     pub fn get(&self, index: usize) -> Option<EpubMetaEntry<'ebook>> {
         self.0.get(index).map(EpubMetaEntry::new)
@@ -824,7 +846,7 @@ impl<'ebook> EpubMetaEntry<'ebook> {
     /// (e.g., `href`, `hreflang`, `rel`).
     ///
     /// # See Also
-    /// - [`EpubMetadata::links`] for iterating over non-refining link entries.
+    /// - [`EpubMetadata::links`] to iterate over non-refining link entries.
     ///
     /// # Examples
     /// - Converting to [`EpubLink`]:
@@ -880,7 +902,7 @@ impl<'ebook> EpubMetaEntry<'ebook> {
 /// ```
 ///
 /// # See Also
-/// - [`EpubMetaEntry::as_link`] for converting from [`EpubMetaEntry`].
+/// - [`EpubMetaEntry::as_link`] to convert from [`EpubMetaEntry`].
 /// - <https://www.w3.org/TR/epub/#sec-link-elem> for official EPUB `<link>` documentation
 pub struct EpubLink<'ebook> {
     data: &'ebook EpubMetaEntryData,
@@ -1193,12 +1215,12 @@ pub enum EpubVersion {
     /// `rbook` handles such scenarios behind-the-scenes.
     ///
     /// # See Also
-    /// - [`EpubSettings`](super::EpubSettings) for preferences between versions 2 and 3.
+    /// - [`EpubOpenOptions`](super::EpubOpenOptions) for preferences between versions 2 and 3.
     Epub3(Version),
     /// An unknown [`Epub`](super::Epub) version
     ///
     /// An [`Epub`](super::Epub) may contain this version when
-    /// [`EpubSettings::strict`](super::EpubSettings::strict) is set to `false`.
+    /// [`EpubOpenOptions::strict`](super::EpubOpenOptions::strict) is set to `false`.
     Unknown(Version),
 }
 
@@ -1234,7 +1256,7 @@ impl EpubVersion {
     /// The encapsulated version information.
     ///
     /// # Note
-    /// If [`EpubSettings::strict`](super::EpubSettings::strict) is set to `false`,
+    /// If [`EpubOpenOptions::strict`](super::EpubOpenOptions::strict) is set to `false`,
     /// the returned [`Version`] may not be within the valid range: `2 <= version < 4`.
     pub fn version(&self) -> Version {
         match self {
