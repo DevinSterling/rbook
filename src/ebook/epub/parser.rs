@@ -94,7 +94,7 @@ impl<'a> EpubParser<'a> {
         parent.ok_or_else(|| missing.into())
     }
 
-    fn assert_optional<T: Default>(
+    fn assert_option<T: Default>(
         &self,
         option: Option<T>,
         error_message: &'static str,

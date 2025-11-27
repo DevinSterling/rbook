@@ -32,6 +32,10 @@ pub enum EpubFormatError {
     #[error("Required attribute is missing: {0} <-- Missing")]
     MissingAttribute(String),
 
+    /// The value of a specified element is missing.
+    #[error("Required element value is missing: <{0}> <-- Missing value")]
+    MissingValue(String),
+
     ////////////////////////////////////////////////////////////////////////////////
     // Within `META-INF/container.xml`
     ////////////////////////////////////////////////////////////////////////////////
@@ -62,7 +66,7 @@ pub enum EpubFormatError {
     /// A cycle has been detected through a refinement `<meta>` chain.
     ///
     /// # Example
-    /// ```xhtml
+    /// ```xml
     /// <meta id="r1" refines="#r2" property="my-property-1">data1</meta>
     /// <meta id="r2" refines="#r1" property="my-property-2">data2</meta>
     /// ```

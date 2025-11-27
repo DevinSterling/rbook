@@ -6,7 +6,7 @@ pub(crate) fn parent(href: &str) -> &str {
         .map_or("", |index| if index == 0 { "/" } else { &href[..index] })
 }
 
-pub(crate) fn decode(encoded: &str) -> Cow<str> {
+pub(crate) fn decode(encoded: &str) -> Cow<'_, str> {
     percent_encoding::percent_decode_str(encoded).decode_utf8_lossy()
 }
 

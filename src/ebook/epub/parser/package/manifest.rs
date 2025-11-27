@@ -20,17 +20,17 @@ impl EpubParser<'_> {
             let mut attributes = el.bytes_attributes();
 
             // Required fields
-            let id = self.assert_optional(
+            let id = self.assert_option(
                 attributes.take_attribute_value(consts::ID)?,
                 "manifest > item[*id]",
             )?;
-            let (href, href_raw) = self.assert_optional(
+            let (href, href_raw) = self.assert_option(
                 attributes
                     .take_attribute_value(consts::HREF)?
                     .map(|href_raw| (ctx.resolver.resolve(&href_raw), href_raw)),
                 "manifest > item[*href]",
             )?;
-            let mut media_type = self.assert_optional(
+            let mut media_type = self.assert_option(
                 attributes.take_attribute_value(consts::MEDIA_TYPE)?,
                 "manifest > item[*media_type]",
             )?;

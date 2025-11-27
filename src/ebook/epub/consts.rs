@@ -1,6 +1,7 @@
 // General
 pub(crate) const ID: &str = "id";
 pub(crate) const HREF: &str = "href";
+pub(crate) const HREFLANG: &str = "hreflang";
 pub(crate) const SRC: &str = "src";
 pub(crate) const LANG: &str = "xml:lang";
 pub(crate) const DIR: &str = "dir";
@@ -27,6 +28,7 @@ pub(crate) const PUBLISHER: &str = "dc:publisher";
 pub(crate) const SUBJECT: &str = "dc:subject";
 pub(crate) const DC_NAMESPACE: &str = "dc";
 pub(crate) const META: &str = "meta";
+pub(crate) const LINK: &str = "link";
 
 // Meta attribute keys
 pub(crate) const TITLE_TYPE: &str = "title-type";
@@ -64,6 +66,7 @@ pub(crate) const PROPERTY: &str = "property";
 pub(crate) const NAME: &str = "name";
 pub(crate) const CONTENT: &str = "content";
 pub(crate) const REFINES: &str = "refines";
+pub(crate) const REL: &str = "rel"; // link only
 
 // Manifest attributes
 pub(crate) const FALLBACK: &str = "fallback";

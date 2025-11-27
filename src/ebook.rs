@@ -52,22 +52,22 @@ use crate::reader::Reader;
 /// tied to the lifetime of the owned [`Ebook`] instance (`'ebook`).
 pub trait Ebook {
     /// Returns a new [`Reader`] to sequentially read over the [`Spine`] contents of an ebook.
-    fn reader(&self) -> impl Reader;
+    fn reader(&self) -> impl Reader<'_>;
 
     /// Attributes associated with an ebook, such as title and author information.
-    fn metadata(&self) -> impl Metadata;
+    fn metadata(&self) -> impl Metadata<'_>;
 
     /// The [`Manifest`], encompassing the [`resources`](Resource) contained within an ebook.
-    fn manifest(&self) -> impl Manifest;
+    fn manifest(&self) -> impl Manifest<'_>;
 
     /// The [`Spine`], encompassing the canonical reading-order sequence.
     ///
     /// # See Also
     /// - [`Self::reader`] to sequentially read spine content with greater control.
-    fn spine(&self) -> impl Spine;
+    fn spine(&self) -> impl Spine<'_>;
 
     /// The table of contents ([`Toc`]), encompassing navigation points.
-    fn toc(&self) -> impl Toc;
+    fn toc(&self) -> impl Toc<'_>;
 
     /// Returns the specified [`Resource`] in the form of a string.
     ///

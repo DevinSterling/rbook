@@ -97,28 +97,29 @@ impl EpubParser<'_> {
         };
 
         while let Some(event) = ctx.reader.next() {
-            if let Event::Start(el) = event? {
-                match el.local_name().as_ref() {
-                    bytes::PACKAGE => {
-                        package.replace(self.parse_package(&el)?);
-                    }
-                    bytes::METADATA => {
-                        metadata.replace(self.parse_metadata(
-                            &mut ctx,
-                            Self::assert_required(EpubFormatError::NoPackageFound, package.take())?,
-                        )?);
-                    }
-                    bytes::MANIFEST => {
-                        manifest.replace(self.parse_manifest(&mut ctx)?);
-                    }
-                    bytes::SPINE => {
-                        spine.replace(self.parse_spine(&mut ctx, &el)?);
-                    }
-                    bytes::GUIDE => {
-                        guide.replace(self.parse_guide(&mut ctx, &el)?);
-                    }
-                    _ => {}
+            let Event::Start(el) = event? else {
+                continue;
+            };
+            match el.local_name().as_ref() {
+                bytes::PACKAGE => {
+                    package.replace(self.parse_package(&el)?);
                 }
+                bytes::METADATA => {
+                    metadata.replace(self.parse_metadata(
+                        &mut ctx,
+                        Self::assert_required(EpubFormatError::NoPackageFound, package.take())?,
+                    )?);
+                }
+                bytes::MANIFEST => {
+                    manifest.replace(self.parse_manifest(&mut ctx)?);
+                }
+                bytes::SPINE => {
+                    spine.replace(self.parse_spine(&mut ctx, &el)?);
+                }
+                bytes::GUIDE => {
+                    guide.replace(self.parse_guide(&mut ctx, &el)?);
+                }
+                _ => {}
             }
         }
 
@@ -129,11 +130,11 @@ impl EpubParser<'_> {
         let mut attributes = package.bytes_attributes();
 
         // Required attributes
-        let version = self.assert_optional(
+        let version = self.assert_option(
             attributes.take_attribute_value(consts::VERSION)?,
             "package[*version]",
         )?;
-        let unique_id = self.assert_optional(
+        let unique_id = self.assert_option(
             attributes.take_attribute_value(consts::UNIQUE_ID)?,
             "package[*unique-identifier]",
         )?;
@@ -194,15 +195,11 @@ impl EpubParser<'_> {
         child: &[u8],
     ) -> ParserResult<Option<BytesStart<'b>>> {
         while let Some(event) = reader.next() {
-            match event? {
-                Event::Start(el) | Event::Empty(el) if el.local_name().as_ref() == child => {
-                    return Ok(Some(el));
-                }
-                Event::End(el) if el.local_name().as_ref() == parent => {
-                    break;
-                }
-                _ => {}
-            }
+            return Ok(Some(match event? {
+                Event::Start(el) | Event::Empty(el) if el.local_name().as_ref() == child => el,
+                Event::End(el) if el.local_name().as_ref() == parent => break,
+                _ => continue,
+            }));
         }
         Ok(None)
     }

@@ -384,7 +384,7 @@ pub trait ReaderContent<'ebook>: PartialEq + Into<String> + Into<Vec<u8>> {
     /// ```
     fn position(&self) -> usize;
 
-    /// The readable content (i.e., `XHTML`, `HTML`, etc.).
+    /// The readable content (e.g., `XHTML`, `HTML`, etc.).
     fn content(&self) -> &str;
 
     /// The associated [`SpineEntry`] containing reading order details.

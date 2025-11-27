@@ -191,7 +191,7 @@ impl Epub {
 
     /// Returns a new [`EpubReader`] to sequentially read over the [`EpubSpine`]
     /// contents of an ebook with the specified [`EpubReaderSettings`].
-    pub fn reader_with(&self, settings: impl Into<EpubReaderSettings>) -> EpubReader {
+    pub fn reader_with(&self, settings: impl Into<EpubReaderSettings>) -> EpubReader<'_> {
         EpubReader::new(self, settings.into())
     }
 
@@ -217,7 +217,7 @@ impl Epub {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn package_file(&self) -> Href {
+    pub fn package_file(&self) -> Href<'_> {
         self.package_file.as_str().into()
     }
 
@@ -248,7 +248,7 @@ impl Epub {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn package_directory(&self) -> Href {
+    pub fn package_directory(&self) -> Href<'_> {
         uri::parent(&self.package_file).into()
     }
 
@@ -291,23 +291,23 @@ impl Ebook for Epub {
     ///
     /// # See Also
     /// - [`Self::reader_with`] to alter the behavior of an [`EpubReader`].
-    fn reader(&self) -> EpubReader {
+    fn reader(&self) -> EpubReader<'_> {
         EpubReader::new(self, EpubReaderSettings::default())
     }
 
-    fn metadata(&self) -> EpubMetadata {
+    fn metadata(&self) -> EpubMetadata<'_> {
         EpubMetadata::new(&self.metadata)
     }
 
-    fn manifest(&self) -> EpubManifest {
+    fn manifest(&self) -> EpubManifest<'_> {
         EpubManifest::new(&self.manifest, EpubResourceProvider(self.archive.as_ref()))
     }
 
-    fn spine(&self) -> EpubSpine {
+    fn spine(&self) -> EpubSpine<'_> {
         EpubSpine::new(self.manifest().into(), &self.spine)
     }
 
-    fn toc(&self) -> EpubToc {
+    fn toc(&self) -> EpubToc<'_> {
         EpubToc::new(self.manifest().into(), &self.toc)
     }
 
@@ -341,7 +341,7 @@ impl Ebook for Epub {
     ///
     /// assert_eq!("/EPUB", epub.package_directory().as_str());
     ///
-    /// // Absolute container path (leading slash stripped):
+    /// // Absolute chapter path:
     /// let c1 = epub.read_resource_bytes("/EPUB/c1.xhtml")?;
     /// // Resolves to existing `/EPUB/c1.xhtml`:
     /// assert_eq!(c1, epub.read_resource_bytes("c1.xhtml")?);
@@ -350,7 +350,7 @@ impl Ebook for Epub {
     /// // Resolves to non-existing `/EPUB/EPUB/c1.xhtml`:
     /// assert!(epub.read_resource_bytes("EPUB/c1.xhtml").is_err());
     ///
-    /// // Navigation doc at the root:
+    /// // Absolute container path:
     /// let toc = epub.read_resource_bytes("/META-INF/container.xml")?;
     /// // Resolves to existing `/META-INF/container.xml`:
     /// assert_eq!(toc, epub.read_resource_bytes("../META-INF/container.xml")?);
@@ -410,6 +410,7 @@ pub struct EpubSettings {
     ///
     /// Default: [`EpubVersion::Epub3`]
     pub preferred_toc: EpubVersion,
+
     /// Prefer a landmark format over another as the default
     /// from [`EpubToc::landmarks`].
     ///
@@ -425,6 +426,7 @@ pub struct EpubSettings {
     ///
     /// Default: [`EpubVersion::Epub3`]
     pub preferred_landmarks: EpubVersion,
+
     /// Prefer a page list format over another as the default
     /// from [`EpubToc::page_list`].
     ///
@@ -440,6 +442,7 @@ pub struct EpubSettings {
     ///
     /// Default: [`EpubVersion::Epub3`]
     pub preferred_page_list: EpubVersion,
+
     /// Store **both** EPUB 2 and 3-specific information.
     ///
     /// Currently, this only pertains to the table of contents.
@@ -450,13 +453,14 @@ pub struct EpubSettings {
     ///
     /// Default: `false`
     pub store_all: bool,
+
     /// When set to `true`, ensures an EPUB conforms to the following:
     /// - Has an **identifier**.
     /// - Has a **title**.
     /// - Has a primary **language**.
     /// - Has a **version** where `2.0 <= version < 4.0`.
     /// - Has a **table of contents**.
-    /// - Elements (i.e., `item`, `itemref`) have their required attributes present.
+    /// - Elements (e.g., `item`, `itemref`) have their required attributes present.
     ///
     /// If any of the conditions are not met,
     /// an error will be returned.

@@ -25,22 +25,25 @@ impl EpubParser<'_> {
             let mut attributes = el.bytes_attributes();
 
             // Required fields
-            let (href, href_raw) = self.assert_optional(
+            let (href, href_raw) = self.assert_option(
                 attributes
                     .take_attribute_value(consts::HREF)?
                     .map(|href_raw| (ctx.resolver.resolve(&href_raw), href_raw)),
                 "guide > reference[*href]",
             )?;
-            let label = self.assert_optional(
+            let label = self.assert_option(
                 attributes.take_attribute_value(consts::GUIDE_TITLE)?,
                 "guide > reference[*title]",
             )?;
             let kind = self
-                .assert_optional(
+                .assert_option(
                     attributes.take_attribute_value(consts::GUIDE_TYPE)?,
                     "guide > reference[*type]",
                 )?
                 .into();
+
+            // Optional fields
+            let id = attributes.take_attribute_value(consts::ID)?;
 
             root.children.push(EpubTocEntryData {
                 order: root.children.len() + 1,
@@ -48,6 +51,7 @@ impl EpubParser<'_> {
                 href_raw: Some(href_raw),
                 attributes: attributes.try_into()?,
                 depth: 1, // The parent `root` has a depth of `0`
+                id,
                 label,
                 kind,
                 ..Default::default()

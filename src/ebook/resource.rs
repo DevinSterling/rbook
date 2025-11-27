@@ -317,7 +317,7 @@ impl ResourceKind<'_> {
 
     /// An unspecified or unknown resource.
     ///
-    /// This constant has nothing (i.e., no maintype, subtype, etc.), primarily for
+    /// This constant has nothing (e.g., no maintype, subtype, etc.), primarily for
     /// use as a wildcard to catch all resources for methods that accept a [`ResourceKind`].
     pub const UNSPECIFIED: ResourceKind<'static> = Self::borrowed(Self::_UNSPECIFIED);
 
@@ -357,7 +357,7 @@ impl ResourceKind<'_> {
     /// wildcard matching any `video/*` for methods that accept a [`ResourceKind`].
     pub const VIDEO: ResourceKind<'static> = Self::borrowed(Self::_VIDEO);
 
-    const fn borrowed(static_str: &str) -> ResourceKind {
+    const fn borrowed(static_str: &str) -> ResourceKind<'_> {
         ResourceKind(Cow::Borrowed(static_str))
     }
 

@@ -10,6 +10,7 @@ use std::fmt::{Display, Formatter};
 /// # See Also
 /// - [`Reader`](crate::reader::Reader)
 ///   to sequentially read spine content with greater control.
+/// - [`EpubSpine`](crate::epub::spine::EpubSpine) for epub-specific spine information.
 ///
 /// # Examples
 /// - Traversing the contents in canonical order:
@@ -109,6 +110,9 @@ pub trait Spine<'ebook> {
 }
 
 /// An entry contained within a [`Spine`], encompassing associated metadata.
+///
+/// # See Also
+/// - [`EpubSpineEntry`](crate::epub::spine::EpubSpineEntry) for epub-specific entry information.
 pub trait SpineEntry<'ebook>: Ord {
     /// The canonical order of an entry (`0 = first entry`).
     fn order(&self) -> usize;

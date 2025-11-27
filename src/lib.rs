@@ -41,16 +41,16 @@
 //! These are toggleable features for `rbook` that are
 //! enabled by default in a project's `cargo.toml` file:
 //!
-//! | Feature        | Description                                                 |
-//! |----------------|-------------------------------------------------------------|
-//! | **prelude**    | Convenience [`prelude`] ***only*** including common traits. |
-//! | **threadsafe** | Enables constraint and support for [`Send`] + [`Sync`].     |
+//! | Feature                | Description                                                 |
+//! |------------------------|-------------------------------------------------------------|
+//! | [**prelude**](prelude) | Convenience prelude ***only*** including common traits.     |
+//! | **threadsafe**         | Enables constraint and support for [`Send`] + [`Sync`].     |
 //!
 //! Default features can be disabled and toggled selectively.
 //! For example, omitting the `prelude` while retaining the `threadsafe` feature:
 //! ```toml
 //! [dependencies]
-//! rbook = { version = "0.6.6", default-features = false, features = ["threadsafe"] }
+//! rbook = { version = "0.6.7", default-features = false, features = ["threadsafe"] }
 //! ```
 //!
 //! # Opening an [`Ebook`]
@@ -196,7 +196,7 @@
 //! For example, omitting the `prelude` while retaining the `threadsafe` feature:
 //! ```toml
 //! [dependencies]
-//! rbook = { version = "0.6.6", default-features = false, features = ["threadsafe"] }
+//! rbook = { version = "0.6.7", default-features = false, features = ["threadsafe"] }
 //! ```
 //!
 //! # Examples
@@ -240,16 +240,14 @@
 //! ```
 //! ## Extracting images from the [`Manifest`](ebook::manifest::Manifest)
 //! ```no_run
-//! use std::fs::{self, File};
-//! use std::path::Path;
-//! use std::io::Write;
+//! use std::{fs, path::Path};
 //! # use rbook::{Ebook, Epub};
 //! # use rbook::ebook::manifest::{Manifest, ManifestEntry};
-//! # let epub = Epub::open("example.epub").unwrap();
+//! # let epub = Epub::open("tests/ebooks/example_epub").unwrap();
 //!
 //! // Create an output directory for the extracted images
-//! let dir = Path::new("extracted_images");
-//! fs::create_dir(&dir).unwrap();
+//! let out = Path::new("extracted_images");
+//! fs::create_dir_all(&out).unwrap();
 //!
 //! for image in epub.manifest().images() {
 //!     // Retrieve the raw image bytes
@@ -257,8 +255,7 @@
 //!
 //!     // Extract the filename from the href and write to disk
 //!     let filename = image.href().name().decode(); // Decode as EPUB hrefs may be URL-encoded
-//!     let mut file = File::create(dir.join(&*filename)).unwrap();
-//!     file.write_all(&bytes).unwrap();
+//!     fs::write(out.join(&*filename), bytes).unwrap();
 //! }
 //! ```
 //! ## Accessing [`EpubManifest`](epub::manifest::EpubManifest) fallbacks

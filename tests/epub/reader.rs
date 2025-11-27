@@ -42,7 +42,7 @@ fn test_reader_cursor() -> ReaderResult<()> {
     let epub = open_example_epub_file();
     let mut reader = epub.reader();
 
-    fn idref(content: EpubReaderContent) -> &str {
+    fn idref(content: EpubReaderContent<'_>) -> &str {
         content.spine_entry().idref()
     }
 

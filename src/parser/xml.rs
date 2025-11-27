@@ -42,20 +42,20 @@ pub(crate) trait XmlReader<'a> {
     /// the event that caused the stop is consumed from the reader,
     /// which may need to also be read by the caller.
     ///
-    /// As such, upon return, `last_event` is set to the event that caused the stop.
+    /// As such, returns the [`Event`] that caused the stop and text.
     fn get_text(
         &mut self,
-        last_event: &mut Option<Event<'a>>,
         mut is_stop: impl FnMut(&Event) -> bool,
-    ) -> ParserResult<String> {
+    ) -> ParserResult<(Option<Event<'a>>, String)> {
         let mut value = String::new();
+        let mut consumed_event = None;
 
         while let Some(result) = self.next() {
             let event = result?;
 
             if is_stop(&event) {
                 value.trim_in_place();
-                last_event.replace(event);
+                consumed_event.replace(event);
                 break;
             }
             match event {
@@ -65,25 +65,22 @@ pub(crate) trait XmlReader<'a> {
                 _ => {}
             }
         }
-        Ok(value)
+        Ok((consumed_event, value))
     }
 
     /// Retrieve consolidated text for a specified element up to its end tag.
     fn get_text_simple(&mut self, start: &BytesStart) -> ParserResult<String> {
-        self.get_text(
-            &mut None,
-            |event| matches!(event, Event::End(el) if el.name() == start.name()),
-        )
+        self.get_text(|event| matches!(event, Event::End(el) if el.name() == start.name()))
+            .map(|x| x.1)
     }
 
     /// See [`Self::get_text`]
     fn get_text_till_either(
         &mut self,
-        last_event: &mut Option<Event<'a>>,
         start: &BytesStart,
         till: &BytesStart,
-    ) -> ParserResult<String> {
-        self.get_text(last_event, |event| {
+    ) -> ParserResult<(Option<Event<'a>>, String)> {
+        self.get_text(|event| {
             let predicate = |el| el == start.name() || el == till.name();
 
             match event {
@@ -109,9 +106,11 @@ pub(crate) trait XmlElement<'a> {
 
     fn is_prefix(&self, prefix: impl AsRef<[u8]>) -> bool;
 
-    fn get_attribute(&self, key: impl AsRef<[u8]>) -> Option<Cow<[u8]>>;
+    fn get_attribute(&self, key: impl AsRef<[u8]>) -> Option<Cow<'_, [u8]>>;
 
-    fn bytes_attributes(&self) -> BytesAttributes;
+    fn has_attribute(&self, key: impl AsRef<[u8]>) -> bool;
+
+    fn bytes_attributes(&self) -> BytesAttributes<'_>;
 }
 
 impl<'a> XmlElement<'a> for BytesStart<'a> {
@@ -125,14 +124,18 @@ impl<'a> XmlElement<'a> for BytesStart<'a> {
             .is_some_and(|p| p.as_ref() == target_prefix.as_ref())
     }
 
-    fn get_attribute(&self, key: impl AsRef<[u8]>) -> Option<Cow<[u8]>> {
+    fn get_attribute(&self, key: impl AsRef<[u8]>) -> Option<Cow<'_, [u8]>> {
         match self.try_get_attribute(key) {
             Ok(option) => option.map(|attribute| attribute.value),
             Err(_) => None,
         }
     }
 
-    fn bytes_attributes(&self) -> BytesAttributes {
+    fn has_attribute(&self, key: impl AsRef<[u8]>) -> bool {
+        self.try_get_attribute(key).ok().flatten().is_some()
+    }
+
+    fn bytes_attributes(&self) -> BytesAttributes<'_> {
         BytesAttributes(self.attributes().filter_map(Result::ok).collect())
     }
 }
@@ -175,17 +178,6 @@ impl BytesAttributes<'_> {
         name: impl AsRef<[u8]>,
     ) -> Result<Option<String>, FromUtf8Error> {
         self.take_attribute(name.as_ref()).transpose()
-    }
-
-    /// Removes and returns the first attribute value matching any of `names`.
-    pub(crate) fn take_attribute_value_any(
-        &mut self,
-        names: impl IntoIterator<Item = impl AsRef<[u8]>>,
-    ) -> Result<Option<String>, FromUtf8Error> {
-        names
-            .into_iter()
-            .find_map(|name| self.take_attribute(name.as_ref()))
-            .transpose()
     }
 }
 

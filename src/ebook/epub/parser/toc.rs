@@ -130,8 +130,10 @@ impl EpubParser<'_> {
         // Get text in <li> elements that have no direct <a> tag
         // but may contain relevant text before any child <li>.
         if self.version_hint.is_epub3() {
-            child.label =
-                reader.get_text_till_either(&mut continue_from_event, el, &BytesStart::new("a"))?;
+            let (consumed_event, label) = reader.get_text_till_either(el, &BytesStart::new("a"))?;
+
+            continue_from_event = consumed_event;
+            child.label = label;
         }
         // Check for order explicitly set by NCX <navPoint> elements
         else if self.version_hint.is_epub2() && el.local_name().as_ref() == bytes::NAV_POINT {
@@ -219,7 +221,7 @@ impl EpubParser<'_> {
         attributes: &mut BytesAttributes,
     ) -> ParserResult<TocEntryKind<'static>> {
         Ok(if self.version_hint.is_epub3() {
-            let mut epub_type = self.assert_optional(
+            let mut epub_type = self.assert_option(
                 attributes.take_attribute_value(consts::EPUB_TYPE)?,
                 "nav[*epub:type]",
             )?;

@@ -1,5 +1,24 @@
 # Changelog
 
+## 0.6.7 (2025-11-27)
+### Additions　**＋**
+- Add support for EPUB 3 metadata `<link/>` elements.
+- New *non-exhaustive* enum `EpubMetaEntryKind` to determine type of metadata entries (e.g., `<dc:*>` (Dublin Core), `<meta>`, `<link>`).
+- New struct `EpubLink` to access `<link>`-associated fields conveniently (e.g., `href`, `rel`, `properties`).
+- New method `EpubMetadata#links` to retrieve all non-refining links.
+- New method `EpubMetaEntry#kind` to determine the `EpubMetaEntryKind` of a metadata entry.
+- New method `EpubMetaEntry#as_link` to retrieve an `EpubLink` view.
+- New enum variant `EpubFormatError::MissingValue` to indicate if the required inner text of an element is absent.
+- `Href` now implements `Display`.
+
+### Changes　**⟳**
+- Update `zip` dependency: 4.3.0 → 6.0.0
+- Refine documentation for enhanced clarity.
+
+### Fixes　**✓**
+- Fix bug where authors explicitly set refining metadata elements with duplicate `display-seq` 
+  (Display Sequence) values.
+
 ## 0.6.6 (2025-07-13)
 ### Additions　**＋**
 - New `name` method for `Href` to retrieve the encapsulated filename.
@@ -91,7 +110,7 @@ The summary below highlights the key changes.
 ### Additions　**＋**
 - New, more expressive models (`Spine`, `Metadata`, `Manifest`, `Toc`, `Attributes`, `Properties`, etc.), 
   self-documenting types, and improved documentation.
-- Refactor core traits (i.e., `Ebook`) with a greater detailed contract and shared interface for current and future formats.
+- Refactor core traits (e.g., `Ebook`) with a greater detailed contract and shared interface for current and future formats.
 - Greatly enhance Resource API for retrieval and analysis of an ebook's contents, 
   such as analyzing MIME type of resources in detail.
 - Configurable `Epub` and `EpubReader` instances via `EpubSettings` and `EpubReaderSettings`, 
@@ -99,7 +118,7 @@ The summary below highlights the key changes.
 - Improved, faster, and more scalable version-agnostic parsing of EPUBs.
 - Add `prelude` feature for convenient trait imports.
 - Rename `multi-thread` feature to `threadsafe` which is now enabled by default.
-  The new name further clarifies that an instance (i.e., `Epub`) may safely be shared between threads.
+  The new name further clarifies that an instance (e.g., `Epub`) may safely be shared between threads.
 - Replace `Vec<_>` return types with iterators for greater control and efficiency.
 - Hrefs are now automatically resolved to simplify resource access.
 - More detailed errors in returned results pinpointing where problems originate from.

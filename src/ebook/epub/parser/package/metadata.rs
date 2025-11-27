@@ -6,9 +6,10 @@ use crate::ebook::epub::metadata::{
 };
 use crate::ebook::epub::parser::EpubParser;
 use crate::ebook::epub::parser::package::PackageData;
+use crate::epub::metadata::{EpubMetaEntryKind, EpubVersion};
 use crate::epub::parser::package::PackageContext;
 use crate::parser::ParserResult;
-use crate::parser::xml::{ByteReader, XmlElement, XmlReader};
+use crate::parser::xml::{ByteReader, BytesAttributes, XmlElement, XmlReader};
 use crate::util::sync::Shared;
 use quick_xml::events::{BytesStart, Event};
 use std::cell::Cell;
@@ -21,9 +22,9 @@ struct IdMetaWithDepth {
 }
 
 impl IdMetaWithDepth {
+    const UNSET: u8 = u8::MAX;
     /// Flag to detect cycles in malformed epubs.
     const IN_PROGRESS: u8 = u8::MAX - 1;
-    const UNSET: u8 = u8::MAX;
 
     fn new(meta: EpubMetaEntryData) -> Self {
         Self {
@@ -89,58 +90,30 @@ impl EpubParser<'_> {
         // EpubMeta not carrying an `id` and `refines` attribute.
         // **Identified as root meta elements with a depth of 0.**
         let mut no_id_generic = Vec::new();
-
         let mut natural_order = 0;
+        let reader = &mut ctx.reader;
 
-        while let Some((el, has_inner_content)) = Self::meta_handler(&mut ctx.reader)? {
+        while let Some((kind, el, is_start)) = Self::meta_handler(reader)? {
             let mut attributes = el.bytes_attributes();
-
-            // Retrieve the required property name of the meta
-            let property = if el.is_local_name(consts::META) {
-                self.assert_optional(
-                    attributes.take_attribute_value_any([consts::PROPERTY, consts::NAME])?,
-                    "metadata > meta[*property (EPUB 3) or *name (EPUB 2)]",
-                )?
-            } else {
-                String::from_utf8(el.name().as_ref().to_vec())?
+            // Could opt for a strategy pattern in the future
+            let mut meta = match kind {
+                EpubMetaEntryKind::DublinCore {} => {
+                    Self::handle_dublin_core(reader, &package, &el, &mut attributes, is_start)?
+                }
+                EpubMetaEntryKind::Meta { version } => {
+                    self.handle_meta(reader, &package, version, &el, &mut attributes, is_start)?
+                }
+                // `<link>` elements do not require specialized handling here
+                EpubMetaEntryKind::Link {} => EpubMetaEntryData::default(),
             };
-
-            // Retrieve the text content if there is a corresponding end tag.
-            // An empty element is most likely from the EPUB2 standard.
-            let value = if has_inner_content {
-                ctx.reader.get_text_simple(&el)?
-            } else {
-                self.assert_optional(
-                    attributes.take_attribute_value(consts::CONTENT)?,
-                    "metadata > meta[*content]",
-                )?
-            };
-
-            // Optional attributes
             let id = attributes.take_attribute_value(consts::ID)?;
-            let refines = attributes
+
+            meta.refines = attributes
                 .take_attribute_value(consts::REFINES)?
                 .map(Self::normalize_refines);
-
-            // These attributes are inherited from the package if not specified here
-            let language = attributes
-                .take_attribute_value(consts::LANG)?
-                .map(Shared::new)
-                .or_else(|| package.xml_lang.clone());
-            let text_direction = attributes
-                .take_attribute_value(consts::DIR)?
-                .map_or(package.dir, TextDirection::from);
-
-            let meta = EpubMetaEntryData {
-                order: natural_order,
-                attributes: attributes.try_into()?,
-                refines,
-                property,
-                value,
-                language,
-                text_direction,
-                ..Default::default()
-            };
+            meta.attributes = attributes.try_into()?;
+            meta.order = natural_order;
+            meta.kind = kind;
 
             natural_order += 1;
 
@@ -173,26 +146,136 @@ impl EpubParser<'_> {
         ))
     }
 
+    // Handle `<dc:*>` elements
+    fn handle_dublin_core(
+        reader: &mut ByteReader,
+        package: &PackageData,
+        el: &BytesStart,
+        attributes: &mut BytesAttributes,
+        is_start: bool,
+    ) -> ParserResult<EpubMetaEntryData> {
+        let property = String::from_utf8(el.name().as_ref().to_vec())?;
+        // Dublin core elements must not be self-closing; <dc:title/> is invalid.
+        let value = if is_start {
+            reader.get_text_simple(el)?
+        } else {
+            return Err(EpubFormatError::MissingValue(property).into());
+        };
+
+        Self::handle_general_meta(package, attributes, property, value)
+    }
+
+    // Handle `<meta>` elements
+    fn handle_meta(
+        &self,
+        reader: &mut ByteReader,
+        package: &PackageData,
+        structural_version: EpubVersion,
+        el: &BytesStart,
+        attributes: &mut BytesAttributes,
+        is_start: bool,
+    ) -> ParserResult<EpubMetaEntryData> {
+        let is_epub2 = structural_version.is_epub2();
+
+        // Retrieve the `<meta>` property
+        let (key, err_msg) = if is_epub2 {
+            (consts::NAME, "metadata > meta[*name]")
+        } else {
+            (consts::PROPERTY, "metadata > meta[*property]")
+        };
+        let property = self.assert_option(attributes.take_attribute_value(key)?, err_msg)?;
+
+        // Retrieve the `<meta>` value
+        let value =
+        //////////////////////////////////
+        // Epub 2 meta value extraction //
+        //////////////////////////////////
+        if is_epub2 {
+            self.assert_option(
+                attributes.take_attribute_value(consts::CONTENT)?,
+                "metadata > meta[*content]",
+            )?
+        }
+        //////////////////////////////////
+        // Epub 3 meta value extraction //
+        //////////////////////////////////
+        else if is_start {
+            reader.get_text_simple(el)?
+        }
+        // Rare but can happen, attempt to recover if the epub is non-standard:
+        // `<meta property="a" content="b" />`
+        else if let Some(content) = attributes.take_attribute_value(consts::CONTENT)?
+            && !self.settings.strict
+        {
+            content
+        } else {
+            return Err(EpubFormatError::MissingValue(property))?
+        };
+
+        Self::handle_general_meta(package, attributes, property, value)
+    }
+
+    // Handle `<dc:*>` and `<meta>` elements
+    fn handle_general_meta(
+        package: &PackageData,
+        attributes: &mut BytesAttributes,
+        property: String,
+        value: String,
+    ) -> ParserResult<EpubMetaEntryData> {
+        // These attributes are inherited from the package if not specified here
+        let language = attributes
+            .take_attribute_value(consts::LANG)?
+            .map(Shared::new)
+            .or_else(|| package.xml_lang.clone());
+        let text_direction = attributes
+            .take_attribute_value(consts::DIR)?
+            .map_or(package.dir, TextDirection::from);
+
+        Ok(EpubMetaEntryData {
+            property,
+            value,
+            language,
+            text_direction,
+            ..Default::default()
+        })
+    }
+
+    fn extract_kind(el: &BytesStart) -> Option<EpubMetaEntryKind> {
+        if el.is_prefix(consts::DC_NAMESPACE) {
+            Some(EpubMetaEntryKind::DublinCore {})
+        } else if el.is_local_name(consts::META) {
+            // Empty tag <meta name="" content=""/>:       EPUB 2
+            // Start tag <meta name="" content=""></meta>: EPUB 2
+            // Start tag <meta property="">...</meta>:     EPUB 3
+            Some(EpubMetaEntryKind::Meta {
+                // EPUB 2 `<meta>` does NOT use the `property` attribute
+                version: if el.has_attribute(consts::PROPERTY) {
+                    EpubVersion::EPUB3
+                } else {
+                    EpubVersion::EPUB2
+                },
+            })
+        } else if el.is_local_name(consts::LINK) {
+            Some(EpubMetaEntryKind::Link {})
+        } else {
+            None
+        }
+    }
+
     fn meta_handler<'b>(
         reader: &mut ByteReader<'b>,
-    ) -> ParserResult<Option<(BytesStart<'b>, bool)>> {
-        fn is_meta_element(el: &BytesStart) -> bool {
-            el.is_local_name(consts::META) || el.is_prefix(consts::DC_NAMESPACE)
-        }
-
+    ) -> ParserResult<Option<(EpubMetaEntryKind, BytesStart<'b>, bool)>> {
         while let Some(event) = reader.next() {
-            match event? {
-                // Meta/Dublin Core meta elements
-                Event::Start(el) if is_meta_element(&el) => {
-                    return Ok(Some((el, true)));
-                }
-                Event::Empty(el) if is_meta_element(&el) => {
-                    return Ok(Some((el, false)));
-                }
-                Event::End(el) if el.local_name().as_ref() == bytes::METADATA => {
-                    break;
-                }
-                _ => {}
+            let (el, is_start) = match event? {
+                Event::Start(el) => (el, true),
+                Event::Empty(el) => (el, false),
+                Event::End(el) if el.local_name().as_ref() == bytes::METADATA => break,
+                _ => continue,
+            };
+
+            // Ignore unknown elements
+            if let Some(kind) = Self::extract_kind(&el) {
+                return Ok(Some((kind, el, is_start)));
             }
         }
         Ok(None)
@@ -411,7 +494,7 @@ impl EpubParser<'_> {
                     seq = seq.saturating_sub(1);
                     // If there is a duplicate display-seq value;
                     // increment by 1 until a slot is free.
-                    while !reserved_indices.insert(meta.order) {
+                    while !reserved_indices.insert(seq) {
                         seq += 1;
                     }
                     seq

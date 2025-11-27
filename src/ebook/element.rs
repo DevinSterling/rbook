@@ -167,7 +167,14 @@ impl<'a> From<&'a str> for Href<'a> {
     }
 }
 
-/// A collection of properties associated with an element.
+impl Display for Href<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.0)
+    }
+}
+
+/// A collection of properties associated with an element,
+/// where each property is separated by whitespace.
 ///
 /// # Examples
 /// - Retrieving the properties from a navigation resource:
@@ -188,9 +195,15 @@ impl<'a> From<&'a str> for Href<'a> {
 /// # }
 /// ```
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
-pub struct Properties<'a>(&'a PropertiesData);
+pub struct Properties<'a>(&'a str);
 
 impl<'a> Properties<'a> {
+    pub(crate) const EMPTY: Properties<'static> = Properties("");
+
+    pub(crate) fn new(properties: &'a str) -> Self {
+        Self(properties)
+    }
+
     /// The number of property entries contained within.
     ///
     /// # Examples
@@ -245,7 +258,7 @@ impl<'a> Properties<'a> {
     /// Returns the associated property if the provided `index` is less than
     /// [`Self::len`], otherwise [`None`].
     pub fn get(&self, index: usize) -> Option<&'a str> {
-        self.0.iter().nth(index)
+        self.iter().nth(index)
     }
 
     /// Returns an iterator over **all** properties.
@@ -270,7 +283,7 @@ impl<'a> Properties<'a> {
     /// # }
     /// ```
     pub fn iter(&self) -> PropertiesIter<'a> {
-        self.into_iter()
+        PropertiesIter(self.0.split_whitespace())
     }
 
     /// Returns `true` if the provided property is present.
@@ -295,7 +308,7 @@ impl<'a> Properties<'a> {
     /// # }
     /// ```
     pub fn has_property(&self, property: &str) -> bool {
-        self.0.has_property(property.trim())
+        self.iter().any(|value| value == property)
     }
 
     /// The underlying raw properties.
@@ -315,19 +328,25 @@ impl<'a> Properties<'a> {
     /// # }
     /// ```
     pub fn as_str(&self) -> &'a str {
-        self.0.0.as_str()
+        self.0
     }
 }
 
 impl<'a> AsRef<str> for Properties<'a> {
     fn as_ref(&self) -> &'a str {
-        self.0.0.as_str()
+        self.0
     }
 }
 
 impl<'a> From<&'a PropertiesData> for Properties<'a> {
     fn from(properties: &'a PropertiesData) -> Self {
-        Self(properties)
+        Self(&properties.0)
+    }
+}
+
+impl<'a> From<Attribute<'a>> for Properties<'a> {
+    fn from(attribute: Attribute<'a>) -> Self {
+        attribute.properties()
     }
 }
 
@@ -336,7 +355,7 @@ impl<'a> IntoIterator for &Properties<'a> {
     type IntoIter = PropertiesIter<'a>;
 
     fn into_iter(self) -> Self::IntoIter {
-        PropertiesIter(self.0.iter())
+        self.iter()
     }
 }
 
@@ -345,7 +364,7 @@ impl<'a> IntoIterator for Properties<'a> {
     type IntoIter = PropertiesIter<'a>;
 
     fn into_iter(self) -> Self::IntoIter {
-        (&self).into_iter()
+        self.iter()
     }
 }
 
@@ -499,6 +518,11 @@ impl<'a> Attribute<'a> {
     pub fn value(&self) -> &'a str {
         &self.0.value
     }
+
+    /// The attribute [`value`](Self::value) in the form of [`Properties`].
+    pub fn properties(&self) -> Properties<'a> {
+        Properties::new(&self.0.value)
+    }
 }
 
 /// The name of an element or [`Attribute`].
@@ -615,7 +639,7 @@ impl PropertiesData {
         }
     }
 
-    pub(crate) fn iter(&self) -> SplitWhitespace {
+    pub(crate) fn iter(&self) -> SplitWhitespace<'_> {
         self.0.split_whitespace()
     }
 

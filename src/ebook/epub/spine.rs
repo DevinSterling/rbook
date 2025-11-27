@@ -27,7 +27,7 @@ impl EpubSpineData {
     }
 }
 
-#[derive(Debug, Default, Hash, PartialEq)]
+#[derive(Debug, Hash, PartialEq)]
 pub(super) struct EpubSpineEntryData {
     pub(super) id: Option<String>,
     pub(super) order: usize,

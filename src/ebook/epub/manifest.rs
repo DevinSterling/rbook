@@ -34,7 +34,7 @@ impl EpubManifestData {
         self.entries.get_mut(id)
     }
 
-    pub(super) fn iter(&self) -> HashMapIter<String, EpubManifestEntryData> {
+    pub(super) fn iter(&self) -> HashMapIter<'_, String, EpubManifestEntryData> {
         self.entries.iter()
     }
 }
@@ -346,7 +346,8 @@ impl<'ebook> EpubManifestEntry<'ebook> {
         self.data.href_raw.as_str().into()
     }
 
-    /// The **non-capitalized** `MIME` of this [`EpubManifestEntry`].
+    /// The **non-capitalized** `MIME` identifying the media type of
+    /// the resource referenced by [`Self::href`].
     ///
     /// This method is a lower-level call than [`Self::resource_kind`].
     pub fn media_type(&self) -> &'ebook str {

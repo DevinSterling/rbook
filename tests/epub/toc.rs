@@ -72,7 +72,7 @@ fn test_toc() {
 #[test]
 #[wasm_bindgen_test]
 fn test_preference() {
-    fn get_test_flag(attributes: Attributes) -> &str {
+    fn get_test_flag(attributes: Attributes<'_>) -> &str {
         attributes.by_name("rbook:test").unwrap().value()
     }
     let versions = [

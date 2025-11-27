@@ -1,12 +1,13 @@
 //! EPUB metadata-related content.
 
-use crate::ebook::element::{AttributeData, Attributes, Name, TextDirection};
+use crate::ebook::element::{AttributeData, Attributes, Href, Name, Properties, TextDirection};
 use crate::ebook::epub::consts;
 use crate::ebook::epub::metadata::macros::{impl_meta_entry, impl_meta_entry_abstraction};
 use crate::ebook::metadata::{AlternateScript, DateTime, Scheme, Version};
 use crate::ebook::metadata::{
     Contributor, Identifier, Language, LanguageKind, LanguageTag, MetaEntry, Tag, Title, TitleKind,
 };
+use crate::ebook::resource::ResourceKind;
 use crate::ebook::{Metadata, element};
 use crate::util::sync::Shared;
 use std::collections::HashMap;
@@ -64,7 +65,7 @@ impl EpubRefinementsData {
         Self(refinements)
     }
 
-    fn get_schemes(&self, key: &str) -> impl Iterator<Item = Scheme> {
+    fn get_schemes(&self, key: &str) -> impl Iterator<Item = Scheme<'_>> {
         self.by_refinements(key).map(|key_item| {
             // Note: There is usually a `scheme` associated with the `value`,
             // although it's not always guaranteed
@@ -106,7 +107,7 @@ impl DerefMut for EpubRefinementsData {
     }
 }
 
-#[derive(Debug, Default, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash)]
 pub(super) struct EpubMetaEntryData {
     pub(super) order: usize,
     pub(super) id: Option<String>,
@@ -117,6 +118,25 @@ pub(super) struct EpubMetaEntryData {
     pub(super) text_direction: TextDirection,
     pub(super) attributes: Vec<AttributeData>,
     pub(super) refinements: EpubRefinementsData,
+    pub(super) kind: EpubMetaEntryKind,
+}
+
+impl Default for EpubMetaEntryData {
+    fn default() -> Self {
+        Self {
+            order: 0,
+            id: None,
+            refines: None,
+            property: String::new(),
+            value: String::new(),
+            language: None,
+            text_direction: TextDirection::Auto,
+            attributes: Vec::new(),
+            refinements: EpubRefinementsData::default(),
+            // This is merely a placeholder
+            kind: EpubMetaEntryKind::DublinCore {},
+        }
+    }
 }
 
 impl EpubMetaEntryData {
@@ -124,7 +144,7 @@ impl EpubMetaEntryData {
         self.language.as_ref().map(|language| language.as_str())
     }
 
-    fn attributes(&self) -> Attributes {
+    fn attributes(&self) -> Attributes<'_> {
         (&self.attributes).into()
     }
 
@@ -209,7 +229,7 @@ impl<'ebook> EpubMetadata<'ebook> {
     ///
     /// # Excluded Entries
     /// Refining entries, `<meta>` elements with a `refines` field, are excluded:
-    /// ```xhtml
+    /// ```xml
     /// <meta refines="#parent-id">...</meta>
     /// ```
     ///
@@ -277,6 +297,22 @@ impl<'ebook> EpubMetadata<'ebook> {
     /// The underlying [`Epub`](super::Epub) version string.
     pub fn version_str(&self) -> &'ebook str {
         self.data.version.raw.as_str()
+    }
+
+    /// Returns an iterator over non-refining link entries.
+    /// Only entries which have a [`kind`](EpubMetaEntry::kind) of [`EpubMetaEntryKind::Link`]
+    /// are included in the iterator.
+    ///
+    /// # Excluded Entries
+    /// Refining entries, `<link>` elements with a `refines` field are excluded, for example:
+    /// ```xml
+    /// <link refines="#parent-id" ...>...</meta>
+    /// ```
+    ///
+    /// # See Also
+    /// - [`Self::entries`] for iterating over **non-refining** metadata entries, including links.
+    pub fn links(&self) -> impl Iterator<Item = EpubLink<'ebook>> + 'ebook {
+        self.entries().filter_map(|entry| entry.as_link())
     }
 }
 
@@ -403,14 +439,23 @@ impl<'ebook> Metadata<'ebook> for EpubMetadata<'ebook> {
     /// As grouping by property relies on a hash map, the order in which property groups appear
     /// is arbitrary; non-deterministic.
     ///
+    /// # Included Entries
+    /// All the following types retrievable via [`EpubMetaEntry::kind`] are included
+    /// in the iterator:
+    /// - [`EpubMetaEntryKind::DublinCore`]
+    /// - [`EpubMetaEntryKind::Meta`]
+    /// - [`EpubMetaEntryKind::Link`]
+    ///
     /// # Excluded Entries
-    /// Refining entries, `<meta>` elements with a `refines` field, are excluded:
-    /// ```xhtml
-    /// <meta refines="#parent-id">...</meta>
+    /// Refining entries elements with a `refines` field are excluded, for example:
+    /// ```xml
+    /// <meta refines="#parent-id" ...>...</meta>
+    /// <link refines="#parent-id" ...>...</meta>
     /// ```
     ///
     /// # See Also
-    /// - [`Self::by_property`]
+    /// - [`Self::by_property`] for iterating over **non-refining** metadata entries by property.
+    /// - [`Self::links`] for iterating over **non-refining** link entries.
     ///
     /// # Examples
     /// - Iterating over metadata entries:
@@ -580,6 +625,16 @@ impl<'ebook> Iterator for EpubRefinementsIter<'ebook> {
 }
 
 /// A [`MetaEntry`] within [`EpubMetadata`].
+///
+/// A metadata entry is an element that appears within `<metadata>`
+/// inside an EPUB's package.opf file, specifically:
+/// - Dublin core elements: `<dc:*>`
+/// - `meta` elements: `<meta>`
+/// - `link` elements: `<link>`
+///
+/// # See Also
+/// - [`EpubMetaEntryKind`] for more info regarding the different kinds of metadata entries.
+/// - [`EpubLink`] for metadata regarding potentially linked external content.
 #[derive(Copy, Clone, Debug, PartialEq)]
 pub struct EpubMetaEntry<'ebook> {
     data: &'ebook EpubMetaEntryData,
@@ -612,7 +667,7 @@ impl<'ebook> EpubMetaEntry<'ebook> {
     ///
     /// | `XML` Element Type   | Mapped From                                                        |
     /// |----------------------|--------------------------------------------------------------------|
-    /// | Dublin Core (`dc:*`) | element tag (`<dc:title>...</dc:title>`)                           |
+    /// | Dublin Core `<dc:*>` | element tag (`<dc:title>...</dc:title>`)                           |
     /// | EPUB 2 `<meta>`      | `name` attribute (`<meta name="cover" content="..."/>`)            |
     /// | EPUB 3 `<meta>`      | `property` attribute (`<meta property="media:duration">...</meta>`)|
     pub fn property(&self) -> Name<'ebook> {
@@ -625,15 +680,15 @@ impl<'ebook> EpubMetaEntry<'ebook> {
     /// The behavior of this method changes depending on an entry’s immediate attributes
     /// ([`Self::attributes`]).
     ///
-    /// | Attribute presence  | `Scheme::source` Mapping | `Scheme::code` Mapping |
-    /// |---------------------|--------------------------|------------------------|
-    /// | Legacy `opf:scheme` | [`None`]                 | value of `opf:scheme`  |
-    /// | `scheme`            | value of `scheme`        | [`Self::value`]        |
-    /// | none                | [`None`]                 | [`Self::value`]        |
+    /// | Attribute presence  | [`Scheme::source`] Mapping | [`Scheme::code`] Mapping |
+    /// |---------------------|----------------------------|--------------------------|
+    /// | Legacy `opf:scheme` | [`None`]                   | value of `opf:scheme`    |
+    /// | `scheme`            | value of `scheme`          | [`Self::value`]          |
+    /// | None of the above   | [`None`]                   | [`Self::value`]          |
     ///
     /// # Examples
     /// - Legacy `opf:scheme` attribute present:
-    /// ```xhtml
+    /// ```xml
     /// <dc:identifier id="uid" opf:scheme="URL">
     ///     https://github.com/devinsterling/rbook
     /// </dc:identifier>
@@ -655,7 +710,7 @@ impl<'ebook> EpubMetaEntry<'ebook> {
     /// # }
     /// ```
     /// - `scheme` attribute present:
-    /// ```xhtml
+    /// ```xml
     /// <meta property="role" refines="#author" scheme="marc:relators">
     ///     aut
     /// </meta>
@@ -678,7 +733,7 @@ impl<'ebook> EpubMetaEntry<'ebook> {
     /// # }
     /// ```
     /// - No scheme attribute present:
-    /// ```xhtml
+    /// ```xml
     /// <dc:language>
     ///     en
     /// </dc:language>
@@ -715,7 +770,12 @@ impl<'ebook> EpubMetaEntry<'ebook> {
 
     /// The specified or inherited language in `BCP 47` format.
     ///
-    /// [`None`] is returned if the `<package>` element contains no `xml:lang` attribute.
+    /// [`None`] is returned if the element contains no `xml:lang` attribute
+    /// (and the `<package>` has none).
+    ///
+    /// # See Also
+    /// - [`EpubLink::href_lang`] for the language of the linked resource.
+    ///   `<link>` elements do not formally support the `xml:lang` attribute.
     pub fn language(&self) -> Option<LanguageTag<'ebook>> {
         self.data
             .language()
@@ -724,8 +784,10 @@ impl<'ebook> EpubMetaEntry<'ebook> {
 
     /// The specified or inherited text direction (`ltr`, `rtl`, or `auto`).
     ///
-    /// [`TextDirection::Auto`] is returned if the `<package>` and specified element
-    /// contains no `dir` attribute.
+    /// [`TextDirection::Auto`] is returned if any of the following conditions are met:
+    /// - The `<package>` and specified element contains no `dir` attribute.
+    /// - [`Self::kind`] is [`EpubMetaEntryKind::Link`], as `<link>`
+    ///   elements do not formally support the `dir` attribute.
     pub fn text_direction(&self) -> TextDirection {
         self.data.text_direction
     }
@@ -748,6 +810,366 @@ impl<'ebook> EpubMetaEntry<'ebook> {
     /// Complementary refinement metadata entries.
     pub fn refinements(&self) -> EpubRefinements<'ebook> {
         (&self.data.refinements).into()
+    }
+
+    /// The kind of metadata entry.
+    pub fn kind(&self) -> EpubMetaEntryKind {
+        self.data.kind
+    }
+
+    /// Returns an [`EpubLink`] view of a metadata entry,
+    /// otherwise [`None`] if the entry is not a `<link>` element.
+    ///
+    /// This method provides convenient access to link-specific attributes
+    /// (e.g., `href`, `hreflang`, `rel`).
+    ///
+    /// # See Also
+    /// - [`EpubMetadata::links`] for iterating over non-refining link entries.
+    ///
+    /// # Examples
+    /// - Converting to [`EpubLink`]:
+    /// ```
+    /// # use rbook::ebook::element::Href;
+    /// # use rbook::ebook::errors::EbookResult;
+    /// # use rbook::ebook::metadata::Metadata;
+    /// # use rbook::{Ebook, Epub};
+    /// # fn main() -> EbookResult<()> {
+    /// let epub = Epub::open("tests/ebooks/example_epub")?;
+    /// let meta_entry = epub.metadata().by_id("example-link").unwrap();
+    ///
+    /// // Convert to link view
+    /// let link = meta_entry.as_link().unwrap();
+    /// let href = link.href().unwrap();
+    ///
+    /// assert_eq!(href.as_str(), "https://github.com/devinsterling/rbook");
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn as_link(&self) -> Option<EpubLink<'ebook>> {
+        self.kind()
+            .is_link()
+            .then_some(EpubLink { data: self.data })
+    }
+}
+
+/// A specialized view of [`EpubMetaEntry`] for `<link>` elements.
+///
+/// Link elements provide associations to resources related to the EPUB publication
+/// (e.g., metadata records, alternate representations, related resources).
+///
+/// # Examples
+/// - Accessing link metadata:
+/// ```
+/// # use rbook::ebook::errors::EbookResult;
+/// # use rbook::ebook::metadata::Metadata;
+/// # use rbook::{Ebook, Epub};
+/// # fn main() -> EbookResult<()> {
+/// let epub = Epub::open("tests/ebooks/example_epub")?;
+///
+/// for link in epub.metadata().links() {
+///     if let Some(href) = link.href() {
+///         println!("Link to: {}", href.as_str());
+///     }
+///
+///     if let Some(media_type) = link.media_type() {
+///         println!("Media type: {}", media_type);
+///     }
+/// }
+/// # Ok(())
+/// # }
+/// ```
+///
+/// # See Also
+/// - [`EpubMetaEntry::as_link`] for converting from [`EpubMetaEntry`].
+/// - <https://www.w3.org/TR/epub/#sec-link-elem> for official EPUB `<link>` documentation
+pub struct EpubLink<'ebook> {
+    data: &'ebook EpubMetaEntryData,
+}
+
+impl<'ebook> EpubLink<'ebook> {
+    /// The location of the specified resource a link points to.
+    ///
+    /// Returns [`None`] if not present.
+    pub fn href(&self) -> Option<Href<'ebook>> {
+        self.data
+            .attributes()
+            .by_name(consts::HREF)
+            .map(|attribute| attribute.value().into())
+    }
+
+    /// The language of the resource referenced by [`Self::href`].
+    ///
+    /// Returns [`None`] if not present.
+    pub fn href_lang(&self) -> Option<LanguageTag<'ebook>> {
+        self.data
+            .attributes()
+            .by_name(consts::HREFLANG)
+            .map(|attribute| LanguageTag::new(attribute.value(), LanguageKind::Bcp47))
+    }
+
+    /// The **non-capitalized** `MIME` identifying the media type
+    /// of the resource referenced by [`Self::href`].
+    ///
+    /// Returns [`None`] if not present.
+    ///
+    /// This method is a lower-level call than [`Self::resource_kind`].
+    pub fn media_type(&self) -> Option<&'ebook str> {
+        self.data
+            .attributes()
+            .by_name(consts::MEDIA_TYPE)
+            .map(|attribute| attribute.value())
+    }
+
+    /// The [`ResourceKind`] identifying the media type
+    /// of the resource referenced by [`Self::href`].
+    ///
+    /// Returns [`None`] if not present.
+    pub fn resource_kind(&self) -> Option<ResourceKind<'ebook>> {
+        self.media_type().map(Into::into)
+    }
+
+    /// List of property values.
+    pub fn properties(&self) -> Properties<'ebook> {
+        self.data
+            .attributes()
+            .by_name(consts::PROPERTIES)
+            .map_or(Properties::EMPTY, Into::into)
+    }
+
+    /// List of relationship values describing the linked resource.
+    ///
+    /// Common values include:
+    /// - `alternate`: Alternate representation
+    /// - `record`: Metadata record
+    /// - `xml-signature`: XML signature
+    pub fn rel(&self) -> Properties<'ebook> {
+        self.data
+            .attributes()
+            .by_name(consts::REL)
+            .map_or(Properties::EMPTY, Into::into)
+    }
+
+    /// Returns the underlying [`EpubMetaEntry`] to access generic metadata details
+    /// such as id, refinements, and attributes.
+    pub fn as_meta(&self) -> EpubMetaEntry<'_> {
+        EpubMetaEntry::new(self.data)
+    }
+}
+
+/// Contains the kinds of metadata entries that can be found within an
+/// [`Epub`](super::Epub)'s `<metadata>` element:
+/// - [`DublinCore`](EpubMetaEntryKind::DublinCore)
+/// - [`Meta`](EpubMetaEntryKind::Meta)
+/// - [`Link`](EpubMetaEntryKind::Link)
+///
+/// # See Also
+/// - [`EpubMetaEntry::kind`] to retrieve the kind from an [`EpubMetaEntry`].
+#[non_exhaustive]
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
+pub enum EpubMetaEntryKind {
+    /// A set of standardized metadata elements that provide a common vocabulary
+    /// for describing relevant information about a publication
+    /// (e.g., `dc:title`, `dc:creator`, `dc:publisher`).
+    ///
+    /// **Dublin Core (`<dc:title>`) element structure example**:
+    /// ```xml
+    /// <dc:title>
+    ///   rbook
+    /// </dc:title>
+    /// ```
+    ///
+    /// # See Also
+    /// <https://www.w3.org/TR/epub/#sec-opf-dcmes-hd> for official EPUB dublin core documentation.
+    #[non_exhaustive]
+    DublinCore {},
+
+    /// General metadata packaged within an [`Epub`](super::Epub).
+    ///
+    /// - **Legacy EPUB 2 (OPF2) `<meta>` element structure example**:
+    /// ```xml
+    /// <meta name="cover" content="c0" />
+    /// ```
+    /// - **EPUB 3 `<meta>` element structure example**:
+    /// ```xml
+    /// <meta property="display-seq" refines="#parent">
+    ///   0
+    /// </meta>
+    /// ```
+    ///
+    /// # Examples
+    /// - Pattern Matching
+    /// ```
+    /// # use rbook::epub::metadata::{EpubMetaEntryKind, EpubVersion};
+    /// # use rbook::ebook::errors::EbookResult;
+    /// # use rbook::ebook::metadata::Metadata;
+    /// # use rbook::{Ebook, Epub};
+    /// # fn main() -> EbookResult<()> {
+    /// let epub = Epub::open("tests/ebooks/example_epub")?;
+    /// let source = epub.metadata().by_property("dc:source").next().unwrap();
+    ///
+    /// match source.kind() {
+    ///     EpubMetaEntryKind::Meta { version: EpubVersion::EPUB3, ..} => {},
+    ///     EpubMetaEntryKind::Meta { version: EpubVersion::EPUB2, ..} => {},
+    ///     EpubMetaEntryKind::Meta { .. } => {},
+    ///     _ => {/* Other kind (i.e., dublin core, link) */},
+    /// };
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # See Also
+    /// <https://www.w3.org/TR/epub/#sec-meta-elem> for official EPUB `<meta>` documentation.
+    #[non_exhaustive]
+    Meta {
+        /// Structural version associated with a `<meta>` element.
+        ///
+        /// # See Also
+        /// - [`EpubMetaEntryKind::version`]
+        version: EpubVersion,
+    },
+
+    /// A link element pertaining to a task such as resource associations,
+    /// linkage to external resources, etc.
+    ///
+    /// **`<link>` element structure example**:
+    /// ```xml
+    /// <link rel="record" href="meta/133333333337.xml" media-type="application/marc" />
+    /// ```
+    ///
+    /// # See Also
+    /// <https://www.w3.org/TR/epub/#sec-link-elem> for official EPUB `<link>` documentation.
+    #[non_exhaustive]
+    Link {},
+}
+
+impl EpubMetaEntryKind {
+    /// Returns `true` if the kind is [`Self::DublinCore`].
+    ///
+    /// # Examples
+    /// - Assessing a dublin core (`<dc:*>`) element:
+    /// ```
+    /// # use rbook::epub::metadata::EpubMetaEntryKind;
+    /// # use rbook::ebook::errors::EbookResult;
+    /// # use rbook::ebook::metadata::Metadata;
+    /// # use rbook::{Ebook, Epub};
+    /// # fn main() -> EbookResult<()> {
+    /// let epub = Epub::open("tests/ebooks/example_epub")?;
+    /// let title_meta = epub.metadata().title().unwrap().as_meta();
+    /// let kind = title_meta.kind();
+    ///
+    /// assert!(matches!(kind, EpubMetaEntryKind::DublinCore { .. }));
+    /// assert!(kind.is_dublin_core());
+    ///
+    /// // Kinds are mutually exclusive (Below will always resolve to `false`)
+    /// assert!(!kind.is_meta());
+    /// assert!(!kind.is_link());
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn is_dublin_core(&self) -> bool {
+        matches!(self, Self::DublinCore { .. })
+    }
+
+    /// Returns `true` if the kind is [`Self::Meta`].
+    ///
+    /// # See Also
+    /// - [`Self::version`] for the structural version of a `<meta>` element.
+    ///
+    /// # Examples
+    /// - Assessing a `meta` element:
+    /// ```
+    /// # use rbook::epub::metadata::{EpubMetaEntryKind, EpubVersion};
+    /// # use rbook::ebook::errors::EbookResult;
+    /// # use rbook::ebook::metadata::Metadata;
+    /// # use rbook::{Ebook, Epub};
+    /// # fn main() -> EbookResult<()> {
+    /// let epub = Epub::open("tests/ebooks/example_epub")?;
+    /// let cover_meta = epub.metadata().by_property("cover").next().unwrap();
+    /// let kind = cover_meta.kind();
+    ///
+    /// assert!(matches!(kind, EpubMetaEntryKind::Meta { version: EpubVersion::EPUB2, .. }));
+    /// assert!(kind.is_meta());
+    ///
+    /// // Kinds are mutually exclusive (Below will always resolve to `false`)
+    /// assert!(!kind.is_dublin_core());
+    /// assert!(!kind.is_link());
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn is_meta(&self) -> bool {
+        matches!(self, Self::Meta { .. })
+    }
+
+    /// Returns `true` if the kind is [`Self::Link`].
+    ///
+    /// # Examples
+    /// - Assessing a `link` element:
+    /// ```
+    /// # use rbook::epub::metadata::EpubMetaEntryKind;
+    /// # use rbook::ebook::errors::EbookResult;
+    /// # use rbook::ebook::metadata::Metadata;
+    /// # use rbook::{Ebook, Epub};
+    /// # fn main() -> EbookResult<()> {
+    /// let epub = Epub::open("tests/ebooks/example_epub")?;
+    /// let link = epub.metadata().by_id("example-link").unwrap();
+    /// let kind = link.kind();
+    ///
+    /// assert!(matches!(kind, EpubMetaEntryKind::Link { .. }));
+    /// assert!(kind.is_link());
+    ///
+    /// // Kinds are mutually exclusive (Below will always resolve to `false`)
+    /// assert!(!kind.is_dublin_core());
+    /// assert!(!kind.is_meta());
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn is_link(&self) -> bool {
+        matches!(self, Self::Link { .. })
+    }
+
+    /// The structural [`EpubVersion`] a metadata entry is associated with.
+    ///
+    /// # Note
+    /// This method is applicable if [`EpubMetaEntryKind`] is [`EpubMetaEntryKind::Meta`].
+    ///
+    /// For all other kinds ([`DublinCore`](EpubMetaEntryKind::DublinCore),
+    /// [`Link`](EpubMetaEntryKind::Link)),
+    /// the returned version is **always** [`None`]
+    /// as their main structure remains the same between EPUB 2 and 3.
+    ///
+    /// # See Also
+    /// - [`Self::Meta`] for the structural differences between EPUB 2 and 3 `<meta>` elements.
+    ///
+    /// # Examples
+    /// - Retrieving the structural version:
+    /// ```
+    /// # use rbook::epub::metadata::{EpubMetaEntryKind, EpubVersion};
+    /// # use rbook::ebook::errors::EbookResult;
+    /// # use rbook::ebook::metadata::Metadata;
+    /// # use rbook::{Ebook, Epub};
+    /// # fn main() -> EbookResult<()> {
+    /// let epub = Epub::open("tests/ebooks/example_epub")?;
+    /// let metadata = epub.metadata();
+    /// let cover = metadata.by_property("cover").next().unwrap();
+    /// let title = metadata.title().unwrap().as_meta();
+    /// let link = metadata.by_id("example-link").unwrap();
+    ///
+    /// // `<meta>` elements always have a structural version
+    /// assert_eq!(cover.kind().version(), Some(EpubVersion::EPUB2));
+    ///
+    /// // Dublin core `<dc:*>` elements never have an associated structural version
+    /// assert_eq!(title.kind().version(), None);
+    ///
+    /// // `<link>` elements never have an associated structural version
+    /// assert_eq!(link.kind().version(), None);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn version(&self) -> Option<EpubVersion> {
+        match self {
+            Self::Meta { version, .. } => Some(*version),
+            _ => None,
+        }
     }
 }
 
@@ -781,10 +1203,10 @@ pub enum EpubVersion {
 }
 
 impl EpubVersion {
-    /// [`EpubVersion::Epub2`] constant with a predefined version of `2.0`.
+    /// [`EpubVersion::Epub2`] constant with a predefined [`Version`] of `2.0`.
     pub const EPUB2: Self = Self::Epub2(Version(2, 0));
 
-    /// [`EpubVersion::Epub3`] constant with a predefined version of `3.0`.
+    /// [`EpubVersion::Epub3`] constant with a predefined [`Version`] of `3.0`.
     pub const EPUB3: Self = Self::Epub3(Version(3, 0));
 
     /// Returns the major form of an epub version.
@@ -1104,7 +1526,7 @@ mod macros {
         ($implementation:ident) => {
             impl<'ebook> $implementation<'ebook> {
                 /// Returns the [`EpubMetaEntry`] form to access additional
-                /// meta details, such as attributes and refinements.
+                /// metadata entry details, such as attributes and refinements.
                 pub fn as_meta(&self) -> EpubMetaEntry<'ebook> {
                     EpubMetaEntry::new(self.data)
                 }

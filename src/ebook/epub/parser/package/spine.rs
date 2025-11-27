@@ -23,7 +23,7 @@ impl EpubParser<'_> {
             let mut attributes = el.bytes_attributes();
 
             // Required fields
-            let idref = self.assert_optional(
+            let idref = self.assert_option(
                 attributes.take_attribute_value(consts::IDREF)?,
                 "spine > itemref[*idref]",
             )?;

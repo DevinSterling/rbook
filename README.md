@@ -13,7 +13,13 @@ Most importantly, this library is designed with future formats in mind
 (`CBZ`, `FB2`, `MOBI`, etc.) via core traits defined within the [ebook](https://docs.rs/rbook/latest/rbook/ebook) 
 and [reader](https://docs.rs/rbook/latest/rbook/reader) module, allowing all formats to share the same "base" API.
 
+## Documentation
+- [API documentation](https://docs.rs/rbook)
+- [Changelog](CHANGELOG.md)
+
 ## Features
+Here is a non-exhaustive list of the features `rbook` provides:
+
 | Feature                     | Overview                                                                                    | Documentation                                                        |
 |-----------------------------|---------------------------------------------------------------------------------------------|----------------------------------------------------------------------|
 | **EPUB 2 and 3**            | Read-only (for now) view of EPUB `2` and `3` formats.                                       | [epub module](https://docs.rs/rbook/latest/rbook/ebook/epub)         |
@@ -25,21 +31,22 @@ and [reader](https://docs.rs/rbook/latest/rbook/reader) module, allowing all for
 | **Table of Contents (ToC)** | Navigation points, including the EPUB 2 guide and EPUB 3 landmarks.                         | [toc module](https://docs.rs/rbook/latest/rbook/ebook/toc)           |
 | **Resources**               | Retrieve bytes or UTF-8 strings for any manifest resource.                                  | [resource module](https://docs.rs/rbook/latest/rbook/ebook/resource) |
 
-## Documentation
-- [API documentation](https://docs.rs/rbook)
-- [Changelog](CHANGELOG.md)
+### Default crate features
+These are toggleable features for `rbook` that are
+enabled by default in a project's `cargo.toml` file:
+
+| Feature        | Description                                                                                           |
+|----------------|-------------------------------------------------------------------------------------------------------|
+| **prelude**    | Convenience [prelude](https://docs.rs/rbook/latest/rbook/prelude) ***only*** including common traits. |
+| **threadsafe** | Enables constraint and support for `Send` + `Sync`.                                                   |
 
 ## Usage
 `rbook` can be used by adding it as a dependency in a project's `cargo.toml` file:
 ```toml
 [dependencies]
-rbook = "0.6.6"                                           # with default features
-# rbook = { version = "0.6.6", default-features = false } # excluding default features
+rbook = "0.6.7"                                           # with default features
+# rbook = { version = "0.6.7", default-features = false } # excluding default features
 ```
-
-Default crate features:
-- `prelude`: Convenience prelude ***only*** including common traits.
-- `threadsafe`: Enables constraint and support for `Send + Sync`.
 
 ## WebAssembly
 The `wasm32-unknown-unknown` target is supported by default.
@@ -47,8 +54,8 @@ The `wasm32-unknown-unknown` target is supported by default.
 ## Examples
 ### Opening and reading an EPUB file
 ```rust
-use rbook::epub::{Epub, EpubSettings};
-use rbook::prelude::*; // Prelude for traits
+use rbook::{Epub, prelude::*}; // Prelude for traits
+use rbook::epub::EpubSettings;
 
 fn main() {
     // Open an epub from a file or directory
@@ -70,9 +77,8 @@ fn main() {
 ```
 ### Accessing metadata: Retrieving the main title
 ```rust
-use rbook::Epub;
+use rbook::{Epub, prelude::*};
 use rbook::ebook::metadata::{LanguageKind, TitleKind};
-use rbook::prelude::*;
 
 fn main() {
     let epub = Epub::open("tests/ebooks/example_epub").unwrap();
@@ -91,9 +97,8 @@ fn main() {
 ```
 ### Accessing metadata: Retrieving the first creator
 ```rust
-use rbook::Epub;
+use rbook::{Epub, prelude::*};
 use rbook::ebook::metadata::LanguageKind;
-use rbook::prelude::*;
 
 fn main() {
     let epub = Epub::open("tests/ebooks/example_epub").unwrap();
@@ -118,27 +123,23 @@ fn main() {
 ```
 ### Extracting images from the manifest
 ```rust
-use rbook::Epub;
-use rbook::prelude::*;
-use std::fs::{self, File};
-use std::path::Path;
-use std::io::Write;
+use rbook::{Epub, prelude::*};
+use std::{fs, path::Path};
 
 fn main() {
-    let epub = Epub::open("example.epub").unwrap();
+    let epub = Epub::open("tests/ebooks/example_epub").unwrap();
     
     // Create an output directory for the extracted images
-    let dir = Path::new("extracted_images");
-    fs::create_dir(&dir).unwrap();
+    let out = Path::new("extracted_images");
+    fs::create_dir_all(&out).unwrap();
     
     for image in epub.manifest().images() {
-        // Retrieve the raw image bytes
+        // Read the raw image bytes
         let bytes = image.read_bytes().unwrap();
 
         // Extract the filename from the href and write to disk
         let filename = image.href().name().decode(); // Decode as EPUB hrefs may be URL-encoded
-        let mut file = File::create(dir.join(&*filename)).unwrap();
-        file.write_all(&bytes).unwrap();
+        fs::write(out.join(&*filename), bytes).unwrap();
     }
 }
 ```

@@ -6,6 +6,9 @@ use std::hash::Hash;
 /// The metadata of an [`Ebook`](super::Ebook), encompassing detailed information,
 /// such as the [`Version`], [`Title`], and [`Identifier`].
 ///
+/// # See Also
+/// - [`EpubMetadata`](crate::epub::metadata::EpubMetadata) for epub-specific metadata information.
+///
 /// # Examples
 /// - Retrieving the [`author`](Metadata::creators) and [`subtitle`](Metadata::title):
 /// ```
@@ -318,6 +321,9 @@ impl<'ebook> AlternateScript<'ebook> {
 /// This trait provides access to details such as its [`value`](MetaEntry::value),
 /// [`order`](MetaEntry::order), [`sort key`](MetaEntry::file_as), and
 /// [`alternate scripts`](MetaEntry::alternate_scripts).
+///
+/// # See Also
+/// - [`EpubMetaEntry`](crate::epub::metadata::EpubMetaEntry) for epub-specific entry information.
 pub trait MetaEntry<'ebook> {
     /// The text value of an entry.
     ///
@@ -621,7 +627,7 @@ pub enum TitleKind {
 impl TitleKind {
     // **For now**, there is no public From<&str> method for TitleKind because
     // other ebook formats may have different (and potentially conflicting)
-    // mappings (i.e., main-title, primary, etc.)
+    // mappings (e.g., main-title, primary, etc.)
     pub(super) fn from(kind: &str) -> Self {
         match kind {
             "main" => TitleKind::Main,

@@ -14,6 +14,9 @@ use std::fmt::{Display, Formatter};
 /// The methods [`Self::by_kind`] and [`Self::kinds`] can be used to retrieve TOC variants,
 /// such as [`landmarks`](TocEntryKind::Landmarks), [`page-list`](TocEntryKind::PageList), etc.
 ///
+/// # See Also
+/// - [`EpubToc`](crate::epub::toc::EpubToc) for epub-specific table of contents information.
+///
 /// # Examples
 /// - Iterating over the table of contents:
 /// ```
@@ -79,6 +82,9 @@ pub trait Toc<'ebook> {
 }
 
 /// An entry contained within a [`Toc`], encompassing associated metadata.
+///
+/// # See Also
+/// - [`EpubTocEntry`](crate::epub::toc::EpubTocEntry) for epub-specific entry information.
 pub trait TocEntry<'ebook> {
     /// The display order of an entry (`0 = first item`).
     fn order(&self) -> usize;

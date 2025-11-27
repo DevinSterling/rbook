@@ -52,13 +52,13 @@ where
 }
 
 #[cfg(feature = "threadsafe")]
-fn acquire_archive_lock<T>(lock: &Lock<T>) -> ArchiveResult<std::sync::MutexGuard<T>> {
+fn acquire_archive_lock<T>(lock: &Lock<T>) -> ArchiveResult<std::sync::MutexGuard<'_, T>> {
     lock.lock().map_err(|_| ArchiveError::UnreadableArchive {
         source: io::Error::other("Poisoned ZipArchive"),
         path: None,
     })
 }
 #[cfg(not(feature = "threadsafe"))]
-fn acquire_archive_lock<T>(lock: &Lock<T>) -> Result<std::cell::RefMut<T>, ArchiveError> {
+fn acquire_archive_lock<T>(lock: &Lock<T>) -> Result<std::cell::RefMut<'_, T>, ArchiveError> {
     Ok(lock.borrow_mut())
 }

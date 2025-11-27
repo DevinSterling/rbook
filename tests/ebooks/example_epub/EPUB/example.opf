@@ -43,7 +43,11 @@
         <dc:subject id="tag">Quests (Expeditions) -- Fiction</dc:subject>
         <dc:subject>Fantasy</dc:subject>
 
-        <meta name="cover" content="cover-image1" />
+        <meta name="cover" content="cover-image1"></meta>
+        <meta name="test" content="data"/>
+        
+        <link id="example-link" href="https://github.com/devinsterling/rbook" rel="external" />
+        <link id="example-link2" href="https://github.com/devinsterling/rbook" rel="external">ignored</link>
     </metadata>
     <manifest>
         <item href="cover.xhtml" id="cover" media-type="application/xhtml+xml"/>

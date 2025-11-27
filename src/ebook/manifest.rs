@@ -6,6 +6,9 @@ use crate::ebook::resource::{Resource, ResourceKind};
 /// The manifest of an [`Ebook`](super::Ebook)
 /// encompassing internal [`resources`](Resource) (e.g., images, files, etc.).
 ///
+/// # See Also
+/// - [`EpubManifest`](crate::epub::manifest::EpubManifest) for epub-specific manifest information.
+///
 /// # Examples
 /// - Retrieving the cover image from the manifest:
 /// ```
@@ -146,6 +149,10 @@ pub trait Manifest<'ebook> {
 ///
 /// An entry corresponds to a single [`Resource`] (e.g., an `XHTML` file,
 /// a `JPEG` image, a `CSS` stylesheet), providing access to that resource.
+///
+/// # See Also
+/// - [`EpubManifestEntry`](crate::epub::manifest::EpubManifestEntry)
+///   for epub-specific entry information.
 pub trait ManifestEntry<'ebook> {
     /// The unique key of an entry within the [`Manifest`].
     fn key(&self) -> Option<&'ebook str>;
@@ -174,7 +181,7 @@ pub trait ManifestEntry<'ebook> {
     /// ```
     fn resource(&self) -> Resource<'ebook>;
 
-    /// The kind of [`ResourceKind`] a manifest entry represents,
+    /// The [`ResourceKind`] a manifest entry represents,
     /// such as `XHTML`, `PNG`, `CSS`, etc.
     ///
     /// # Examples
