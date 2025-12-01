@@ -153,7 +153,6 @@ impl EpubParser<'_> {
         el: &BytesStart,
         attributes: &mut BytesAttributes,
         is_start: bool,
-        strict: bool,
     ) -> ParserResult<EpubMetaEntryData> {
         let property = String::from_utf8(el.name().as_ref().to_vec())?;
         // Dublin core elements must not be self-closing; <dc:title/> is invalid.
