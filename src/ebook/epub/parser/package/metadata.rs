@@ -158,8 +158,8 @@ impl EpubParser<'_> {
         // Dublin core elements must not be self-closing; <dc:title/> is invalid.
         let value = if is_start {
             reader.get_text_simple(el)?
-        } else if !strict {
-            "".to_string()
+        } else if !self.config.strict {
+            String::new()
         } else {
             return Err(EpubFormatError::MissingValue(property).into());
         };
