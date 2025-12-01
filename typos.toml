@@ -1,0 +1,2 @@
+[default.extend-words]
+opf = "opf" # EPUB `opf` is falsely flagged

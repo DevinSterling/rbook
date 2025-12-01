@@ -1,4 +1,7 @@
 //! Format-agnostic [`Metadata`]-related content.
+//!
+//! # See Also
+//! - [`epub::metadata`][crate::epub::metadata] for the epub-specific metadata module.
 
 use std::fmt::{Display, Formatter};
 use std::hash::Hash;
@@ -234,6 +237,10 @@ pub trait Metadata<'ebook> {
 /// Sources are optional and will not be specified if there is no known
 /// registry for a `code`.
 ///
+/// # Equality
+/// Two schemes are equal if their [`source`](Scheme::source) and [`code`](Scheme::code)
+/// are **case-sensitively** equal.
+///
 /// # Examples
 /// - Retrieving the source and code:
 /// ```
@@ -443,6 +450,9 @@ pub trait MetaEntry<'ebook> {
 ///
 /// Provides both the raw scheme string and a parsed kind.
 ///
+/// # See Also
+/// - [`EpubLanguage`](crate::epub::metadata::EpubLanguage) for epub-specific information.
+///
 /// # Examples
 /// - Retrieving a language's kind and scheme:
 /// ```
@@ -479,6 +489,9 @@ pub trait Language<'ebook>: MetaEntry<'ebook> {
 
 /// A unique identifier for an [`Ebook`](super::Ebook), such as `ISBN`, `DOI`, and `URL`.
 ///
+/// # See Also
+/// - [`EpubIdentifier`](crate::epub::metadata::EpubIdentifier) for epub-specific information.
+///
 /// # Examples
 /// - Retrieving the main identifier:
 /// ```
@@ -504,6 +517,9 @@ pub trait Identifier<'ebook>: MetaEntry<'ebook> + Eq + Hash {
 /// A title of an [`Ebook`](super::Ebook).
 ///
 /// Titles may have an optional scheme for further categorization (e.g. `subtitle`, `edition`).
+///
+/// # See Also
+/// - [`EpubTitle`](crate::epub::metadata::EpubTitle) for epub-specific information.
 ///
 /// # Examples
 /// - Retrieving a title's kind:
@@ -538,6 +554,9 @@ pub trait Title<'ebook>: MetaEntry<'ebook> {
 }
 
 /// A tag that categorizes an [`Ebook`](super::Ebook).
+///
+/// # See Also
+/// - [`EpubTag`](crate::epub::metadata::EpubTag) for epub-specific information.
 ///
 /// # Examples
 /// - Retrieving all tags:
@@ -574,6 +593,9 @@ pub trait Tag<'ebook>: MetaEntry<'ebook> {
 
 /// Individuals or organizations that helped with the creation of an [`Ebook`](super::Ebook),
 /// such as, `authors`, `illustrators`, and `publishers`.
+///
+/// # See Also
+/// - [`EpubContributor`](crate::epub::metadata::EpubContributor) for epub-specific information.
 ///
 /// # Examples
 /// - Retrieving an author:

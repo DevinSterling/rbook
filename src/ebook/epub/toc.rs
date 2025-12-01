@@ -1,14 +1,14 @@
-//! EPUB table-of-contents-related content.
+//! EPUB-specific table-of-contents content.
 
 use crate::ebook::element::{AttributeData, Attributes, Href};
 use crate::ebook::epub::manifest::{EpubManifestEntry, EpubManifestEntryProvider};
 use crate::ebook::epub::{EpubConfig, EpubVersion};
 use crate::ebook::toc::{Toc, TocChildren, TocEntry, TocEntryKind};
-use std::cmp::Ordering;
+use std::collections::HashMap;
 use std::collections::hash_map::Iter as HashMapIter;
-use std::collections::{BinaryHeap, HashMap};
 use std::fmt::{Debug, Formatter};
 use std::slice::Iter as SliceIter;
+
 ////////////////////////////////////////////////////////////////////////////////
 // PRIVATE API
 ////////////////////////////////////////////////////////////////////////////////
@@ -442,48 +442,27 @@ impl<'ebook> TocChildren<'ebook> for EpubTocChildren<'ebook> {
     }
 
     fn flatten(&self) -> impl Iterator<Item = EpubTocEntry<'ebook>> + 'ebook {
-        struct OrderedEpubTocEntry<'a>(EpubTocEntry<'a>);
-        struct FlatEpubTocEntryIterator<'a>(BinaryHeap<OrderedEpubTocEntry<'a>>);
-
-        impl Eq for OrderedEpubTocEntry<'_> {}
-
-        impl PartialEq<Self> for OrderedEpubTocEntry<'_> {
-            fn eq(&self, other: &Self) -> bool {
-                self.0.order() == other.0.order()
-            }
-        }
-
-        impl PartialOrd<Self> for OrderedEpubTocEntry<'_> {
-            fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-                Some(self.cmp(other))
-            }
-        }
-
-        impl Ord for OrderedEpubTocEntry<'_> {
-            fn cmp(&self, other: &Self) -> Ordering {
-                other.0.order().cmp(&self.0.order())
-            }
-        }
-
-        impl<'a> FlatEpubTocEntryIterator<'a> {
-            fn extend(&mut self, entries: impl Iterator<Item = EpubTocEntry<'a>>) {
-                self.0.extend(entries.into_iter().map(OrderedEpubTocEntry));
-            }
+        struct FlatEpubTocEntryIterator<'ebook> {
+            stack: Vec<&'ebook EpubTocEntryData>,
+            provider: EpubManifestEntryProvider<'ebook>,
         }
 
         impl<'ebook> Iterator for FlatEpubTocEntryIterator<'ebook> {
             type Item = EpubTocEntry<'ebook>;
 
             fn next(&mut self) -> Option<Self::Item> {
-                let entry = self.0.pop()?;
-                self.extend(entry.0.children().iter());
-                Some(entry.0)
+                let entry = self.stack.pop()?;
+
+                // Push children in reverse order to maintain DFS order
+                self.stack.extend(entry.children.iter().rev());
+                Some(EpubTocEntry::new(entry, self.provider))
             }
         }
 
-        let mut iterator = FlatEpubTocEntryIterator(BinaryHeap::new());
-        iterator.extend(self.iter());
-        iterator
+        FlatEpubTocEntryIterator {
+            stack: self.0.data.children.iter().rev().collect(),
+            provider: self.0.provider,
+        }
     }
 
     fn len(&self) -> usize {

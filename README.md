@@ -44,8 +44,8 @@ enabled by default in a project's `cargo.toml` file:
 `rbook` can be used by adding it as a dependency in a project's `cargo.toml` file:
 ```toml
 [dependencies]
-rbook = "0.6.8"                                           # with default features
-# rbook = { version = "0.6.8", default-features = false } # excluding default features
+rbook = "0.6.9"                                           # with default features
+# rbook = { version = "0.6.9", default-features = false } # excluding default features
 ```
 
 ## WebAssembly

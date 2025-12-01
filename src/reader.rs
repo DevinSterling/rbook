@@ -1,4 +1,7 @@
 //! Sequential + random‐access [`Ebook`](super::Ebook) [`Reader`] module.
+//!
+//! # See Also
+//! - [`epub::reader`][crate::epub::reader] for the epub-specific reader module.
 
 pub mod errors;
 
@@ -11,6 +14,9 @@ use crate::reader::errors::ReaderResult;
 /// # Lifetime
 /// All returned [`ReaderContent<'ebook>`](ReaderContent) are tied to the lifetime of the
 /// underlying [`Ebook`](super::Ebook).
+///
+/// # See Also
+/// - [`EpubReader`](crate::epub::reader::EpubReader) for epub-specific reader information.
 ///
 /// # Examples
 /// - Streaming over a reader's contents:

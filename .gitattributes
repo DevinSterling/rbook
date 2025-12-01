@@ -1,0 +1,5 @@
+# Prefer `\n` over `\r\n`
+* text=auto eol=lf
+
+# Keep specified files as is
+*.epub binary

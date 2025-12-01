@@ -3,6 +3,12 @@ name: CI
 on: [push, pull_request]
 
 jobs:
+  find_typos:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: crate-ci/typos@v1.40.0
+
   format_and_docs:
     runs-on: ubuntu-latest
     steps:
@@ -10,6 +16,7 @@ jobs:
       - uses: dtolnay/rust-toolchain@stable
         with:
           components: rustfmt
+      - uses: Swatinem/rust-cache@v2
       - name: 'Run fmt (Check formatting)'
         run: cargo fmt -- --check
       - name: 'Run doc (Check documentation)'

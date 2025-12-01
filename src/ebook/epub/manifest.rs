@@ -1,4 +1,4 @@
-//! EPUB manifest-related content.
+//! EPUB-specific manifest content.
 
 use crate::ebook::element::{AttributeData, Attributes, Href, Properties, PropertiesData};
 use crate::ebook::epub::consts;

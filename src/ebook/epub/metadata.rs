@@ -1,4 +1,4 @@
-//! EPUB metadata-related content.
+//! EPUB-specific metadata content.
 
 use crate::ebook::element::{AttributeData, Attributes, Href, Name, Properties, TextDirection};
 use crate::ebook::epub::consts;
@@ -1205,7 +1205,7 @@ impl EpubMetaEntryKind {
 /// # See Also
 /// - [`EpubMetadata::version_str`] for the original representation.
 #[non_exhaustive]
-#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub enum EpubVersion {
     /// [`Epub`](super::Epub) Version `2.*` **(Legacy)**
     Epub2(Version),
@@ -1277,6 +1277,18 @@ impl EpubVersion {
     /// Returns `true` if the variant is [`EpubVersion::Unknown`].
     pub fn is_unknown(&self) -> bool {
         matches!(self, Self::Unknown(_))
+    }
+}
+
+impl PartialOrd for EpubVersion {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for EpubVersion {
+    fn cmp(&self, other: &Self) -> std::cmp::Ordering {
+        self.version().cmp(&other.version())
     }
 }
 
@@ -1395,7 +1407,8 @@ impl<'ebook> Title<'ebook> for EpubTitle<'ebook> {
             .refinements
             .by_refinement(consts::TITLE_TYPE)
             .map_or(TitleKind::Unknown, |title_type| {
-                TitleKind::from(&title_type.value)
+                // Make lowercase as some Epubs may capitalize the title type
+                TitleKind::from(&title_type.value.to_ascii_lowercase())
             })
     }
 }
@@ -1555,8 +1568,8 @@ mod macros {
             }
 
             impl PartialEq<EpubMetaEntry<'_>> for $implementation<'_> {
-                fn eq(&self, _: &EpubMetaEntry<'_>) -> bool {
-                    &self.data == &self.data
+                fn eq(&self, other: &EpubMetaEntry<'_>) -> bool {
+                    self.data == other.data
                 }
             }
 
