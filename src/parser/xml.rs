@@ -4,7 +4,7 @@ use crate::parser::ParserResult;
 use crate::util::StringExt;
 use quick_xml::Reader;
 use quick_xml::encoding::EncodingError;
-use quick_xml::escape::resolve_xml_entity;
+use quick_xml::escape;
 use quick_xml::events::attributes::Attribute;
 use quick_xml::events::{BytesCData, BytesRef, BytesStart, BytesText, Event};
 use std::borrow::Cow;
@@ -219,7 +219,7 @@ fn handle_general_ref(value: &mut String, general_ref: &BytesRef) -> ParserResul
     } else {
         let decoded = general_ref.decode()?;
 
-        if let Some(resolved) = resolve_xml_entity(decoded.as_ref()) {
+        if let Some(resolved) = escape::resolve_xml_entity(decoded.as_ref()) {
             value.push_str(resolved.as_ref());
         } else {
             // Unsupported entity

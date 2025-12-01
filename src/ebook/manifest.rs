@@ -1,4 +1,7 @@
 //! Format-agnostic [`Manifest`]-related content.
+//!
+//! # See Also
+//! - [`epub::manifest`][crate::epub::manifest] for the epub-specific manifest module.
 
 use crate::ebook::errors::{ArchiveError, EbookResult};
 use crate::ebook::resource::{Resource, ResourceKind};
@@ -76,10 +79,12 @@ pub trait Manifest<'ebook> {
     ///
     /// let epub2_cover = epub2.manifest().cover_image().unwrap();
     /// assert_eq!(epub2_cover.href().as_ref(), "/cover.jpg" );
+    /// assert_eq!(epub2_cover.resource_kind().subtype(), "jpg");
     /// # assert_eq!(epub2.metadata().version(), EpubVersion::EPUB2);
     ///
     /// let epub3_cover = epub3.manifest().cover_image().unwrap();
     /// assert_eq!(epub3_cover.href().as_ref(), "/EPUB/img/cover.webm");
+    /// assert_eq!(epub3_cover.resource_kind().subtype(), "webm");
     /// # assert_eq!(epub3.metadata().version(), EpubVersion::EPUB3);
     /// # Ok(())
     /// # }

@@ -1,4 +1,4 @@
-use crate::epub::open_example_epub_file;
+use crate::epub::util::open_example_epub_file;
 use rbook::Ebook;
 use rbook::epub::reader::{EpubReaderContent, LinearBehavior};
 use rbook::reader::errors::ReaderResult;

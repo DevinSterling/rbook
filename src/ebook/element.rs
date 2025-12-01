@@ -640,7 +640,9 @@ impl PropertiesData {
     /// Adds the given property if it is not contained within.
     pub(crate) fn add_property(&mut self, property: &str) {
         if !self.has_property(property) {
-            self.0.push(' ');
+            if !self.0.is_empty() {
+                self.0.push(' ');
+            }
             self.0.push_str(property);
         }
     }

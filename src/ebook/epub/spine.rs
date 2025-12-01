@@ -1,4 +1,4 @@
-//! EPUB spine-related content.
+//! EPUB-specific spine content.
 
 use crate::ebook::element::{AttributeData, Attributes, Properties, PropertiesData};
 use crate::ebook::epub::manifest::{EpubManifestEntry, EpubManifestEntryProvider};

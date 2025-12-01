@@ -1,4 +1,4 @@
-//! [`Reader`]-related implementations for the [`Epub`] format.
+//! [`Reader`]-specific implementations for the [`Epub`] format.
 
 use crate::ebook::Ebook;
 use crate::ebook::epub::Epub;
@@ -16,7 +16,7 @@ use std::cmp::PartialEq;
 ///
 /// # Configuration
 /// Reading behavior, such as how to handle non-linear content,
-/// can be configured using [`EpubReaderOptions`].
+/// can be configured using [`Epub::reader_builder`] or [`EpubReaderOptions`].
 ///
 /// # Examples
 /// - Retrieving a new EPUB reader instance with configuration:

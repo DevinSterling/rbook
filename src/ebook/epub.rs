@@ -402,7 +402,11 @@ impl Debug for Epub {
 
 impl PartialEq for Epub {
     fn eq(&self, other: &Self) -> bool {
-        self.metadata() == other.metadata()
+        self.package_file() == other.package_file()
+            && self.metadata() == other.metadata()
+            && self.manifest() == other.manifest()
+            && self.spine() == other.spine()
+            && self.toc() == other.toc()
     }
 }
 

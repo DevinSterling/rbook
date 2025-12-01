@@ -1,4 +1,7 @@
 //! Format-agnostic [`Spine`]-related content.
+//!
+//! # See Also
+//! - [`epub::spine`][crate::epub::spine] for the epub-specific spine module.
 
 use crate::ebook::manifest::ManifestEntry;
 use crate::ebook::resource::Resource;
@@ -41,7 +44,7 @@ pub trait Spine<'ebook> {
     /// The [`PageDirection`] hint, indicating how readable content flows.
     fn page_direction(&self) -> PageDirection;
 
-    /// The total number of [`entries`](SpineEntry) that make up the spine.
+    /// The total number of [`entries`](SpineEntry) that makes up the spine.
     ///
     /// # Examples
     /// - Retrieving the count:

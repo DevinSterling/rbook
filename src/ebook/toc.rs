@@ -1,4 +1,7 @@
 //! Format-agnostic table-of-contents; [`Toc`]-related content.
+//!
+//! # See Also
+//! - [`epub::toc`][crate::epub::toc] for the epub-specific toc module.
 
 use crate::ebook::manifest::ManifestEntry;
 use crate::ebook::resource::Resource;

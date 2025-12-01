@@ -1,4 +1,4 @@
-use crate::epub::open_example_epub_file_with;
+use crate::epub::util::open_example_epub_file_with;
 use rbook::ebook::element::Attributes;
 use rbook::ebook::manifest::ManifestEntry;
 use rbook::ebook::toc::{Toc, TocChildren, TocEntry, TocEntryKind};
