@@ -1,0 +1,24 @@
+<package xmlns="http://www.idpf.org/2007/opf" unique-identifier="uid" version="2.0" xml:lang="en">
+    <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+        <dc:title id="subtitle">A subtitle</dc:title>
+        <dc:creator id="author" opf:role="aut" opf:file-as="Doe, John">John Doe</dc:creator>
+        <dc:source>rbook</dc:source>
+        <dc:language>en</dc:language>
+        <dc:identifier id="uid" opf:scheme="URL">https://github.com/devinsterling/rbook</dc:identifier>
+        <dc:subject opf:authority="BISAC" opf:term="FIC024000">
+            FICTION / Occult &amp; Supernatural
+        </dc:subject>
+        <dc:date>2024-11-27</dc:date>
+        <dc:date opf:event="modification">2025-11-27</dc:date>
+        <dc:date opf:event="publication">2023-01-25</dc:date>
+        <dc:format/>
+        <meta name="cover" content="cover-image1"></meta>
+    </metadata>
+    <manifest>
+        <!-- Literally empty files; but useful for tests -->
+        <item href="cover.jpg" id="cover-image1" media-type="image/jpg"/>
+        <item href="nav.ncx" id="nav" media-type="application/x-dtbncx+xml"/>
+    </manifest>
+    <spine toc="nav" page-progression-direction="rtl">
+    </spine>
+</package>
