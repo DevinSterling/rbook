@@ -97,14 +97,9 @@ impl EpubParser<'_> {
             let mut attributes = el.bytes_attributes();
             // Could opt for a strategy pattern in the future
             let mut meta = match kind {
-                EpubMetaEntryKind::DublinCore {} => Self::handle_dublin_core(
-                    reader,
-                    &package,
-                    &el,
-                    &mut attributes,
-                    is_start,
-                    self.config.strict,
-                )?,
+                EpubMetaEntryKind::DublinCore {} => {
+                    self.handle_dublin_core(reader, &package, &el, &mut attributes, is_start)?
+                }
                 EpubMetaEntryKind::Meta { version } => {
                     self.handle_meta(reader, &package, version, &el, &mut attributes, is_start)?
                 }
