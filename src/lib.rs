@@ -18,7 +18,7 @@
 //! // Here `ebook` may be of any supported format.
 //! fn cover_image_bytes<E: Ebook>(ebook: &E) -> Option<Vec<u8>> {
 //!     // 1 - An ebook may not have a `cover_image` entry, hence the try operator (`?`).
-//!     // 2 - `read_bytes` returns a `Result`; `ok()` coverts the result into `Option`.
+//!     // 2 - `read_bytes` returns a `Result`; `ok()` converts the result into `Option`.
 //!     ebook.manifest().cover_image()?.read_bytes().ok()
 //! }
 //! ```

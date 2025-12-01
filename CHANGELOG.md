@@ -145,7 +145,7 @@
 ### Additions　**＋**
 - Implement `IntoIterator` for:
 
-  | Implementor                          | Iterator Item                   |
+  | Implementer                          | Iterator Item                   |
   |--------------------------------------|---------------------------------|
   | `EpubSpine`/`&EpubSpine`             | `EpubSpineEntry`                |
   | `EpubManifest`/`&EpubManifest`       | `EpubManifestEntry`             |
