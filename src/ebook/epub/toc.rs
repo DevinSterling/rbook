@@ -52,6 +52,10 @@ impl EpubTocData {
         }
     }
 
+    pub(super) fn empty() -> Self {
+        Self::new(HashMap::new())
+    }
+
     pub(super) fn from_guide(data: EpubTocEntryData) -> Self {
         let mut map = HashMap::new();
         map.insert(
@@ -59,10 +63,6 @@ impl EpubTocData {
             data,
         );
         Self::new(map)
-    }
-
-    pub(super) fn empty() -> Self {
-        Self::new(HashMap::new())
     }
 
     pub(super) fn extend(&mut self, data: Self) {

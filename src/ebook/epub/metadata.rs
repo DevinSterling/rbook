@@ -45,8 +45,21 @@ impl EpubMetadataData {
         }
     }
 
-    pub(super) fn by_group_mut(&mut self, group: &str) -> Option<&mut Vec<EpubMetaEntryData>> {
-        self.entries.get_mut(group)
+    pub(super) fn by_group(&self, group: &str) -> Option<&Vec<EpubMetaEntryData>> {
+        self.entries.get(group)
+    }
+}
+
+impl From<EpubVersion> for EpubMetadataData {
+    fn from(version: EpubVersion) -> Self {
+        Self::new(
+            String::new(),
+            EpubVersionData {
+                raw: version.to_string(),
+                parsed: version,
+            },
+            HashMap::new(),
+        )
     }
 }
 
@@ -456,8 +469,8 @@ impl<'ebook> Metadata<'ebook> for EpubMetadata<'ebook> {
 
     /// Returns an iterator over non-refining metadata entries.
     ///
-    /// Each entry is first grouped by its [`property`](Self::by_property) then
-    /// [`order`](MetaEntry::order), before being flattened into a single iterator.
+    /// Each entry is first grouped by its [`property`](Self::by_property),
+    /// then [`order`](MetaEntry::order) before being flattened into a single iterator.
     /// As grouping by property relies on a hash map, the order in which property groups appear
     /// is arbitrary; non-deterministic.
     ///

@@ -240,8 +240,15 @@ impl Epub {
     }
 
     /// With the specified [`EpubOpenOptions`],
-    /// opens an EPUB from any implementation of [`Read`] + [`Seek`]
-    /// (and [`Send`] + [`Sync`] if the `threadsafe` feature is enabled).
+    /// opens an EPUB from any implementation of [`Read`] + [`Seek`].
+    ///
+    /// # Thread-safety
+    /// [`Send`] + [`Sync`] are required constraints if the
+    /// `threadsafe` feature is enabled (**enabled by default**).
+    ///
+    /// Thread-safety can be disabled in a project's `Cargo.toml` file.
+    /// See the [base documentation](crate)
+    /// for a list of the default crate features and an example.
     #[deprecated(
         since = "0.6.8",
         note = "Use `Epub::options`, then call `EpubOpenOptions::read` instead."
@@ -422,6 +429,14 @@ pub(crate) struct EpubConfig {
     pub(crate) store_all: bool,
     /// See [`EpubOpenOptions::strict`].
     pub(crate) strict: bool,
+    /// See [`EpubOpenOptions::skip_metadata`]; inverted.
+    pub(crate) parse_metadata: bool,
+    /// See [`EpubOpenOptions::skip_manifest`]; inverted.
+    pub(crate) parse_manifest: bool,
+    /// See [`EpubOpenOptions::skip_spine`]; inverted.
+    pub(crate) parse_spine: bool,
+    /// See [`EpubOpenOptions::skip_toc`]; inverted.
+    pub(crate) parse_toc: bool,
 }
 
 // Temporary placeholder for now until 0.7.0
@@ -434,6 +449,10 @@ impl From<EpubOpenOptions> for EpubConfig {
             preferred_page_list: value.preferred_page_list,
             store_all: value.store_all,
             strict: value.strict,
+            parse_metadata: !value.skip_metadata,
+            parse_manifest: !value.skip_manifest,
+            parse_spine: !value.skip_spine,
+            parse_toc: !value.skip_toc,
         }
     }
 }
@@ -454,6 +473,9 @@ pub type EpubSettings = EpubOpenOptions;
 /// - [`preferred_page_list`](EpubOpenOptions::preferred_page_list)
 /// - [`store_all`](EpubOpenOptions::store_all)
 /// - [`strict`](EpubOpenOptions::strict)
+/// - [`skip_manifest`](EpubOpenOptions::skip_manifest)
+/// - [`skip_spine`](EpubOpenOptions::skip_spine)
+/// - [`skip_toc`](EpubOpenOptions::skip_toc)
 ///
 /// # Examples
 /// - Supplying specific options to open an [`Epub`] with:
@@ -465,6 +487,7 @@ pub type EpubSettings = EpubOpenOptions;
 /// let epub = Epub::options() // returns `EpubOpenOptions`
 ///     .store_all(true)
 ///     .strict(false)
+///     .skip_toc(true)
 ///     .preferred_landmarks(EpubVersion::EPUB2)
 ///     .open("tests/ebooks/example_epub")?;
 /// # Ok(())
@@ -473,6 +496,7 @@ pub type EpubSettings = EpubOpenOptions;
 #[non_exhaustive]
 #[derive(Clone, Debug)]
 pub struct EpubOpenOptions /*(EpubConfig)*/ {
+    // In 0.7.0, all these fields will be replaced with `EpubConfig`.
     /// See [`EpubOpenOptions::preferred_toc`].
     #[deprecated(since = "0.6.8", note = "Use `preferred_toc` method instead.")]
     pub preferred_toc: EpubVersion,
@@ -488,6 +512,10 @@ pub struct EpubOpenOptions /*(EpubConfig)*/ {
     /// See [`EpubOpenOptions::strict`].
     #[deprecated(since = "0.6.8", note = "Use `strict` method instead.")]
     pub strict: bool,
+    skip_metadata: bool,
+    skip_manifest: bool,
+    skip_spine: bool,
+    skip_toc: bool,
 }
 
 #[allow(deprecated)]
@@ -503,6 +531,10 @@ impl EpubOpenOptions {
             preferred_page_list: EpubVersion::EPUB3,
             store_all: false,
             strict: true,
+            skip_metadata: false,
+            skip_manifest: false,
+            skip_spine: false,
+            skip_toc: false,
         }
     }
 
@@ -526,8 +558,15 @@ impl EpubOpenOptions {
     }
 
     /// Opens an EPUB from any implementation of [`Read`] + [`Seek`]
-    /// (and [`Send`] + [`Sync`] if the `threadsafe` feature is enabled)
     /// with the specified [options](EpubOpenOptions).
+    ///
+    /// # Thread-safety
+    /// [`Send`] + [`Sync`] are required constraints if the
+    /// `threadsafe` feature is enabled (**enabled by default**).
+    ///
+    /// Thread-safety can be disabled in a project's `Cargo.toml` file.
+    /// See the [base documentation](crate)
+    /// for a list of the default crate features and an example.
     ///
     /// # Errors
     /// - [`ArchiveError`](EbookError::Archive): Missing or invalid EPUB files.
@@ -633,7 +672,7 @@ impl EpubOpenOptions {
 
     /// Store **both** EPUB 2 and 3-specific information.
     ///
-    /// Currently, this only pertains to the table of contents.
+    /// **Currently, this only pertains to the table of contents.**
     ///
     /// If the epub contains both an EPUB2 `ncx` toc
     /// and EPUB3 `xhtml` toc, they will both be parsed and
@@ -662,6 +701,88 @@ impl EpubOpenOptions {
     /// Default: `true`
     pub fn strict(mut self, strict: bool) -> Self {
         self.strict = strict;
+        self
+    }
+
+    /// When set to `true`, all parsing for [`EpubMetadata`] is skipped.
+    /// This is useful as a *speed and space optimization*
+    /// when all metadata-related info (e.g., title, author, etc.) is not required.
+    ///
+    /// If `true`, [`Epub::metadata`] will return an empty [`EpubMetadata`] instance.
+    /// However, version-associated methods (e.g., [`EpubMetadata::version`]) will work,
+    /// as version information is stored independently of internal EPUB metadata entries.
+    ///
+    /// # Side Effects
+    /// - **Refinements**:
+    ///   Methods that return refinements **will** return an empty container (e.g.,
+    ///   [`EpubManifestEntry::refinements`](manifest::EpubManifestEntry::refinements),
+    ///   [`EpubSpineEntry::refinements`](spine::EpubSpineEntry::refinements)).
+    ///
+    /// Default: `false`
+    pub fn skip_metadata(mut self, skip: bool) -> Self {
+        self.skip_metadata = skip;
+        self
+    }
+
+    /// When set to `true`, all parsing for [`EpubManifest`] is skipped.
+    /// This is useful as a *speed and space optimization*
+    /// when all manifest-related info is not required.
+    ///
+    /// If `true`, [`Epub::manifest`] will return an empty [`EpubManifest`] instance.
+    ///
+    /// # Side Effects
+    /// - **Table of Contents**:
+    ///   As [`EpubToc`] mainly relies on the manifest to resolve ToC-related resources,
+    ///   setting this to `true` **prevents detecting ToC files** (e.g. `toc.ncx`),
+    ///   even if [`Self::skip_toc`] is set to `false`.
+    ///
+    ///   **Exception**: The EPUB 2 `guide` (which resides within the package file)
+    ///   will still be parsed if present, as it does not depend on the manifest.
+    ///   To disable this, set [`Self::skip_toc`] to `true`.
+    ///
+    /// - **Manifest Entries & Resources**:
+    ///   Methods that resolve to a manifest entry or [`Resource`] **will** return [`None`] (e.g.,
+    ///   [`EpubSpineEntry::manifest_entry`](crate::ebook::spine::SpineEntry::manifest_entry),
+    ///   [`EpubTocEntry::resource`](crate::ebook::toc::TocEntry::resource)).
+    ///
+    /// - **Reader Content**:
+    ///   Accessing content from an [`EpubReader`]
+    ///   **will** result in a [`ReaderError`](crate::reader::errors::ReaderError),
+    ///   as it requires a lookup to the manifest.
+    ///
+    /// Default: `false`
+    pub fn skip_manifest(mut self, skip: bool) -> Self {
+        self.skip_manifest = skip;
+        self
+    }
+
+    /// When set to `true`, all parsing for [`EpubSpine`] is skipped.
+    /// This is useful as a *speed and space optimization*
+    /// when all spine-related info is not required.
+    ///
+    /// If `true`, [`Epub::spine`] will return an empty [`EpubSpine`] instance.
+    ///
+    /// # Side Effects
+    /// - **Readers**:
+    ///   Each created [`EpubReader`] **will** be untraversable
+    ///   as readers requires a lookup to the spine.
+    ///
+    /// Default: `false`
+    pub fn skip_spine(mut self, skip: bool) -> Self {
+        self.skip_spine = skip;
+        self
+    }
+
+    /// When set to `true`, all parsing for [`EpubToc`] is skipped
+    /// (e.g., toc, guide, landmarks, etc.).
+    /// This is useful as a *speed and space optimization*
+    /// when all ToC-related info is not required.
+    ///
+    /// If `true`, [`Epub::toc`] will return an empty [`EpubToc`] instance.
+    ///
+    /// Default: `false`
+    pub fn skip_toc(mut self, skip: bool) -> Self {
+        self.skip_toc = skip;
         self
     }
 

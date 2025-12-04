@@ -91,8 +91,11 @@ impl<'a> EpubParser<'a> {
     }
 
     // Helper methods
-    fn assert_required<T>(missing: EpubFormatError, parent: Option<T>) -> ParserResult<T> {
-        parent.ok_or_else(|| missing.into())
+    fn assert_required<T>(
+        parent: Option<T>,
+        if_missing: impl FnOnce() -> EpubFormatError,
+    ) -> ParserResult<T> {
+        parent.ok_or_else(|| if_missing().into())
     }
 
     fn assert_option<T: Default>(

@@ -49,7 +49,7 @@ pub enum EpubFormatError {
     ////////////////////////////////////////////////////////////////////////////////
     // Within `package.opf`
     ////////////////////////////////////////////////////////////////////////////////
-    /// Required EPUB version information is missing.
+    /// Required EPUB version information is missing or invalid.
     ///
     /// Error Source: `.opf` file
     #[error("Missing or invalid epub version defined in the `.opf` file: {0}")]

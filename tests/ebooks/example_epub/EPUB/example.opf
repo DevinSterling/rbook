@@ -1,4 +1,4 @@
-<package xmlns="http://www.idpf.org/2007/opf" unique-identifier="uid" version="3.0" xml:lang="en">
+<package xmlns="http://www.idpf.org/2007/opf" unique-identifier="uid" version="3.3" xml:lang="en">
     <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
         <meta property="media:duration" refines="#c1_audio">0:32:29</meta>
         <meta property="media:duration" refines="#c2_audio">0:29:49</meta>
