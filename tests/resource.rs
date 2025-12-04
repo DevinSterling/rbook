@@ -1,4 +1,4 @@
-use rbook::ebook::resource::ResourceKind;
+use rbook::ebook::resource::{Resource, ResourceKind};
 use wasm_bindgen_test::wasm_bindgen_test;
 
 #[test]
@@ -40,4 +40,21 @@ fn test_resource_kind_eq() {
 
     let e = ResourceKind::from("  example/test    ");
     assert_eq!(d, e);
+}
+
+#[test]
+#[wasm_bindgen_test]
+fn test_resource_from() {
+    let a = Resource::from("r1");
+    let b = Resource::from(&a);
+    assert_eq!(a, b);
+
+    let c = Resource::from((ResourceKind::UNSPECIFIED, "r1"));
+    assert_eq!(b, c);
+
+    let d = Resource::from((ResourceKind::TEXT, 0));
+    assert_ne!(c, d);
+
+    let e = Resource::from(0);
+    assert_ne!(b, e);
 }

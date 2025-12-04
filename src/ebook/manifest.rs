@@ -80,12 +80,10 @@ pub trait Manifest<'ebook> {
     /// let epub2_cover = epub2.manifest().cover_image().unwrap();
     /// assert_eq!(epub2_cover.href().as_ref(), "/cover.jpg" );
     /// assert_eq!(epub2_cover.resource_kind().subtype(), "jpg");
-    /// # assert_eq!(epub2.metadata().version(), EpubVersion::EPUB2);
     ///
     /// let epub3_cover = epub3.manifest().cover_image().unwrap();
     /// assert_eq!(epub3_cover.href().as_ref(), "/EPUB/img/cover.webm");
     /// assert_eq!(epub3_cover.resource_kind().subtype(), "webm");
-    /// # assert_eq!(epub3.metadata().version(), EpubVersion::EPUB3);
     /// # Ok(())
     /// # }
     /// ```
@@ -297,7 +295,7 @@ pub trait ManifestEntry<'ebook> {
 /// This will be removed in v0.7.0 where
 /// [`ManifestEntry::read_str`] and [`ManifestEntry::read_bytes`] will not be default methods.
 ///
-/// This method is only invoked if [`ManifestEntry`] is implemented
+/// This function is only invoked if [`ManifestEntry`] is implemented
 /// outside `rbook`.
 fn default_placeholder<T>(resource: Resource) -> EbookResult<T> {
     Err(ArchiveError::InvalidResource {

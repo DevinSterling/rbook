@@ -1,4 +1,4 @@
-<package xmlns="http://www.idpf.org/2007/opf" unique-identifier="uid" version="2.0" xml:lang="en">
+<package xmlns="http://www.idpf.org/2007/opf" unique-identifier="uid" version="2.5" xml:lang="en">
     <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
         <dc:title id="subtitle">A subtitle</dc:title>
         <dc:creator id="author" opf:role="aut" opf:file-as="Doe, John">John Doe</dc:creator>
@@ -14,9 +14,30 @@
         <meta name="cover" content="cover-image1"></meta>
     </metadata>
     <manifest>
-        <!-- Literally empty files; but useful for tests -->
-        <item href="cover.jpg" id="cover-image1" media-type="image/jpg"/>
         <item href="nav.ncx" id="nav" media-type="application/x-dtbncx+xml"/>
+
+        <!-- Empty files; but useful for tests -->
+        <item href="cover.jpg" id="cover-image1" media-type="image/jpg"/>
+
+        <!-- FONTS -->
+        <item href="fonts/font.woff" id="ft1-woff" media-type="font/woff"/>
+        <item href="fonts/font.ttf" id="ft2-ttf" media-type="font/ttf"/>
+        <item href="font.woff" id="ft3-woff" media-type="application/font-woff"/>
+
+        <!-- AUDIO -->
+        <item href="audio/p1.aac" id="p1-aac" media-type="audio/aac"/>
+        <item href="mp3/p2.mp3" id="p2-mp3" media-type="audio/mp3"/>
+        <item href="p3.ogg" id="p3-ogg" media-type="audio/ogg"/>
+
+        <!-- VIDEO -->
+        <item href="v1.mp4" id="v1-mp4" media-type="video/mp4"/>
+        <item href="v2.mpv" id="v2-mpv" media-type="video/mpv"/>
+
+        <!-- SCRIPTS -->
+        <item href="js/1.js" id="script-1" media-type="application/javascript" />
+        <item href="2.js" id="script-2" media-type="application/ecmascript" />
+        <item href="scripts/3.js" id="script-3" media-type="text/javascript" />
+        <item href="scripts/4.js" id="script-4" media-type="application/javascript" />
     </manifest>
     <spine page-progression-direction="rtl">
     </spine>

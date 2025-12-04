@@ -8,9 +8,9 @@ use crate::ebook::archive::zip::ZipArchive;
 use crate::ebook::resource::{Resource, ResourceKey};
 use crate::util;
 use crate::util::sync::SendAndSync;
+use std::fmt::{Debug, Formatter};
 use std::fs::File;
-use std::io;
-use std::io::BufReader;
+use std::io::{self, BufReader};
 use std::path::Path;
 
 pub(super) trait Archive: SendAndSync {
@@ -25,6 +25,34 @@ pub(super) trait Archive: SendAndSync {
         // Retrieve converted bytes
         util::utf::into_utf8_str(self.read_resource_bytes(resource)?)
             .map_err(|_| ArchiveError::InvalidUtf8Resource(resource.as_static()))
+    }
+}
+
+/// This is a wrapper currently.
+/// > When the write/modify API is released,
+/// > additional fields will be added to this struct.
+pub(super) struct ResourceArchive {
+    /// The original state of an ebook
+    base: Box<dyn Archive>,
+}
+
+impl ResourceArchive {
+    pub(super) fn new(base: Box<dyn Archive>) -> Self {
+        Self { base }
+    }
+}
+
+impl Archive for ResourceArchive {
+    fn read_resource_bytes(&self, resource: &Resource) -> ArchiveResult<Vec<u8>> {
+        self.base.read_resource_bytes(resource)
+    }
+}
+
+impl Debug for ResourceArchive {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ResourceArchive")
+            .field("base", &std::any::type_name_of_val(&self.base))
+            .finish()
     }
 }
 
@@ -45,7 +73,7 @@ fn extract_resource_key<'a>(resource: &'a Resource<'a>) -> ArchiveResult<&'a str
     }
 }
 
-/// Unzip the file if it is not directory.
+/// Unzip the file if it is not a directory.
 ///
 /// If it is, the contents can be accessed directly,
 /// which makes using a zip file unnecessary.

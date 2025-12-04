@@ -1,4 +1,4 @@
-use crate::epub::util::open_example_epub_file;
+use crate::epub::util::TestEpub::Epub3File;
 use rbook::Ebook;
 use rbook::epub::reader::{EpubReaderContent, LinearBehavior};
 use rbook::reader::errors::ReaderResult;
@@ -8,7 +8,7 @@ use wasm_bindgen_test::wasm_bindgen_test;
 #[test]
 #[wasm_bindgen_test]
 fn test_reader_linear_behavior() {
-    let epub = open_example_epub_file();
+    let epub = Epub3File.open();
     #[rustfmt::skip]
     let linear_behaviors = [
         (
@@ -41,7 +41,7 @@ fn test_reader_linear_behavior() {
 #[test]
 #[wasm_bindgen_test]
 fn test_reader_cursor() -> ReaderResult<()> {
-    let epub = open_example_epub_file();
+    let epub = Epub3File.open();
     let mut reader = epub.reader();
 
     fn idref(content: EpubReaderContent<'_>) -> &str {
@@ -98,7 +98,7 @@ fn test_reader_cursor() -> ReaderResult<()> {
 #[test]
 #[wasm_bindgen_test]
 fn test_reader_into_content_integrity() -> ReaderResult<()> {
-    let epub = open_example_epub_file();
+    let epub = Epub3File.open();
 
     // Ensure integrity
     for content_result in epub.reader() {

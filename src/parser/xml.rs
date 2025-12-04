@@ -165,19 +165,18 @@ impl XmlText for BytesText<'_> {
 pub(crate) struct BytesAttributes<'a>(Vec<Attribute<'a>>);
 
 impl BytesAttributes<'_> {
-    fn take_attribute(&mut self, name: &[u8]) -> Option<Result<String, FromUtf8Error>> {
+    /// Removes and returns the value of the attribute by `name`.
+    pub(crate) fn remove(
+        &mut self,
+        name: impl AsRef<[u8]>,
+    ) -> Result<Option<String>, FromUtf8Error> {
+        let name = name.as_ref();
+
         self.0
             .iter()
             .position(|attribute| attribute.key.as_ref() == name)
             .map(|i| String::from_utf8(self.0.swap_remove(i).value.into_owned()))
-    }
-
-    /// Removes and returns the value of the attribute by `name`.
-    pub(crate) fn take_attribute_value(
-        &mut self,
-        name: impl AsRef<[u8]>,
-    ) -> Result<Option<String>, FromUtf8Error> {
-        self.take_attribute(name.as_ref()).transpose()
+            .transpose()
     }
 }
 
@@ -219,11 +218,10 @@ fn handle_general_ref(value: &mut String, general_ref: &BytesRef) -> ParserResul
     } else {
         let decoded = general_ref.decode()?;
 
-        if let Some(resolved) = escape::resolve_xml_entity(decoded.as_ref()) {
-            value.push_str(resolved.as_ref());
-        } else {
+        match escape::resolve_xml_entity(decoded.as_ref()) {
+            Some(resolved) => value.push_str(resolved.as_ref()),
             // Unsupported entity
-            value.push_str(format!("&{decoded};").as_ref());
+            None => value.push_str(format!("&{decoded};").as_ref()),
         }
     }
 

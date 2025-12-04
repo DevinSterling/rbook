@@ -1,4 +1,3 @@
-#![warn(missing_docs)]
 //! - Repository: <https://github.com/DevinSterling/rbook>
 //! - Documentation: <https://docs.rs/rbook>
 //!
@@ -26,31 +25,31 @@
 //! # Features
 //! Here is a non-exhaustive list of the features `rbook` provides:
 //!
-//! | Feature                                   | Overview                                                                                    |
-//! |-------------------------------------------|---------------------------------------------------------------------------------------------|
-//! | [**EPUB 2 and 3**](epub)                  | Read-only (for now) view of EPUB `2` and `3` formats.                                       |
-//! | [**Streaming Reader**](reader)            | Random‐access or sequential iteration over readable content.                                |
-//! | **Detailed Types**                        | Abstractions built on expressive traits and types.                                          |
-//! | [**Metadata**](ebook::metadata)           | Typed access to titles, creators, publishers, languages, tags, roles, attributes, and more. |
-//! | [**Manifest**](ebook::manifest)           | Lookup and traverse contained resources such as readable content (XHTML) and images.        |
-//! | [**Spine**](ebook::spine)                 | Chronological reading order and preferred page direction.                                   |
-//! | [**Table of Contents (ToC)**](ebook::toc) | Navigation points, including the EPUB 2 guide and EPUB 3 landmarks.                         |
-//! | [**Resources**](ebook::resource)          | Retrieve bytes or UTF-8 strings for any manifest resource.                                  |
+//! | Feature                                   | Overview                                                                                                        |
+//! |-------------------------------------------|-----------------------------------------------------------------------------------------------------------------|
+//! | [**EPUB 2 and 3**](epub)                  | Read-only (for now) view of EPUB `2` and `3` formats.                                                           |
+//! | [**Streaming Reader**](reader)            | Random‐access or sequential iteration over readable content.                                                    |
+//! | **Detailed Types**                        | Abstractions built on expressive traits and types.                                                              |
+//! | [**Metadata**](ebook::metadata)           | Typed access to titles, creators, publishers, languages, tags, roles, attributes, and more.                     |
+//! | [**Manifest**](ebook::manifest)           | Lookup and traverse contained resources such as readable content (XHTML) and images.                            |
+//! | [**Spine**](ebook::spine)                 | Chronological reading order and preferred page direction.                                                       |
+//! | [**Table of Contents (ToC)**](ebook::toc) | Navigation points, including the EPUB 2 guide and EPUB 3 landmarks.                                             |
+//! | [**Resources**](ebook::resource)          | On-demand retrieval of bytes or strings for any manifest resource; data is not loaded up-front until requested. |                                  |
 //!
 //! ## Default crate features
 //! These are toggleable features for `rbook` that are
-//! enabled by default in a project's `cargo.toml` file:
+//! enabled by default in a project's `Cargo.toml` file:
 //!
-//! | Feature                | Description                                                 |
-//! |------------------------|-------------------------------------------------------------|
-//! | [**prelude**](prelude) | Convenience prelude ***only*** including common traits.     |
-//! | **threadsafe**         | Enables constraint and support for [`Send`] + [`Sync`].     |
+//! | Feature                | Description                                             |
+//! |------------------------|---------------------------------------------------------|
+//! | [**prelude**](prelude) | Convenience prelude ***only*** including common traits. |
+//! | **threadsafe**         | Enables `Send` + `Sync` constraint for `Epub`.          |
 //!
 //! Default features can be disabled and toggled selectively.
 //! For example, omitting the `prelude` while retaining the `threadsafe` feature:
 //! ```toml
 //! [dependencies]
-//! rbook = { version = "0.6.9", default-features = false, features = ["threadsafe"] }
+//! rbook = { version = "0.6.10", default-features = false, features = ["threadsafe"] }
 //! ```
 //!
 //! # Opening an [`Ebook`]
@@ -68,9 +67,9 @@
 //! - Or any implementation of [`Read`](std::io::Read) + [`Seek`](std::io::Seek)
 //!   (and [`Send`] + [`Sync`] if the `threadsafe` feature is enabled):
 //!   ```no_run
-//!   # use rbook::epub::{Epub, EpubSettings};
-//!   # let bytes_vec = Vec::new(); // Rea
-//!   let cursor = std::io::Cursor::new(bytes_vec);
+//!   # use rbook::Epub;
+//!   # let bytes = Vec::new();
+//!   let cursor = std::io::Cursor::new(bytes);
 //!   let epub = Epub::options().read(cursor);
 //!   ```
 //!
@@ -80,6 +79,10 @@
 //! # use rbook::Epub;
 //! let epub = Epub::options()
 //!     .strict(false) // Disable strict checks (`true` by default)
+//!     // If only metadata is needed, skipping helps quicken parsing time and reduce space.
+//!     .skip_toc(true) // Skips ToC-related parsing, such as toc.ncx (`false` by default)
+//!     .skip_manifest(true) // Skips manifest-related parsing (`false` by default)
+//!     .skip_spine(true) // Skips spine-related parsing (`false` by default)
 //!     .open("tests/ebooks/example_epub")
 //!     .unwrap();
 //! ```
@@ -88,6 +91,8 @@
 //! which traverses end-user-readable resources in canonical order:
 //! ```
 //! # use rbook::{Ebook, Epub};
+//! // Import traits (Alternatively, rbook::prelude::*)
+//! use rbook::ebook::manifest::ManifestEntry;
 //! use rbook::reader::{Reader, ReaderContent};
 //! # let epub = Epub::open("tests/ebooks/example_epub").unwrap();
 //!
@@ -96,7 +101,10 @@
 //!
 //! // Print the readable content
 //! while let Some(Ok(data)) = reader.read_next() {
-//!     assert_eq!("application/xhtml+xml", data.manifest_entry().media_type());
+//!     let resource_kind = data.manifest_entry().resource_kind();
+//!
+//!     assert_eq!("application/xhtml+xml", resource_kind.as_str());
+//!     assert_eq!("xhtml", resource_kind.subtype());
 //!     println!("{}", data.content());
 //! }
 //! ```
@@ -104,7 +112,7 @@
 //! such as [linearity](epub::reader::EpubReaderOptions::linear_behavior):
 //! ```
 //! # use rbook::{Ebook, Epub};
-//! use rbook::epub::reader::{LinearBehavior};
+//! use rbook::epub::reader::LinearBehavior;
 //!
 //! # let epub = Epub::open("tests/ebooks/example_epub").unwrap();
 //! let mut reader = epub.reader_builder()
@@ -146,7 +154,7 @@
 //! # let epub = Epub::open("tests/ebooks/example_epub")?;
 //! let manifest_entry = epub.manifest().cover_image().unwrap();
 //!
-//! let bytes_a = epub.read_resource_bytes(manifest_entry.resource())?;
+//! let bytes_a = epub.read_resource_bytes(manifest_entry)?;
 //! let bytes_b = epub.read_resource_bytes("/EPUB/img/cover.webm")?;
 //!
 //! assert_eq!(bytes_a, bytes_b);
@@ -187,11 +195,11 @@
 //!
 //! The idea of libraries providing a prelude is subjective and may not be desirable.
 //! As such, it is set as a default crate feature that can be disabled inside a
-//! project's `cargo.toml` file.
+//! project's `Cargo.toml` file.
 //! For example, omitting the `prelude` while retaining the `threadsafe` feature:
 //! ```toml
 //! [dependencies]
-//! rbook = { version = "0.6.9", default-features = false, features = ["threadsafe"] }
+//! rbook = { version = "0.6.10", default-features = false, features = ["threadsafe"] }
 //! ```
 //!
 //! # Examples
@@ -276,6 +284,9 @@
 //! // No more fallbacks
 //! assert_eq!(None, png_cover.fallback());
 //! ```
+
+#![warn(missing_docs)]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
 mod parser;
 mod util;

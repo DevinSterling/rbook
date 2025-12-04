@@ -20,7 +20,7 @@ jobs:
       - name: 'Run fmt (Check formatting)'
         run: cargo fmt -- --check
       - name: 'Run doc (Check documentation)'
-        run: cargo doc --no-deps --all-features
+        run: RUSTDOCFLAGS="-D warnings" cargo doc --no-deps --all-features
 
   clippy:
     strategy:

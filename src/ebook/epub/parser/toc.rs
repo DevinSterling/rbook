@@ -63,7 +63,7 @@ impl EpubParser<'_> {
                     if Self::is_nav_details(el.local_name()) =>
                 {
                     let is_start = matches!(event, Event::Start(_));
-                    Self::handle_details(resolver, el, is_start, &mut entry_stack, &mut reader)?;
+                    self.handle_details(resolver, el, is_start, &mut entry_stack, &mut reader)?;
                 }
                 // Pop from `entry_stack`; backtrack
                 Event::End(el)
@@ -138,7 +138,7 @@ impl EpubParser<'_> {
         // Check for order explicitly set by NCX <navPoint> elements
         else if self.version_hint.is_epub2() && el.local_name().as_ref() == bytes::NAV_POINT {
             child.order = attributes
-                .take_attribute_value(consts::PLAY_ORDER)?
+                .remove(consts::PLAY_ORDER)?
                 .and_then(|value| value.parse().ok())
                 .unwrap_or(order);
         }
@@ -159,13 +159,14 @@ impl EpubParser<'_> {
         }
         // The nav element does not have a parent; the root.
         else {
-            let version = &self.version_hint;
+            let version = self.version_hint.as_major();
             let toc_kind = nav_entry.kind.clone();
-            toc_groups.insert(EpubTocKey::of(toc_kind, *version), nav_entry);
+            toc_groups.insert(EpubTocKey::new(toc_kind, version).into(), nav_entry);
         }
     }
 
     fn handle_details(
+        &self,
         resolver: &UriResolver,
         el: &BytesStart,
         is_start: bool,
@@ -183,19 +184,19 @@ impl EpubParser<'_> {
         // If currently not on a `navLabel`, then the current element is either
         // `a` or `navContent` with a potentially corresponding `href`/`src` attribute
         if el_name.as_ref() == bytes::ANCHOR {
-            nav_entry.href_raw = attributes.take_attribute_value(consts::HREF)?;
+            nav_entry.href_raw = attributes.remove(consts::HREF)?;
             nav_entry.kind = attributes
-                .take_attribute_value(consts::EPUB_TYPE)?
+                .remove(consts::EPUB_TYPE)?
                 .unwrap_or_default()
                 .into();
         } else if el_name.as_ref() == bytes::NAV_CONTENT {
-            nav_entry.href_raw = attributes.take_attribute_value(consts::SRC)?;
+            nav_entry.href_raw = attributes.remove(consts::SRC)?;
         }
         // Convert relative href into absolute
-        nav_entry.href = nav_entry
-            .href_raw
-            .as_deref()
-            .map(|href_raw| resolver.resolve(href_raw));
+        if let Some(href_raw) = &nav_entry.href_raw {
+            let resolved = resolver.resolve(href_raw);
+            nav_entry.href = Some(self.require_encoded(resolved)?);
+        }
 
         // Get value if the element isn't <ncx:content>.
         // <ncx:content> contains no text to extract.
@@ -208,7 +209,10 @@ impl EpubParser<'_> {
 
     fn assert_toc(&self, map: &TocGroups) -> ParserResult<()> {
         // Check if the epub contains a main table of contents
-        if map.contains_key(&EpubTocKey::of(TocEntryKind::Toc, self.version_hint)) {
+        if map.contains_key(&EpubTocKey::new(
+            TocEntryKind::Toc,
+            self.version_hint.as_major(),
+        )) {
             Ok(())
         } else {
             Err(EpubFormatError::NoTocFound.into())
@@ -221,10 +225,8 @@ impl EpubParser<'_> {
         attributes: &mut BytesAttributes,
     ) -> ParserResult<TocEntryKind<'static>> {
         Ok(if self.version_hint.is_epub3() {
-            let mut epub_type = self.assert_option(
-                attributes.take_attribute_value(consts::EPUB_TYPE)?,
-                "nav[*epub:type]",
-            )?;
+            let mut epub_type =
+                self.require_attribute(attributes.remove(consts::EPUB_TYPE)?, "nav[*epub:type]")?;
             // Although rare, `epub:type` allows several properties
             // separated by whitespace for toc elements. As a result,
             // get the first value as it is the most relevant and ignore the rest.
@@ -245,7 +247,7 @@ impl EpubParser<'_> {
         attributes: &mut BytesAttributes,
     ) -> ParserResult<EpubTocEntryData> {
         Ok(EpubTocEntryData {
-            id: attributes.take_attribute_value(consts::ID)?,
+            id: attributes.remove(consts::ID)?,
             order,
             depth,
             ..Default::default()

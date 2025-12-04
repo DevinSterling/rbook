@@ -2,6 +2,10 @@
 
 /// Possible format errors from a [`Epub`](super::Epub).
 ///
+/// Most of these errors are ignored when
+/// [`EpubOpenOptions::strict`](super::EpubOpenOptions::strict)
+/// is disabled.
+///
 /// # Variants
 /// ## Container Errors (`META-INF/container.xml`)
 /// Occurs within the `META-INF/container.xml` file:
@@ -17,11 +21,13 @@
 /// - [`NoManifestFound`](EpubFormatError::NoManifestFound)
 /// - [`NoSpineFound`](EpubFormatError::NoSpineFound)
 /// ## Toc Errors (`.ncx/.xhtml`)
-/// Occurs within the toc `.ncx` or `xhtml` file:
+/// Occurs within toc `.ncx` or `.xhtml` files:
 /// - [`NoTocFound`](EpubFormatError::NoTocFound)
 /// ## General Errors
 /// Occurs in any file:
 /// - [`MissingAttribute`](EpubFormatError::MissingAttribute)
+/// - [`MissingValue`](EpubFormatError::MissingValue)
+/// - [`InvalidHref`](EpubFormatError::InvalidHref)
 #[non_exhaustive]
 #[derive(thiserror::Error, Debug)]
 pub enum EpubFormatError {
@@ -46,10 +52,21 @@ pub enum EpubFormatError {
     #[error("Missing `<rootfile>` referencing an `.opf` file in `META-INF/container.xml`.")]
     NoOpfReference,
 
+    /// An href pointing to a location is malformed.
+    ///
+    /// # Example
+    /// Hrefs are expected be percent-encoded. Otherwise, it is malformed.
+    /// - **Valid**:
+    ///   `path/to/some%20cool%20file.xhtml`
+    /// - **Malformed**:
+    ///   `path/to/some cool file.xhtml`
+    #[error("Invalid href: {0}")]
+    InvalidHref(String),
+
     ////////////////////////////////////////////////////////////////////////////////
     // Within `package.opf`
     ////////////////////////////////////////////////////////////////////////////////
-    /// Required EPUB version information is missing.
+    /// Required EPUB version information is missing or invalid.
     ///
     /// Error Source: `.opf` file
     #[error("Missing or invalid epub version defined in the `.opf` file: {0}")]

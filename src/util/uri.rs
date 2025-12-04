@@ -1,6 +1,23 @@
 use std::borrow::Cow;
 use std::path::{Component, Path, PathBuf};
 
+/// Resolver to turn relative uris into absolute.
+#[derive(Copy, Clone, Debug)]
+pub(crate) struct UriResolver<'a>(
+    /// The absolute path where relative paths are made absolute from.
+    &'a str,
+);
+
+impl<'a> UriResolver<'a> {
+    pub(crate) fn new(absolute_path: &'a str) -> Self {
+        Self(absolute_path)
+    }
+
+    pub(crate) fn resolve(&self, href: &str) -> String {
+        resolve(self.0, href).into_owned()
+    }
+}
+
 pub(crate) fn parent(href: &str) -> &str {
     href.rfind('/')
         .map_or("", |index| if index == 0 { "/" } else { &href[..index] })
@@ -8,6 +25,24 @@ pub(crate) fn parent(href: &str) -> &str {
 
 pub(crate) fn decode(encoded: &str) -> Cow<'_, str> {
     percent_encoding::percent_decode_str(encoded).decode_utf8_lossy()
+}
+
+pub(crate) fn encode(original: &str) -> Cow<'_, str> {
+    const ASCII_SET: &percent_encoding::AsciiSet = &percent_encoding::NON_ALPHANUMERIC
+        .remove(b'%') // Prevent double-encoding
+        .remove(b'.') // File extensions
+        .remove(b'/') // Directory separator
+        .remove(b':') // Schemes
+        .remove(b'#') // Fragments (Toc entries)
+        .remove(b'?') // Query strings (Toc entries, although rare...)
+        .remove(b'-')
+        .remove(b'_')
+        .remove(b'+')
+        .remove(b'~')
+        .remove(b'=')
+        .remove(b'&');
+
+    percent_encoding::percent_encode(original.as_bytes(), ASCII_SET).into()
 }
 
 pub(crate) fn normalize(href: &str) -> String {

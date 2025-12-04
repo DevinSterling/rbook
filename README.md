@@ -6,7 +6,7 @@
 
 ![rbook](https://raw.githubusercontent.com/DevinSterling/devinsterling-com/master/public/images/rbook/rbook.png)
 
-A fast, format-agnostic, ergonomic ebook library with a focus on EPUB.
+> A fast, format-agnostic, ergonomic ebook library with a focus on EPUB.
 
 The primary goal of `rbook` is to provide an easy-to-use high-level API for handling ebooks.
 Most importantly, this library is designed with future formats in mind
@@ -20,32 +20,32 @@ and [reader](https://docs.rs/rbook/latest/rbook/reader) module, allowing all for
 ## Features
 Here is a non-exhaustive list of the features `rbook` provides:
 
-| Feature                     | Overview                                                                                    | Documentation                                                        |
-|-----------------------------|---------------------------------------------------------------------------------------------|----------------------------------------------------------------------|
-| **EPUB 2 and 3**            | Read-only (for now) view of EPUB `2` and `3` formats.                                       | [epub module](https://docs.rs/rbook/latest/rbook/ebook/epub)         |
-| **Reader**                  | Random‐access or sequential iteration over readable content.                                | [reader module](https://docs.rs/rbook/latest/rbook/reader)           |
-| **Detailed Types**          | Abstractions built on expressive traits and types.                                          |                                                                      |
-| **Metadata**                | Typed access to titles, creators, publishers, languages, tags, roles, attributes, and more. | [metadata module](https://docs.rs/rbook/latest/rbook/ebook/metadata) |
-| **Manifest**                | Lookup and traverse contained resources such as readable content (XHTML) and images.        | [manifest module](https://docs.rs/rbook/latest/rbook/ebook/manifest) |
-| **Spine**                   | Chronological reading order and preferred page direction.                                   | [spine module](https://docs.rs/rbook/latest/rbook/ebook/spine)       |
-| **Table of Contents (ToC)** | Navigation points, including the EPUB 2 guide and EPUB 3 landmarks.                         | [toc module](https://docs.rs/rbook/latest/rbook/ebook/toc)           |
-| **Resources**               | Retrieve bytes or UTF-8 strings for any manifest resource.                                  | [resource module](https://docs.rs/rbook/latest/rbook/ebook/resource) |
+| Feature                     | Overview                                                                                                        | Documentation                                                        |
+|-----------------------------|-----------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------|
+| **EPUB 2 and 3**            | Read-only (for now) view of EPUB `2` and `3` formats.                                                           | [epub module](https://docs.rs/rbook/latest/rbook/ebook/epub)         |
+| **Reader**                  | Random‐access or sequential iteration over readable content.                                                    | [reader module](https://docs.rs/rbook/latest/rbook/reader)           |
+| **Detailed Types**          | Abstractions built on expressive traits and types.                                                              |                                                                      |
+| **Metadata**                | Typed access to titles, creators, publishers, languages, tags, roles, attributes, and more.                     | [metadata module](https://docs.rs/rbook/latest/rbook/ebook/metadata) |
+| **Manifest**                | Lookup and traverse contained resources such as readable content (XHTML) and images.                            | [manifest module](https://docs.rs/rbook/latest/rbook/ebook/manifest) |
+| **Spine**                   | Chronological reading order and preferred page direction.                                                       | [spine module](https://docs.rs/rbook/latest/rbook/ebook/spine)       |
+| **Table of Contents (ToC)** | Navigation points, including the EPUB 2 guide and EPUB 3 landmarks.                                             | [toc module](https://docs.rs/rbook/latest/rbook/ebook/toc)           |
+| **Resources**               | On-demand retrieval of bytes or strings for any manifest resource; data is not loaded up-front until requested. | [resource module](https://docs.rs/rbook/latest/rbook/ebook/resource) |
 
 ### Default crate features
 These are toggleable features for `rbook` that are
-enabled by default in a project's `cargo.toml` file:
+enabled by default in a project's `Cargo.toml` file:
 
 | Feature        | Description                                                                                           |
 |----------------|-------------------------------------------------------------------------------------------------------|
 | **prelude**    | Convenience [prelude](https://docs.rs/rbook/latest/rbook/prelude) ***only*** including common traits. |
-| **threadsafe** | Enables constraint and support for `Send` + `Sync`.                                                   |
+| **threadsafe** | Enables `Send` + `Sync` constraint for `Epub`.                                                        |
 
 ## Usage
-`rbook` can be used by adding it as a dependency in a project's `cargo.toml` file:
+`rbook` can be used by adding it as a dependency in a project's `Cargo.toml` file:
 ```toml
 [dependencies]
-rbook = "0.6.9"                                           # with default features
-# rbook = { version = "0.6.9", default-features = false } # excluding default features
+rbook = "0.6.10"                                           # With default features
+# rbook = { version = "0.6.10", default-features = false } # Excluding default features
 ```
 
 ## WebAssembly
@@ -58,9 +58,10 @@ use rbook::{Epub, prelude::*}; // Prelude for traits
 
 fn main() {
     // Open an epub from a file or directory
-    // * `Read + Seek` implementations supported via `read(...)`
+    // * `Read + Seek` implementations supported via `read(...)` for byte streams/buffers
     let epub = Epub::options()
         .strict(false) // Disable strict checks (`true` by default)
+        .skip_toc(true) // Skips ToC-related parsing, such as toc.ncx (`false` by default)
         .open("tests/ebooks/example_epub")
         .unwrap();
 
@@ -70,7 +71,9 @@ fn main() {
     
     // Print the readable content
     while let Some(Ok(data)) = reader.read_next() {
-        assert_eq!("application/xhtml+xml", data.manifest_entry().media_type());
+        let resource_kind = data.manifest_entry().resource_kind();
+        assert_eq!("application/xhtml+xml", resource_kind.as_str());
+        assert_eq!("xhtml", resource_kind.subtype());
         println!("{}", data.content());
     }
 }
@@ -101,8 +104,15 @@ use rbook::{Epub, prelude::*};
 use rbook::ebook::metadata::LanguageKind;
 
 fn main() {
-    let epub = Epub::open("tests/ebooks/example_epub").unwrap();
-
+    // If only metadata is needed, skipping helps quicken parsing time and reduce space.
+    let epub = Epub::options()
+        // These flags are `false` by default
+        .skip_toc(true)
+        .skip_manifest(true)
+        .skip_spine(true)
+        .open("tests/ebooks/example_epub")
+        .unwrap();
+    
     // Retrieve the first creator
     let creator = epub.metadata().creators().next().unwrap();
     assert_eq!("John Doe", creator.value());
@@ -145,3 +155,11 @@ fn main() {
 ```
 
 More examples are available in the documentation: <https://docs.rs/rbook>
+
+## License
+Licensed under [**Apache License, Version 2.0**](LICENSE).
+
+### Contribution
+Unless you explicitly state otherwise, any contribution intentionally submitted 
+for inclusion in the work by you, as defined in the Apache-2.0 license,
+shall be licensed as above, without any additional terms or conditions.

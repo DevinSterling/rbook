@@ -23,16 +23,14 @@ impl EpubParser<'_> {
             let mut attributes = el.bytes_attributes();
 
             // Required fields
-            let idref = self.assert_option(
-                attributes.take_attribute_value(consts::IDREF)?,
-                "spine > itemref[*idref]",
-            )?;
+            let idref = self
+                .require_attribute(attributes.remove(consts::IDREF)?, "spine > itemref[*idref]")?;
 
             // Optional fields
-            let id = attributes.take_attribute_value(consts::ID)?;
-            let properties = attributes.take_attribute_value(consts::PROPERTIES)?.into();
+            let id = attributes.remove(consts::ID)?;
+            let properties = attributes.remove(consts::PROPERTIES)?.into();
             let linear = attributes
-                .take_attribute_value(consts::LINEAR)?
+                .remove(consts::LINEAR)?
                 .is_none_or(|linear| linear == "yes");
             let refinements = id
                 .as_deref()

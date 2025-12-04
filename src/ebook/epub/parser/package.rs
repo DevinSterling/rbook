@@ -69,19 +69,58 @@ impl EpubParser<'_> {
     ) -> ParserResult<ProcessedPackageData> {
         let (metadata, manifest, spine, guide) = self.handle_opf(resolver, data)?;
 
-        // Assert existence
-        let mut metadata = Self::assert_required(EpubFormatError::NoMetadataFound, metadata)?;
-        let mut manifest = Self::assert_required(EpubFormatError::NoManifestFound, manifest)?;
-        let spine = Self::assert_required(EpubFormatError::NoSpineFound, spine)?;
+        // Optional, if parsing is skipped
+        let metadata = self.resolve_section(
+            self.config.parse_metadata,
+            metadata,
+            || EpubFormatError::NoMetadataFound,
+            || EpubMetadataData::from(self.version_hint),
+        )?;
+        let mut manifest = self.resolve_section(
+            self.config.parse_manifest,
+            manifest,
+            || EpubFormatError::NoManifestFound,
+            EpubManifestData::empty,
+        )?;
+        let spine = self.resolve_section(
+            self.config.parse_spine,
+            spine,
+            || EpubFormatError::NoSpineFound,
+            EpubSpineData::empty,
+        )?;
         let toc_data = guide.unwrap_or_else(EpubTocData::empty);
 
-        // Post-process
-        if self.version_hint.is_epub2() {
-            Self::handle_epub2_cover_image(&mut metadata, &mut manifest);
+        // Post-processing
+        // Retrieving the toc hrefs depends on the manifest being parsed
+        let toc_hrefs = if self.config.parse_manifest && self.config.parse_toc {
+            self.get_toc_hrefs(&manifest)?
+        } else {
+            Vec::new()
+        };
+        if self.version_hint.is_epub2() && self.config.parse_manifest {
+            Self::handle_epub2_cover_image(&metadata, &mut manifest);
         }
-        let toc_hrefs = self.get_toc_hrefs(&manifest)?;
 
         Ok((toc_hrefs, metadata, manifest, spine, toc_data))
+    }
+
+    fn resolve_section<T>(
+        &self,
+        should_parse: bool,
+        option_data: Option<T>,
+        error: impl FnOnce() -> EpubFormatError,
+        default: impl FnOnce() -> T,
+    ) -> ParserResult<T> {
+        if should_parse {
+            // If parsing should happen, check if the parsed item exists
+            if let Some(data) = option_data {
+                return Ok(data);
+            } else if self.config.strict {
+                return Err(error().into());
+            }
+        }
+        // if not parsed (skipped) or not strict (lenient), use the default
+        Ok(default())
     }
 
     fn handle_opf(&mut self, resolver: UriResolver, data: &[u8]) -> ParserResult<ProcessedOpfData> {
@@ -104,19 +143,20 @@ impl EpubParser<'_> {
                 bytes::PACKAGE => {
                     package.replace(self.parse_package(&el)?);
                 }
-                bytes::METADATA => {
+                bytes::METADATA if self.config.parse_metadata => {
                     metadata.replace(self.parse_metadata(
                         &mut ctx,
-                        Self::assert_required(EpubFormatError::NoPackageFound, package.take())?,
+                        Self::mandatory(package.take(), || EpubFormatError::NoPackageFound)?,
                     )?);
                 }
-                bytes::MANIFEST => {
+                bytes::MANIFEST if self.config.parse_manifest => {
                     manifest.replace(self.parse_manifest(&mut ctx)?);
                 }
-                bytes::SPINE => {
+                bytes::SPINE if self.config.parse_spine => {
                     spine.replace(self.parse_spine(&mut ctx, &el)?);
                 }
-                bytes::GUIDE => {
+                // "toc"-related due to its navigational aspect.
+                bytes::GUIDE if self.config.parse_toc => {
                     guide.replace(self.parse_guide(&mut ctx, &el)?);
                 }
                 _ => {}
@@ -130,21 +170,17 @@ impl EpubParser<'_> {
         let mut attributes = package.bytes_attributes();
 
         // Required attributes
-        let version = self.assert_option(
-            attributes.take_attribute_value(consts::VERSION)?,
-            "package[*version]",
-        )?;
-        let unique_id = self.assert_option(
-            attributes.take_attribute_value(consts::UNIQUE_ID)?,
+        let version =
+            self.require_attribute(attributes.remove(consts::VERSION)?, "package[*version]")?;
+        let unique_id = self.require_attribute(
+            attributes.remove(consts::UNIQUE_ID)?,
             "package[*unique-identifier]",
         )?;
 
         // Optional attributes
-        let xml_lang = attributes
-            .take_attribute_value(consts::LANG)?
-            .map(Shared::new);
+        let xml_lang = attributes.remove(consts::LANG)?.map(Shared::new);
         let dir = attributes
-            .take_attribute_value(consts::DIR)?
+            .remove(consts::DIR)?
             .map_or(TextDirection::Auto, TextDirection::from);
 
         let version = self.handle_epub_version(version)?;
@@ -165,9 +201,11 @@ impl EpubParser<'_> {
         });
 
         self.version_hint = match &parsed {
-            EpubVersion::Epub2(_) => EpubVersion::EPUB2,
+            EpubVersion::Epub2(_) | EpubVersion::Epub3(_) => parsed,
             // If not strict, treat unknown as epub3
-            _ => EpubVersion::EPUB3,
+            _ if !self.config.strict => EpubVersion::EPUB3,
+            // Outside the valid range 2 <= version < 4
+            _ => return Err(EpubFormatError::UnknownVersion(raw).into()),
         };
 
         Ok(EpubVersionData { raw, parsed })
@@ -177,9 +215,9 @@ impl EpubParser<'_> {
     /// referenced manifest entry (if it doesn't contain it already).
     ///
     /// This is ignored for EPUB 3
-    fn handle_epub2_cover_image(metadata: &mut EpubMetadataData, manifest: &mut EpubManifestData) {
+    fn handle_epub2_cover_image(metadata: &EpubMetadataData, manifest: &mut EpubManifestData) {
         if let Some(properties) = metadata
-            .by_group_mut(consts::COVER)
+            .by_group(consts::COVER)
             .and_then(|group| group.first())
             .and_then(|cover| manifest.by_id_mut(&cover.value))
             .map(|entry| &mut entry.properties)

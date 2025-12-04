@@ -720,7 +720,7 @@ impl PartialEq for ResourceKind<'_> {
 
 impl Display for ResourceKind<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.write_str(&self.0)
+        f.write_str(self.as_str())
     }
 }
 
@@ -756,28 +756,4 @@ impl<'a> From<&'a Self> for ResourceKind<'a> {
     fn from(value: &'a Self) -> Self {
         Self(Cow::Borrowed(value.0.as_ref()))
     }
-}
-
-#[cfg(test)]
-mod tests {
-    use crate::ebook::resource::{Resource, ResourceKind};
-
-    #[test]
-    fn test_resource_from() {
-        let a = Resource::from("r1");
-        let b = Resource::from(&a);
-        assert_eq!(a, b);
-
-        let c = Resource::from((ResourceKind::UNSPECIFIED, "r1"));
-        assert_eq!(b, c);
-
-        let d = Resource::from((ResourceKind::TEXT, 0));
-        assert_ne!(c, d);
-
-        let e = Resource::from(0);
-        assert_ne!(b, e);
-    }
-
-    #[test]
-    fn test_resource_display() {}
 }

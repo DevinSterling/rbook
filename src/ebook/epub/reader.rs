@@ -35,7 +35,7 @@ use std::cmp::PartialEq;
 /// // Stream over all linear content
 /// for content_result in &mut reader {
 ///     # count += 1;
-///     let content = content_result.unwrap();
+///     let content = content_result?;
 ///     assert!(content.spine_entry().is_linear());
 /// }
 /// # assert_eq!(3, count);
@@ -91,7 +91,7 @@ impl<'ebook> EpubReader<'ebook> {
         spine_entry.manifest_entry().ok_or_else(|| {
             ReaderError::MalformedEbook(
                 EpubFormatError::MissingAttribute(format!(
-                    "spine idref of `{}` not found within the manifest",
+                    "Invalid spine idref - Resource with id of `{}` not found within the manifest",
                     spine_entry.idref(),
                 ))
                 .into(),
@@ -223,7 +223,7 @@ impl<'ebook> Iterator for EpubReader<'ebook> {
     type Item = ReaderResult<EpubReaderContent<'ebook>>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        Reader::read_next(self)
+        self.read_next()
     }
 }
 

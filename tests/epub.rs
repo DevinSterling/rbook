@@ -7,14 +7,15 @@ mod epub {
     mod toc;
     mod util;
 
+    use crate::epub::util::TestEpub::{Epub3Dir, Epub3File};
     use rbook::Ebook;
     use rbook::ebook::manifest::{Manifest, ManifestEntry};
     use std::path::Path;
 
     #[test]
     fn test_comparison() {
-        let epub_a = util::open_example_epub_file();
-        let epub_b = util::open_example_epub_dir();
+        let epub_a = Epub3File.open();
+        let epub_b = Epub3Dir.open();
 
         assert_eq!(
             epub_a, epub_b,
@@ -24,8 +25,8 @@ mod epub {
 
     #[test]
     fn test_read_resources() {
-        let epub = util::open_example_epub_file();
-        let location = Path::new(util::EXAMPLE_UNZIPPED_EPUB);
+        let epub = Epub3File.open();
+        let location = Path::new(util::EPUB3_DIR);
 
         for item in epub.manifest().entries() {
             // Remove absolute prefix to resolve outside the epub container
@@ -42,8 +43,8 @@ mod epub {
 
     #[test]
     fn test_read_resources_str() {
-        let epub = util::open_example_epub_file();
-        let location = Path::new(util::EXAMPLE_UNZIPPED_EPUB);
+        let epub = Epub3File.open();
+        let location = Path::new(util::EPUB3_DIR);
 
         for item in epub.manifest().readable_content() {
             // Remove absolute prefix to resolve outside the epub container

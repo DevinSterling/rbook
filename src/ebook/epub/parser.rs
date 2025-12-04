@@ -14,7 +14,8 @@ use crate::ebook::epub::spine::EpubSpineData;
 use crate::ebook::epub::toc::EpubTocData;
 use crate::ebook::errors::ArchiveError;
 use crate::parser::ParserResult;
-use crate::util::uri;
+use crate::util::uri::{self, UriResolver};
+use std::borrow::Cow;
 
 pub(super) struct ParsedContent {
     pub(super) package_file: String,
@@ -23,18 +24,6 @@ pub(super) struct ParsedContent {
     pub(super) spine: EpubSpineData,
     /// Encompasses landmarks & guide as well.
     pub(super) toc: EpubTocData,
-}
-
-/// Resolver to turn relative uris into absolute.
-pub(super) struct UriResolver<'a>(
-    /// The absolute path where relative paths are made absolute from.
-    &'a str,
-);
-
-impl UriResolver<'_> {
-    pub(super) fn resolve(&self, href: &str) -> String {
-        uri::resolve(self.0, href).into_owned()
-    }
 }
 
 pub(super) struct EpubParser<'a> {
@@ -57,9 +46,9 @@ impl<'a> EpubParser<'a> {
         // Parse "META-INF/container.xml"
         let content_meta_inf = self.read_resource(consts::CONTAINER)?;
 
-        let package_file = Self::parse_container(&content_meta_inf)?;
+        let package_file = self.parse_container(&content_meta_inf)?;
         // A resolver to turn uris within the <package> from relative to absolute
-        let package_resolver = UriResolver(uri::parent(&package_file));
+        let package_resolver = UriResolver::new(uri::parent(&package_file));
 
         // Parse "package.opf"
         let package_content = self.read_resource(package_file.as_str())?;
@@ -70,7 +59,7 @@ impl<'a> EpubParser<'a> {
         for TocLocation { href, version } in toc_hrefs {
             self.version_hint = version;
             // A resolver to turn uris within the toc file from relative to absolute
-            let toc_resolver = UriResolver(uri::parent(&href));
+            let toc_resolver = UriResolver::new(uri::parent(&href));
             let content_toc = self.read_resource(href.as_str())?;
             toc.extend(self.parse_toc(&toc_resolver, &content_toc)?);
         }
@@ -91,19 +80,40 @@ impl<'a> EpubParser<'a> {
     }
 
     // Helper methods
-    fn assert_required<T>(missing: EpubFormatError, parent: Option<T>) -> ParserResult<T> {
-        parent.ok_or_else(|| missing.into())
+    fn require_encoded(&self, href: String) -> ParserResult<String> {
+        let encoded = uri::encode(&href);
+
+        if self.config.strict && matches!(encoded, Cow::Owned(_)) {
+            Err(EpubFormatError::InvalidHref(format!("`{href}` <-- Not percent-encoded")).into())
+        } else {
+            Ok(match encoded {
+                Cow::Owned(encoded) => encoded,
+                Cow::Borrowed(_) => href,
+            })
+        }
     }
 
-    fn assert_option<T: Default>(
+    fn mandatory<T>(
+        parent: Option<T>,
+        if_missing: impl FnOnce() -> EpubFormatError,
+    ) -> ParserResult<T> {
+        parent.ok_or_else(|| if_missing().into())
+    }
+
+    /// Required attribute value.
+    ///
+    /// If `attribute_value` is [`None`],
+    /// it's [`Default`] is returned if `strict` mode is disabled.
+    /// Otherwise, an error is returned.
+    fn require_attribute<T: Default>(
         &self,
-        option: Option<T>,
+        attribute_value: Option<T>,
         error_message: &'static str,
     ) -> ParserResult<T> {
-        if self.config.strict && option.is_none() {
+        if self.config.strict && attribute_value.is_none() {
             Err(EpubFormatError::MissingAttribute(String::from(error_message)).into())
         } else {
-            Ok(option.unwrap_or_default())
+            Ok(attribute_value.unwrap_or_default())
         }
     }
 }

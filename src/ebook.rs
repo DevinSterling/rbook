@@ -16,7 +16,7 @@
 //!
 //! ## Supporting Components
 //! - [`resource`]: Resource identification and handles.
-//! - [`element`]: Access to `XML`-related types.
+//! - [`element`]: Access to XML-related types.
 
 pub(super) mod archive;
 pub mod element;

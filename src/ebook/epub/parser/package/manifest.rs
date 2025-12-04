@@ -20,25 +20,20 @@ impl EpubParser<'_> {
             let mut attributes = el.bytes_attributes();
 
             // Required fields
-            let id = self.assert_option(
-                attributes.take_attribute_value(consts::ID)?,
-                "manifest > item[*id]",
-            )?;
-            let (href, href_raw) = self.assert_option(
-                attributes
-                    .take_attribute_value(consts::HREF)?
-                    .map(|href_raw| (ctx.resolver.resolve(&href_raw), href_raw)),
-                "manifest > item[*href]",
-            )?;
-            let mut media_type = self.assert_option(
-                attributes.take_attribute_value(consts::MEDIA_TYPE)?,
+            let id =
+                self.require_attribute(attributes.remove(consts::ID)?, "manifest > item[*id]")?;
+            let href_raw =
+                self.require_attribute(attributes.remove(consts::HREF)?, "manifest > item[*href]")?;
+            let href = self.require_encoded(ctx.resolver.resolve(&href_raw))?;
+            let mut media_type = self.require_attribute(
+                attributes.remove(consts::MEDIA_TYPE)?,
                 "manifest > item[*media_type]",
             )?;
 
             // Optional fields
-            let media_overlay = attributes.take_attribute_value(consts::MEDIA_OVERLAY)?;
-            let fallback = attributes.take_attribute_value(consts::FALLBACK)?;
-            let properties = attributes.take_attribute_value(consts::PROPERTIES)?.into();
+            let media_overlay = attributes.remove(consts::MEDIA_OVERLAY)?;
+            let fallback = attributes.remove(consts::FALLBACK)?;
+            let properties = attributes.remove(consts::PROPERTIES)?.into();
             let refinements = ctx.refinements.take_refinements(&id).unwrap_or_default();
 
             // Set media_type to lowercase to enforce uniformity.
@@ -65,7 +60,6 @@ impl EpubParser<'_> {
         &self,
         manifest: &EpubManifestData,
     ) -> ParserResult<Vec<TocLocation>> {
-        let settings = self.config;
         let mut hrefs = Vec::new();
         let mut formats = vec![
             // 0: Epub version associated with the format
@@ -89,7 +83,7 @@ impl EpubParser<'_> {
                 };
 
                 // Exit early condition
-                if !settings.store_all && &settings.preferred_toc == version {
+                if !self.config.store_all && &self.config.preferred_toc == version {
                     return Ok(vec![location]);
                 }
                 hrefs.push(location);

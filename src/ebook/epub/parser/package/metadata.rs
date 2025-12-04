@@ -106,10 +106,10 @@ impl EpubParser<'_> {
                 // `<link>` elements do not require specialized handling here
                 EpubMetaEntryKind::Link {} => EpubMetaEntryData::default(),
             };
-            let id = attributes.take_attribute_value(consts::ID)?;
+            let id = attributes.remove(consts::ID)?;
 
             meta.refines = attributes
-                .take_attribute_value(consts::REFINES)?
+                .remove(consts::REFINES)?
                 .map(Self::normalize_refines);
             meta.attributes = attributes.try_into()?;
             meta.order = natural_order;
@@ -186,33 +186,28 @@ impl EpubParser<'_> {
         } else {
             (consts::PROPERTY, "metadata > meta[*property]")
         };
-        let property = self.assert_option(attributes.take_attribute_value(key)?, err_msg)?;
+        let property = self.require_attribute(attributes.remove(key)?, err_msg)?;
 
         // Retrieve the `<meta>` value
-        let value =
-        //////////////////////////////////
-        // Epub 2 meta value extraction //
-        //////////////////////////////////
-        if is_epub2 {
-            self.assert_option(
-                attributes.take_attribute_value(consts::CONTENT)?,
+        let value = if is_epub2 {
+            //////////////////////////////////
+            // Epub 2 meta value extraction //
+            //////////////////////////////////
+            self.require_attribute(
+                attributes.remove(consts::CONTENT)?,
                 "metadata > meta[*content]",
             )?
-        }
-        //////////////////////////////////
-        // Epub 3 meta value extraction //
-        //////////////////////////////////
-        else if is_start {
+        } else if is_start {
+            //////////////////////////////////
+            // Epub 3 meta value extraction //
+            //////////////////////////////////
             reader.get_text_simple(el)?
-        }
-        // Rare but can happen, attempt to recover if the epub is non-standard:
-        // `<meta property="a" content="b" />`
-        else if let Some(content) = attributes.take_attribute_value(consts::CONTENT)?
-            && !self.config.strict
-        {
-            content
+        } else if !self.config.strict {
+            // Rare but can happen, attempt to recover if the epub is non-standard:
+            // `<meta property="a" content="b" />`
+            attributes.remove(consts::CONTENT)?.unwrap_or_default()
         } else {
-            return Err(EpubFormatError::MissingValue(property))?
+            return Err(EpubFormatError::MissingValue(property).into());
         };
 
         Self::handle_general_meta(package, attributes, property, value)
@@ -227,11 +222,11 @@ impl EpubParser<'_> {
     ) -> ParserResult<EpubMetaEntryData> {
         // These attributes are inherited from the package if not specified here
         let language = attributes
-            .take_attribute_value(consts::LANG)?
+            .remove(consts::LANG)?
             .map(Shared::new)
             .or_else(|| package.xml_lang.clone());
         let text_direction = attributes
-            .take_attribute_value(consts::DIR)?
+            .remove(consts::DIR)?
             .map_or(package.dir, TextDirection::from);
 
         Ok(EpubMetaEntryData {
@@ -291,7 +286,7 @@ impl EpubParser<'_> {
         mut root_meta: Vec<EpubMetaEntryData>,
     ) -> ParserResult<(EpubMetaGroups, PendingRefinements)> {
         let depths = Self::compute_meta_depths(id_meta, no_id_refinements)?;
-        let (roots, pending) = Self::associate_refinements(depths)?;
+        let (roots, pending) = self.associate_refinements(depths)?;
 
         root_meta.extend(roots);
 
@@ -339,6 +334,7 @@ impl EpubParser<'_> {
             let state = meta.depth.get();
 
             if state == IdMetaWithDepth::IN_PROGRESS {
+                // Realistically, this *should* never happen. Malicious EPUB?
                 return Err(EpubFormatError::CyclicMeta(id.into()).into());
             } else if state != IdMetaWithDepth::UNSET {
                 // The depth has already been computed
@@ -392,6 +388,7 @@ impl EpubParser<'_> {
     /// 1. Remaining depth-0 metadata elements (the roots).
     /// 2. Orphan metadata elements with no parent yet.
     fn associate_refinements(
+        &self,
         mut depths: Vec<Vec<EpubMetaEntryData>>,
     ) -> ParserResult<(Vec<EpubMetaEntryData>, PendingRefinements)> {
         let mut roots = None;
@@ -428,7 +425,7 @@ impl EpubParser<'_> {
                     pending.push(child);
                 }
                 // Otherwise, propagate an error.
-                else {
+                else if self.config.strict {
                     return Err(EpubFormatError::MissingMeta(format!(
                         "refinement <meta> referencing a non-existent id=`{parent_id}`"
                     ))

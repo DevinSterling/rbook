@@ -57,7 +57,7 @@ pub trait Metadata<'ebook> {
     /// let epub = Epub::open("tests/ebooks/example_epub")?;
     /// let metadata = epub.metadata();
     ///
-    /// assert_eq!(Some("3.0"), Metadata::version_str(&metadata));
+    /// assert_eq!(Some("3.3"), Metadata::version_str(&metadata));
     /// # Ok(())
     /// # }
     /// ```
@@ -78,7 +78,7 @@ pub trait Metadata<'ebook> {
     /// let epub = Epub::open("tests/ebooks/example_epub")?;
     /// let metadata = epub.metadata();
     ///
-    /// assert_eq!(Some(Version(3, 0)), Metadata::version(&metadata));
+    /// assert_eq!(Some(Version(3, 3)), Metadata::version(&metadata));
     /// # Ok(())
     /// # }
     /// ```
@@ -177,6 +177,7 @@ pub trait Metadata<'ebook> {
     ///
     /// # See Also
     /// - [`Self::title`] to get the main title, disregarding [`order`](MetaEntry::order).
+    /// - [`Title::kind`] to get the kind of title.
     ///
     /// # Examples
     /// - Retrieving the titles of an ebook:

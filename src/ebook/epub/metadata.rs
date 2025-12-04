@@ -45,8 +45,21 @@ impl EpubMetadataData {
         }
     }
 
-    pub(super) fn by_group_mut(&mut self, group: &str) -> Option<&mut Vec<EpubMetaEntryData>> {
-        self.entries.get_mut(group)
+    pub(super) fn by_group(&self, group: &str) -> Option<&Vec<EpubMetaEntryData>> {
+        self.entries.get(group)
+    }
+}
+
+impl From<EpubVersion> for EpubMetadataData {
+    fn from(version: EpubVersion) -> Self {
+        Self::new(
+            String::new(),
+            EpubVersionData {
+                raw: version.to_string(),
+                parsed: version,
+            },
+            HashMap::new(),
+        )
     }
 }
 
@@ -57,7 +70,7 @@ pub(super) struct EpubVersionData {
     pub(super) parsed: EpubVersion,
 }
 
-#[derive(Debug, Default, Hash, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, Hash, PartialEq, Eq)]
 pub(super) struct EpubRefinementsData(Vec<EpubMetaEntryData>);
 
 impl EpubRefinementsData {
@@ -107,7 +120,7 @@ impl DerefMut for EpubRefinementsData {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub(super) struct EpubMetaEntryData {
     pub(super) order: usize,
     pub(super) id: Option<String>,
@@ -306,7 +319,7 @@ impl<'ebook> EpubMetadata<'ebook> {
     /// # Excluded Entries
     /// Refining entries, `<link>` elements with a `refines` field are excluded, for example:
     /// ```xml
-    /// <link refines="#parent-id" ...>...</meta>
+    /// <link refines="#parent-id" ... />
     /// ```
     ///
     /// # See Also
@@ -405,8 +418,8 @@ impl<'ebook> Metadata<'ebook> for EpubMetadata<'ebook> {
 
     fn titles(&self) -> impl Iterator<Item = EpubTitle<'ebook>> + 'ebook {
         // Although caching the inferred main title is possible,
-        // this is generally inexpensive (nearly all publications only have one title),
-        // and caching would complicate future write-back of EPUB metadata.
+        // this is generally inexpensive (nearly all publications only have one title).
+        // Caching also complicates write-back of EPUB metadata.
         let inferred_main_title_index = self
             .data_by_property(consts::TITLE)
             .enumerate()
@@ -456,8 +469,8 @@ impl<'ebook> Metadata<'ebook> for EpubMetadata<'ebook> {
 
     /// Returns an iterator over non-refining metadata entries.
     ///
-    /// Each entry is first grouped by its [`property`](Self::by_property) then
-    /// [`order`](MetaEntry::order), before being flattened into a single iterator.
+    /// Each entry is first grouped by its [`property`](Self::by_property),
+    /// then [`order`](MetaEntry::order) before being flattened into a single iterator.
     /// As grouping by property relies on a hash map, the order in which property groups appear
     /// is arbitrary; non-deterministic.
     ///
@@ -472,7 +485,7 @@ impl<'ebook> Metadata<'ebook> for EpubMetadata<'ebook> {
     /// Refining entries elements with a `refines` field are excluded, for example:
     /// ```xml
     /// <meta refines="#parent-id" ...>...</meta>
-    /// <link refines="#parent-id" ...>...</meta>
+    /// <link refines="#parent-id" ... />
     /// ```
     ///
     /// # See Also
@@ -684,10 +697,10 @@ impl<'ebook> EpubMetaEntry<'ebook> {
     /// The `property`, such as `dc:title`, `media:duration`, `file-as`, etc.
     ///
     /// # Property Mapping
-    /// Depending on the `XML` element type and EPUB version, this field may be mapped
+    /// Depending on the XML element type and EPUB version, this field may be mapped
     /// differently:
     ///
-    /// | `XML` Element Type   | Mapped From                                                        |
+    /// | XML Element Type     | Mapped From                                                        |
     /// |----------------------|--------------------------------------------------------------------|
     /// | Dublin Core `<dc:*>` | element tag (`<dc:title>...</dc:title>`)                           |
     /// | EPUB 2 `<meta>`      | `name` attribute (`<meta name="cover" content="..."/>`)            |
@@ -814,7 +827,7 @@ impl<'ebook> EpubMetaEntry<'ebook> {
         self.data.text_direction
     }
 
-    /// All additional `XML` [`Attributes`].
+    /// All additional XML [`Attributes`].
     ///
     /// # Omitted Attributes
     /// The following attributes will **not** be found within the returned collection:
@@ -929,7 +942,7 @@ impl<'ebook> EpubLink<'ebook> {
             .map(|attribute| LanguageTag::new(attribute.value(), LanguageKind::Bcp47))
     }
 
-    /// The **non-capitalized** `MIME` identifying the media type
+    /// The `MIME` identifying the media type
     /// of the resource referenced by [`Self::href`].
     ///
     /// Returns [`None`] if not present.

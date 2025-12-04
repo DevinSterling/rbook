@@ -1,4 +1,4 @@
-//! General `XML` element-related types.
+//! General XML element-related types.
 
 use crate::util::{StringExt, uri};
 use std::borrow::Cow;
@@ -33,6 +33,62 @@ impl<'a> Href<'a> {
     /// ```
     pub fn decode(&self) -> Cow<'a, str> {
         uri::decode(self.0)
+    }
+
+    /// The parent directory, if present.
+    ///
+    /// # Examples
+    /// - Retrieving the parent of an href:
+    /// ```
+    /// # use rbook::Epub;
+    /// # use rbook::ebook::errors::EbookResult;
+    /// # fn main() -> EbookResult<()> {
+    /// let epub = Epub::open("tests/ebooks/example_epub")?;
+    ///
+    /// let mut href = epub.package_file();
+    /// assert_eq!("/EPUB/example.opf", href.as_str());
+    ///
+    /// href = href.parent().unwrap();
+    /// assert_eq!("/EPUB", href.as_str());
+    ///
+    /// href = href.parent().unwrap();
+    /// assert_eq!("/", href.as_str());
+    ///
+    /// assert_eq!(None, href.parent());
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn parent(&self) -> Option<Self> {
+        let parent = uri::parent(self.0);
+        (!parent.is_empty() && self.0 != parent).then(|| parent.into())
+    }
+
+    /// The file extension, if present (e.g., `.css`, `.xhtml`).
+    ///
+    /// # See Also
+    /// [`ManifestEntry::resource_kind`](super::manifest::ManifestEntry::resource_kind) to
+    /// inspect the kind of resource in greater detail.
+    ///
+    /// # Examples
+    /// - Retrieving the extension from an href:
+    /// ```
+    /// # use rbook::Epub;
+    /// # use rbook::ebook::errors::EbookResult;
+    /// # fn main() -> EbookResult<()> {
+    /// let epub = Epub::open("tests/ebooks/example_epub")?;
+    ///
+    /// let file = epub.package_file();
+    /// assert_eq!("/EPUB/example.opf", file.as_str());
+    /// assert_eq!(Some("opf"), file.extension());
+    ///
+    /// let dir = epub.package_directory();
+    /// assert_eq!("/EPUB", dir.as_str());
+    /// assert_eq!(None, dir.extension());
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn extension(&self) -> Option<&str> {
+        self.name().0.rsplit_once('.').map(|(_, ext)| ext)
     }
 
     /// The href with **only** the query (`?`) and fragment (`#`) omitted.
@@ -689,6 +745,42 @@ pub(crate) fn get_attribute<'a>(attributes: &'a [AttributeData], key: &str) -> O
 #[cfg(test)]
 mod tests {
     use crate::ebook::element::Href;
+
+    #[test]
+    fn test_href_parent() {
+        let expected = [
+            (None, "abc.html"),
+            (Some("/EPUB"), "/EPUB/c1.xhtml"),
+            (Some("a"), "a/b"),
+            (None, ""),
+            (None, " "),
+            (None, "/"),
+            (None, "xyz"),
+        ];
+
+        for (parent, href) in expected {
+            assert_eq!(parent, Href(href).parent().map(|p| p.as_str()))
+        }
+    }
+
+    #[test]
+    fn test_href_extension() {
+        let expected = [
+            (Some("xhtml"), "s04.xhtml#pgepubid00588"),
+            (Some("html"), "/EPUB/c1.html?q=1#start"),
+            (Some("css"), "abc.css"),
+            (Some("xyz"), ".xyz"),
+            (None, "a/b"),
+            (None, "abc"),
+            (None, ""),
+            (None, " "),
+            (None, "/"),
+        ];
+
+        for (extension, href) in expected {
+            assert_eq!(extension, Href(href).extension())
+        }
+    }
 
     #[test]
     fn test_href_path() {
