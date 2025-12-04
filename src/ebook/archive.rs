@@ -45,7 +45,7 @@ fn extract_resource_key<'a>(resource: &'a Resource<'a>) -> ArchiveResult<&'a str
     }
 }
 
-/// Unzip the file if it is not directory.
+/// Unzip the file if it is not a directory.
 ///
 /// If it is, the contents can be accessed directly,
 /// which makes using a zip file unnecessary.

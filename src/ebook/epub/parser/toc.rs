@@ -159,9 +159,9 @@ impl EpubParser<'_> {
         }
         // The nav element does not have a parent; the root.
         else {
-            let version = &self.version_hint;
+            let version = self.version_hint.as_major();
             let toc_kind = nav_entry.kind.clone();
-            toc_groups.insert(EpubTocKey::of(toc_kind, *version), nav_entry);
+            toc_groups.insert(EpubTocKey::of(toc_kind, version), nav_entry);
         }
     }
 
@@ -208,7 +208,10 @@ impl EpubParser<'_> {
 
     fn assert_toc(&self, map: &TocGroups) -> ParserResult<()> {
         // Check if the epub contains a main table of contents
-        if map.contains_key(&EpubTocKey::of(TocEntryKind::Toc, self.version_hint)) {
+        if map.contains_key(&EpubTocKey::of(
+            TocEntryKind::Toc,
+            self.version_hint.as_major(),
+        )) {
             Ok(())
         } else {
             Err(EpubFormatError::NoTocFound.into())

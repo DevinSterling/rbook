@@ -204,12 +204,10 @@ impl EpubParser<'_> {
         }
         // Rare but can happen, attempt to recover if the epub is non-standard:
         // `<meta property="a" content="b" />`
-        else if let Some(content) = attributes.take_attribute_value(consts::CONTENT)?
-            && !self.config.strict
-        {
-            content
+        else if !self.config.strict {
+            attributes.take_attribute_value(consts::CONTENT)?.unwrap_or_default()
         } else {
-            return Err(EpubFormatError::MissingValue(property))?
+            return Err(EpubFormatError::MissingValue(property).into())
         };
 
         Self::handle_general_meta(package, attributes, property, value)
@@ -288,7 +286,7 @@ impl EpubParser<'_> {
         mut root_meta: Vec<EpubMetaEntryData>,
     ) -> ParserResult<(EpubMetaGroups, PendingRefinements)> {
         let depths = Self::compute_meta_depths(id_meta, no_id_refinements)?;
-        let (roots, pending) = Self::associate_refinements(depths)?;
+        let (roots, pending) = self.associate_refinements(depths)?;
 
         root_meta.extend(roots);
 
@@ -336,6 +334,7 @@ impl EpubParser<'_> {
             let state = meta.depth.get();
 
             if state == IdMetaWithDepth::IN_PROGRESS {
+                // Realistically, this *should* never happen. Malicious EPUB?
                 return Err(EpubFormatError::CyclicMeta(id.into()).into());
             } else if state != IdMetaWithDepth::UNSET {
                 // The depth has already been computed
@@ -389,6 +388,7 @@ impl EpubParser<'_> {
     /// 1. Remaining depth-0 metadata elements (the roots).
     /// 2. Orphan metadata elements with no parent yet.
     fn associate_refinements(
+        &self,
         mut depths: Vec<Vec<EpubMetaEntryData>>,
     ) -> ParserResult<(Vec<EpubMetaEntryData>, PendingRefinements)> {
         let mut roots = None;
@@ -425,7 +425,7 @@ impl EpubParser<'_> {
                     pending.push(child);
                 }
                 // Otherwise, propagate an error.
-                else {
+                else if self.config.strict {
                     return Err(EpubFormatError::MissingMeta(format!(
                         "refinement <meta> referencing a non-existent id=`{parent_id}`"
                     ))

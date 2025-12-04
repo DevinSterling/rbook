@@ -25,6 +25,13 @@ impl EpubSpineData {
             entries,
         }
     }
+
+    pub(super) fn empty() -> Self {
+        Self {
+            page_direction: PageDirection::Default,
+            entries: Vec::new(),
+        }
+    }
 }
 
 #[derive(Debug, Hash, PartialEq)]
@@ -149,7 +156,10 @@ impl<'ebook> Spine<'ebook> for EpubSpine<'ebook> {
     }
 
     fn entries(&self) -> EpubSpineIter<'ebook> {
-        self.into_iter()
+        EpubSpineIter {
+            provider: self.provider,
+            iter: self.data.entries.iter(),
+        }
     }
 }
 
@@ -172,10 +182,7 @@ impl<'ebook> IntoIterator for &EpubSpine<'ebook> {
     type IntoIter = EpubSpineIter<'ebook>;
 
     fn into_iter(self) -> EpubSpineIter<'ebook> {
-        EpubSpineIter {
-            provider: self.provider,
-            iter: self.data.entries.iter(),
-        }
+        self.entries()
     }
 }
 
@@ -184,7 +191,7 @@ impl<'ebook> IntoIterator for EpubSpine<'ebook> {
     type IntoIter = EpubSpineIter<'ebook>;
 
     fn into_iter(self) -> EpubSpineIter<'ebook> {
-        (&self).into_iter()
+        self.entries()
     }
 }
 

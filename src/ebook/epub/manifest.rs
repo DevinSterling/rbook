@@ -30,6 +30,12 @@ impl EpubManifestData {
         Self { entries }
     }
 
+    pub(super) fn empty() -> Self {
+        Self {
+            entries: HashMap::new(),
+        }
+    }
+
     pub(super) fn by_id_mut(&mut self, id: &str) -> Option<&mut EpubManifestEntryData> {
         self.entries.get_mut(id)
     }
@@ -175,7 +181,10 @@ impl<'ebook> Manifest<'ebook> for EpubManifest<'ebook> {
     /// As manifest entries are stored in a hash map with `id` as the key,
     /// iteration order is arbitrary; non-deterministic.
     fn entries(&self) -> EpubManifestIter<'ebook> {
-        self.into_iter()
+        EpubManifestIter {
+            context: self.into(),
+            iter: self.data.iter(),
+        }
     }
 
     fn cover_image(&self) -> Option<EpubManifestEntry<'ebook>> {
@@ -239,10 +248,7 @@ impl<'ebook> IntoIterator for &EpubManifest<'ebook> {
     type IntoIter = EpubManifestIter<'ebook>;
 
     fn into_iter(self) -> EpubManifestIter<'ebook> {
-        EpubManifestIter {
-            context: self.into(),
-            iter: self.data.iter(),
-        }
+        self.entries()
     }
 }
 
@@ -251,7 +257,7 @@ impl<'ebook> IntoIterator for EpubManifest<'ebook> {
     type IntoIter = EpubManifestIter<'ebook>;
 
     fn into_iter(self) -> EpubManifestIter<'ebook> {
-        (&self).into_iter()
+        self.entries()
     }
 }
 

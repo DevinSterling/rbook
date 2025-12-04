@@ -1,4 +1,3 @@
-#![warn(missing_docs)]
 //! - Repository: <https://github.com/DevinSterling/rbook>
 //! - Documentation: <https://docs.rs/rbook>
 //!
@@ -39,7 +38,7 @@
 //!
 //! ## Default crate features
 //! These are toggleable features for `rbook` that are
-//! enabled by default in a project's `cargo.toml` file:
+//! enabled by default in a project's `Cargo.toml` file:
 //!
 //! | Feature                | Description                                                 |
 //! |------------------------|-------------------------------------------------------------|
@@ -50,7 +49,7 @@
 //! For example, omitting the `prelude` while retaining the `threadsafe` feature:
 //! ```toml
 //! [dependencies]
-//! rbook = { version = "0.6.9", default-features = false, features = ["threadsafe"] }
+//! rbook = { version = "0.6.10", default-features = false, features = ["threadsafe"] }
 //! ```
 //!
 //! # Opening an [`Ebook`]
@@ -68,8 +67,8 @@
 //! - Or any implementation of [`Read`](std::io::Read) + [`Seek`](std::io::Seek)
 //!   (and [`Send`] + [`Sync`] if the `threadsafe` feature is enabled):
 //!   ```no_run
-//!   # use rbook::epub::{Epub, EpubSettings};
-//!   # let bytes_vec = Vec::new(); // Rea
+//!   # use rbook::Epub;
+//!   # let bytes_vec = Vec::new();
 //!   let cursor = std::io::Cursor::new(bytes_vec);
 //!   let epub = Epub::options().read(cursor);
 //!   ```
@@ -80,6 +79,10 @@
 //! # use rbook::Epub;
 //! let epub = Epub::options()
 //!     .strict(false) // Disable strict checks (`true` by default)
+//!     // If only metadata is needed, skipping helps quicken parsing time and reduce space.
+//!     .skip_toc(true) // Skips ToC-related parsing, such as toc.ncx (`false` by default)
+//!     .skip_manifest(true) // Skips manifest-related parsing (`false` by default)
+//!     .skip_spine(true) // Skips spine-related parsing (`false` by default)
 //!     .open("tests/ebooks/example_epub")
 //!     .unwrap();
 //! ```
@@ -88,6 +91,8 @@
 //! which traverses end-user-readable resources in canonical order:
 //! ```
 //! # use rbook::{Ebook, Epub};
+//! // Import traits (Alternatively, rbook::prelude::*)
+//! use rbook::ebook::manifest::ManifestEntry;
 //! use rbook::reader::{Reader, ReaderContent};
 //! # let epub = Epub::open("tests/ebooks/example_epub").unwrap();
 //!
@@ -96,7 +101,10 @@
 //!
 //! // Print the readable content
 //! while let Some(Ok(data)) = reader.read_next() {
-//!     assert_eq!("application/xhtml+xml", data.manifest_entry().media_type());
+//!     let resource_kind = data.manifest_entry().resource_kind();
+//!
+//!     assert_eq!("application/xhtml+xml", resource_kind.as_str());
+//!     assert_eq!("xhtml", resource_kind.subtype());
 //!     println!("{}", data.content());
 //! }
 //! ```
@@ -187,11 +195,11 @@
 //!
 //! The idea of libraries providing a prelude is subjective and may not be desirable.
 //! As such, it is set as a default crate feature that can be disabled inside a
-//! project's `cargo.toml` file.
+//! project's `Cargo.toml` file.
 //! For example, omitting the `prelude` while retaining the `threadsafe` feature:
 //! ```toml
 //! [dependencies]
-//! rbook = { version = "0.6.9", default-features = false, features = ["threadsafe"] }
+//! rbook = { version = "0.6.10", default-features = false, features = ["threadsafe"] }
 //! ```
 //!
 //! # Examples
@@ -276,6 +284,9 @@
 //! // No more fallbacks
 //! assert_eq!(None, png_cover.fallback());
 //! ```
+
+#![warn(missing_docs)]
+#![cfg_attr(docsrs, feature(doc_cfg))]
 
 mod parser;
 mod util;

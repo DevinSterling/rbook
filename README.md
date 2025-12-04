@@ -6,7 +6,7 @@
 
 ![rbook](https://raw.githubusercontent.com/DevinSterling/devinsterling-com/master/public/images/rbook/rbook.png)
 
-A fast, format-agnostic, ergonomic ebook library with a focus on EPUB.
+> A fast, format-agnostic, ergonomic ebook library with a focus on EPUB.
 
 The primary goal of `rbook` is to provide an easy-to-use high-level API for handling ebooks.
 Most importantly, this library is designed with future formats in mind
@@ -33,7 +33,7 @@ Here is a non-exhaustive list of the features `rbook` provides:
 
 ### Default crate features
 These are toggleable features for `rbook` that are
-enabled by default in a project's `cargo.toml` file:
+enabled by default in a project's `Cargo.toml` file:
 
 | Feature        | Description                                                                                           |
 |----------------|-------------------------------------------------------------------------------------------------------|
@@ -41,11 +41,11 @@ enabled by default in a project's `cargo.toml` file:
 | **threadsafe** | Enables constraint and support for `Send` + `Sync`.                                                   |
 
 ## Usage
-`rbook` can be used by adding it as a dependency in a project's `cargo.toml` file:
+`rbook` can be used by adding it as a dependency in a project's `Cargo.toml` file:
 ```toml
 [dependencies]
-rbook = "0.6.9"                                           # with default features
-# rbook = { version = "0.6.9", default-features = false } # excluding default features
+rbook = "0.6.10"                                           # With default features
+# rbook = { version = "0.6.10", default-features = false } # Excluding default features
 ```
 
 ## WebAssembly
@@ -58,9 +58,10 @@ use rbook::{Epub, prelude::*}; // Prelude for traits
 
 fn main() {
     // Open an epub from a file or directory
-    // * `Read + Seek` implementations supported via `read(...)`
+    // * `Read + Seek` implementations supported via `read(...)` for byte streams/buffers
     let epub = Epub::options()
         .strict(false) // Disable strict checks (`true` by default)
+        .skip_toc(true) // Skips ToC-related parsing, such as toc.ncx (`false` by default)
         .open("tests/ebooks/example_epub")
         .unwrap();
 
@@ -70,7 +71,9 @@ fn main() {
     
     // Print the readable content
     while let Some(Ok(data)) = reader.read_next() {
-        assert_eq!("application/xhtml+xml", data.manifest_entry().media_type());
+        let resource_kind = data.manifest_entry().resource_kind();
+        assert_eq!("application/xhtml+xml", resource_kind);
+        assert_eq!("xhtml", resource_kind.subtype());
         println!("{}", data.content());
     }
 }
@@ -81,7 +84,14 @@ use rbook::{Epub, prelude::*};
 use rbook::ebook::metadata::{LanguageKind, TitleKind};
 
 fn main() {
-    let epub = Epub::open("tests/ebooks/example_epub").unwrap();
+    // If only metadata is needed, skipping helps quicken parsing time and reduce space.
+    let epub = Epub::options()
+        // These flags are `false` by default
+        .skip_toc(true)
+        .skip_manifest(true)
+        .skip_spine(true)
+        .open("tests/ebooks/example_epub")
+        .unwrap();
     
     // Retrieve the main title (all titles retrievable via `titles()`)
     let title = epub.metadata().title().unwrap();

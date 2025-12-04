@@ -1,4 +1,4 @@
-<package xmlns="http://www.idpf.org/2007/opf" unique-identifier="uid" version="2.0" xml:lang="en">
+<package xmlns="http://www.idpf.org/2007/opf" unique-identifier="uid" version="2.5" xml:lang="en">
     <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
         <dc:title id="subtitle">A subtitle</dc:title>
         <dc:creator id="author" opf:role="aut" opf:file-as="Doe, John">John Doe</dc:creator>

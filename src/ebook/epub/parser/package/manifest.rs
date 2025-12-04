@@ -65,7 +65,6 @@ impl EpubParser<'_> {
         &self,
         manifest: &EpubManifestData,
     ) -> ParserResult<Vec<TocLocation>> {
-        let settings = self.config;
         let mut hrefs = Vec::new();
         let mut formats = vec![
             // 0: Epub version associated with the format
@@ -89,7 +88,7 @@ impl EpubParser<'_> {
                 };
 
                 // Exit early condition
-                if !settings.store_all && &settings.preferred_toc == version {
+                if !self.config.store_all && &self.config.preferred_toc == version {
                     return Ok(vec![location]);
                 }
                 hrefs.push(location);
