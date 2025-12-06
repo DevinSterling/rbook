@@ -8,6 +8,7 @@ mod epub {
     mod util;
 
     use rbook::Ebook;
+    use rbook::ebook::SynchronousEbook;
     use rbook::ebook::manifest::{Manifest, ManifestEntry};
     use std::path::Path;
 

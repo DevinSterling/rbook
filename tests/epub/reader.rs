@@ -1,8 +1,10 @@
 use crate::epub::util::open_example_epub_file;
 use rbook::Ebook;
+use rbook::ebook::SynchronousEbook;
+use rbook::epub::SynchronousArchive;
 use rbook::epub::reader::{EpubReaderContent, LinearBehavior};
 use rbook::reader::errors::ReaderResult;
-use rbook::reader::{Reader, ReaderContent};
+use rbook::reader::{Reader, ReaderContent, SynchronousReader};
 use wasm_bindgen_test::wasm_bindgen_test;
 
 #[test]
@@ -44,7 +46,7 @@ fn test_reader_cursor() -> ReaderResult<()> {
     let epub = open_example_epub_file();
     let mut reader = epub.reader();
 
-    fn idref(content: EpubReaderContent<'_>) -> &str {
+    fn idref<'a>(content: EpubReaderContent<'a, &'a SynchronousArchive>) -> &'a str {
         content.spine_entry().idref()
     }
 

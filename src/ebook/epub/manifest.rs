@@ -4,9 +4,9 @@ use crate::ebook::element::{AttributeData, Attributes, Href, Properties, Propert
 use crate::ebook::epub::consts;
 use crate::ebook::epub::metadata::{EpubRefinements, EpubRefinementsData};
 use crate::ebook::errors::EbookResult;
-use crate::ebook::manifest::{Manifest, ManifestEntry};
+use crate::ebook::manifest::{Manifest, ManifestEntry, SynchronousManifestEntry};
 use crate::ebook::resource::{Resource, ResourceKind};
-use crate::epub::EpubResourceProvider;
+use crate::epub::{EpubResourceProvider, SynchronousArchive};
 use std::collections::hash_map::Iter as HashMapIter;
 use std::collections::{HashMap, HashSet};
 use std::fmt::{Debug, Formatter};
@@ -21,12 +21,12 @@ use std::fmt::{Debug, Formatter};
 const READABLE_CONTENT: [&str; 2] = ["application/xhtml+xml", "text/html"];
 
 #[derive(Debug, PartialEq)]
-pub(super) struct EpubManifestData {
-    entries: HashMap<String, EpubManifestEntryData>,
+pub(super) struct InternalEpubManifest {
+    entries: HashMap<String, InternalEpubManifestEntry>,
 }
 
-impl EpubManifestData {
-    pub(super) fn new(entries: HashMap<String, EpubManifestEntryData>) -> Self {
+impl InternalEpubManifest {
+    pub(super) fn new(entries: HashMap<String, InternalEpubManifestEntry>) -> Self {
         Self { entries }
     }
 
@@ -36,17 +36,17 @@ impl EpubManifestData {
         }
     }
 
-    pub(super) fn by_id_mut(&mut self, id: &str) -> Option<&mut EpubManifestEntryData> {
+    pub(super) fn by_id_mut(&mut self, id: &str) -> Option<&mut InternalEpubManifestEntry> {
         self.entries.get_mut(id)
     }
 
-    pub(super) fn iter(&self) -> HashMapIter<'_, String, EpubManifestEntryData> {
+    pub(super) fn iter(&self) -> HashMapIter<'_, String, InternalEpubManifestEntry> {
         self.entries.iter()
     }
 }
 
 #[derive(Debug, PartialEq)]
-pub(super) struct EpubManifestEntryData {
+pub(super) struct InternalEpubManifestEntry {
     /// The resolved `absolute` href
     pub(super) href: String,
     /// The source `relative` href
@@ -61,33 +61,33 @@ pub(super) struct EpubManifestEntryData {
 
 /// Provider to retrieve [`EpubManifestEntry`] instances.
 #[derive(Copy, Clone)]
-pub(super) struct EpubManifestEntryProvider<'ebook>(EpubManifest<'ebook>);
+pub(super) struct EpubManifestEntryProvider<'ebook, A>(EpubManifestData<'ebook, A>);
 
-impl<'ebook> EpubManifestEntryProvider<'ebook> {
-    pub(super) fn by_id(&self, id: &str) -> Option<EpubManifestEntry<'ebook>> {
+impl<'ebook, A: Copy> EpubManifestEntryProvider<'ebook, A> {
+    pub(super) fn by_id(&self, id: &str) -> Option<EpubManifestEntryData<'ebook, A>> {
         self.0.by_id(id)
     }
 
-    pub(super) fn by_href(&self, href: &str) -> Option<EpubManifestEntry<'ebook>> {
+    pub(super) fn by_href(&self, href: &str) -> Option<EpubManifestEntryData<'ebook, A>> {
         self.0.by_href(href)
     }
 }
 
-impl<'ebook> From<EpubManifest<'ebook>> for EpubManifestEntryProvider<'ebook> {
-    fn from(manifest: EpubManifest<'ebook>) -> Self {
+impl<'ebook, A: Copy> From<EpubManifestData<'ebook, A>> for EpubManifestEntryProvider<'ebook, A> {
+    fn from(manifest: EpubManifestData<'ebook, A>) -> Self {
         Self(manifest)
     }
 }
 
 /// The context of an [`EpubManifestEntry`] for fallback lookup and raw resource retrieval.
 #[derive(Copy, Clone)]
-struct EpubManifestEntryContext<'ebook> {
-    entry: EpubManifestEntryProvider<'ebook>,
-    resource: EpubResourceProvider<'ebook>,
+pub(crate) struct EpubManifestEntryContext<'ebook, A> {
+    entry: EpubManifestEntryProvider<'ebook, A>,
+    pub(crate) resource: EpubResourceProvider<'ebook, A>,
 }
 
-impl<'ebook> From<&EpubManifest<'ebook>> for EpubManifestEntryContext<'ebook> {
-    fn from(manifest: &EpubManifest<'ebook>) -> Self {
+impl<'ebook, A: Copy> From<&EpubManifestData<'ebook, A>> for EpubManifestEntryContext<'ebook, A> {
+    fn from(manifest: &EpubManifestData<'ebook, A>) -> Self {
         Self {
             entry: (*manifest).into(),
             resource: manifest.resource_provider,
@@ -99,21 +99,26 @@ impl<'ebook> From<&EpubManifest<'ebook>> for EpubManifestEntryContext<'ebook> {
 // PUBLIC API
 ////////////////////////////////////////////////////////////////////////////////
 
+/// todo
+pub type EpubManifest<'ebook> = EpubManifestData<'ebook, &'ebook SynchronousArchive>;
+/// todo
+pub type EpubManifestEntry<'ebook> = EpubManifestEntryData<'ebook, &'ebook SynchronousArchive>;
+
 /// An EPUB manifest, see [`Manifest`] for more details.
 ///
 /// Retrieving entries from the manifest from such as [`EpubManifest::by_href`]
 /// is generally a linear (`O(N)`) operation except for [`EpubManifest::by_id`],
 /// which is constant (`O(1)`).
 #[derive(Copy, Clone)]
-pub struct EpubManifest<'ebook> {
-    data: &'ebook EpubManifestData,
-    resource_provider: EpubResourceProvider<'ebook>,
+pub struct EpubManifestData<'ebook, A> {
+    data: &'ebook InternalEpubManifest,
+    resource_provider: EpubResourceProvider<'ebook, A>,
 }
 
-impl<'ebook> EpubManifest<'ebook> {
+impl<'ebook, A: Copy> EpubManifestData<'ebook, A> {
     pub(super) fn new(
-        data: &'ebook EpubManifestData,
-        resource_provider: EpubResourceProvider<'ebook>,
+        data: &'ebook InternalEpubManifest,
+        resource_provider: EpubResourceProvider<'ebook, A>,
     ) -> Self {
         Self {
             data,
@@ -123,23 +128,23 @@ impl<'ebook> EpubManifest<'ebook> {
 
     fn by_predicate(
         &self,
-        predicate: impl Fn(&EpubManifestEntryData) -> bool,
-    ) -> Option<EpubManifestEntry<'ebook>> {
+        predicate: impl Fn(&InternalEpubManifestEntry) -> bool,
+    ) -> Option<EpubManifestEntryData<'ebook, A>> {
         self.data
             .iter()
             .find(|(_, data)| predicate(data))
-            .map(|(id, data)| EpubManifestEntry::new(id, data, self.into()))
+            .map(|(id, data)| EpubManifestEntryData::new(id, data, self.into()))
     }
 
     /// Returns the [`EpubManifestEntry`] that matches the given `id` if present,
     /// otherwise [`None`].
     ///
     /// This is a constant (`O(1)`) operation.
-    pub fn by_id(&self, id: &str) -> Option<EpubManifestEntry<'ebook>> {
+    pub fn by_id(&self, id: &str) -> Option<EpubManifestEntryData<'ebook, A>> {
         self.data
             .entries
             .get_key_value(id)
-            .map(|(id, data)| EpubManifestEntry::new(id, data, self.into()))
+            .map(|(id, data)| EpubManifestEntryData::new(id, data, self.into()))
     }
 
     /// Returns the [`EpubManifestEntry`] that matches the given `href` if present,
@@ -149,7 +154,7 @@ impl<'ebook> EpubManifest<'ebook> {
     /// The given `href` is ***not*** normalized or percent-decoded.
     /// It is compared literally against both [`EpubManifestEntry::href()`] and
     /// [`EpubManifestEntry::href_raw()`].
-    pub fn by_href(&self, href: &str) -> Option<EpubManifestEntry<'ebook>> {
+    pub fn by_href(&self, href: &str) -> Option<EpubManifestEntryData<'ebook, A>> {
         self.by_predicate(|data| data.href == href || data.href_raw == href)
     }
 
@@ -159,18 +164,18 @@ impl<'ebook> EpubManifest<'ebook> {
     pub fn by_property(
         &self,
         property: &'ebook str,
-    ) -> impl Iterator<Item = EpubManifestEntry<'ebook>> + 'ebook {
+    ) -> impl Iterator<Item = EpubManifestEntryData<'ebook, A>> + 'ebook {
         let context = self.into();
 
         self.data
             .iter()
             .filter(move |(_, data)| data.properties.has_property(property))
-            .map(move |(id, data)| EpubManifestEntry::new(id, data, context))
+            .map(move |(id, data)| EpubManifestEntryData::new(id, data, context))
     }
 }
 
 #[allow(refining_impl_trait)]
-impl<'ebook> Manifest<'ebook> for EpubManifest<'ebook> {
+impl<'ebook, A: Copy> Manifest<'ebook> for EpubManifestData<'ebook, A> {
     fn len(&self) -> usize {
         self.data.entries.len()
     }
@@ -180,36 +185,36 @@ impl<'ebook> Manifest<'ebook> for EpubManifest<'ebook> {
     /// # Order
     /// As manifest entries are stored in a hash map with `id` as the key,
     /// iteration order is arbitrary; non-deterministic.
-    fn entries(&self) -> EpubManifestIter<'ebook> {
+    fn entries(&self) -> EpubManifestIter<'ebook, A> {
         EpubManifestIter {
             context: self.into(),
             iter: self.data.iter(),
         }
     }
 
-    fn cover_image(&self) -> Option<EpubManifestEntry<'ebook>> {
+    fn cover_image(&self) -> Option<EpubManifestEntryData<'ebook, A>> {
         self.by_property(consts::COVER_IMAGE).next()
     }
 
-    fn images(&self) -> impl Iterator<Item = EpubManifestEntry<'ebook>> + 'ebook {
+    fn images(&self) -> impl Iterator<Item = EpubManifestEntryData<'ebook, A>> + 'ebook {
         self.by_resource_kind(ResourceKind::IMAGE)
     }
 
-    fn readable_content(&self) -> impl Iterator<Item = EpubManifestEntry<'ebook>> + 'ebook {
+    fn readable_content(&self) -> impl Iterator<Item = EpubManifestEntryData<'ebook, A>> + 'ebook {
         self.by_resource_kinds(READABLE_CONTENT)
     }
 
     fn by_resource_kind(
         &self,
         kind: impl Into<ResourceKind<'ebook>>,
-    ) -> impl Iterator<Item = EpubManifestEntry<'ebook>> + 'ebook {
+    ) -> impl Iterator<Item = EpubManifestEntryData<'ebook, A>> + 'ebook {
         self.by_resource_kinds([kind])
     }
 
     fn by_resource_kinds(
         &self,
         into_kinds: impl IntoIterator<Item = impl Into<ResourceKind<'ebook>>>,
-    ) -> impl Iterator<Item = EpubManifestEntry<'ebook>> + 'ebook {
+    ) -> impl Iterator<Item = EpubManifestEntryData<'ebook, A>> + 'ebook {
         let kinds = into_kinds.into_iter().map(Into::into).collect::<Vec<_>>();
         let context = self.into();
 
@@ -225,11 +230,11 @@ impl<'ebook> Manifest<'ebook> for EpubManifest<'ebook> {
                     }
                 })
             })
-            .map(move |(id, data)| EpubManifestEntry::new(id, data, context))
+            .map(move |(id, data)| EpubManifestEntryData::new(id, data, context))
     }
 }
 
-impl Debug for EpubManifest<'_> {
+impl<A> Debug for EpubManifestData<'_, A> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("EpubManifest")
             .field("data", self.data)
@@ -237,26 +242,26 @@ impl Debug for EpubManifest<'_> {
     }
 }
 
-impl PartialEq for EpubManifest<'_> {
+impl<A> PartialEq for EpubManifestData<'_, A> {
     fn eq(&self, other: &Self) -> bool {
         self.data == other.data
     }
 }
 
-impl<'ebook> IntoIterator for &EpubManifest<'ebook> {
-    type Item = EpubManifestEntry<'ebook>;
-    type IntoIter = EpubManifestIter<'ebook>;
+impl<'ebook, A: Copy> IntoIterator for &EpubManifestData<'ebook, A> {
+    type Item = EpubManifestEntryData<'ebook, A>;
+    type IntoIter = EpubManifestIter<'ebook, A>;
 
-    fn into_iter(self) -> EpubManifestIter<'ebook> {
+    fn into_iter(self) -> EpubManifestIter<'ebook, A> {
         self.entries()
     }
 }
 
-impl<'ebook> IntoIterator for EpubManifest<'ebook> {
-    type Item = EpubManifestEntry<'ebook>;
-    type IntoIter = EpubManifestIter<'ebook>;
+impl<'ebook, A: Copy> IntoIterator for EpubManifestData<'ebook, A> {
+    type Item = EpubManifestEntryData<'ebook, A>;
+    type IntoIter = EpubManifestIter<'ebook, A>;
 
-    fn into_iter(self) -> EpubManifestIter<'ebook> {
+    fn into_iter(self) -> EpubManifestIter<'ebook, A> {
         self.entries()
     }
 }
@@ -280,35 +285,35 @@ impl<'ebook> IntoIterator for EpubManifest<'ebook> {
 /// # Ok(())
 /// # }
 /// ```
-pub struct EpubManifestIter<'ebook> {
-    context: EpubManifestEntryContext<'ebook>,
-    iter: HashMapIter<'ebook, String, EpubManifestEntryData>,
+pub struct EpubManifestIter<'ebook, A> {
+    context: EpubManifestEntryContext<'ebook, A>,
+    iter: HashMapIter<'ebook, String, InternalEpubManifestEntry>,
 }
 
-impl<'ebook> Iterator for EpubManifestIter<'ebook> {
-    type Item = EpubManifestEntry<'ebook>;
+impl<'ebook, A: Copy> Iterator for EpubManifestIter<'ebook, A> {
+    type Item = EpubManifestEntryData<'ebook, A>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.iter
             .next()
-            .map(|(id, data)| EpubManifestEntry::new(id, data, self.context))
+            .map(|(id, data)| EpubManifestEntryData::new(id, data, self.context))
     }
 }
 
 /// A [`ManifestEntry`] contained within an [`EpubManifest`], encompassing
 /// resource-related metadata.
 #[derive(Copy, Clone)]
-pub struct EpubManifestEntry<'ebook> {
+pub struct EpubManifestEntryData<'ebook, A> {
     id: &'ebook str,
-    data: &'ebook EpubManifestEntryData,
-    context: EpubManifestEntryContext<'ebook>,
+    data: &'ebook InternalEpubManifestEntry,
+    pub(crate) context: EpubManifestEntryContext<'ebook, A>,
 }
 
-impl<'ebook> EpubManifestEntry<'ebook> {
+impl<'ebook, A: Copy> EpubManifestEntryData<'ebook, A> {
     fn new(
         id: &'ebook str,
-        data: &'ebook EpubManifestEntryData,
-        context: EpubManifestEntryContext<'ebook>,
+        data: &'ebook InternalEpubManifestEntry,
+        context: EpubManifestEntryContext<'ebook, A>,
     ) -> Self {
         Self { id, data, context }
     }
@@ -344,7 +349,8 @@ impl<'ebook> EpubManifestEntry<'ebook> {
     /// [`Self::href`] is recommended over this method unless access to the original
     /// raw `href` is required for analysis.
     /// Providing the raw value to a method such as
-    /// [`Ebook::read_resource_bytes`](crate::Ebook::read_resource_bytes) can fail.
+    /// [`SynchronousEbook::read_resource_bytes`](crate::SynchronousEbook::read_resource_bytes)
+    /// can fail.
     ///
     /// # See Also
     /// - [`Epub`](super::Epub) documentation of `read_resource_bytes` for normalization details.
@@ -483,7 +489,7 @@ impl<'ebook> EpubManifestEntry<'ebook> {
     }
 }
 
-impl<'ebook> ManifestEntry<'ebook> for EpubManifestEntry<'ebook> {
+impl<'ebook, A: Copy> ManifestEntry<'ebook> for EpubManifestEntryData<'ebook, A> {
     fn key(&self) -> Option<&'ebook str> {
         Some(self.id())
     }
@@ -495,7 +501,9 @@ impl<'ebook> ManifestEntry<'ebook> for EpubManifestEntry<'ebook> {
     fn resource_kind(&self) -> ResourceKind<'ebook> {
         self.media_type().into()
     }
+}
 
+impl<'ebook> SynchronousManifestEntry<'ebook> for EpubManifestEntry<'ebook> {
     fn read_str(&self) -> EbookResult<String> {
         self.context.resource.read_str(self.href().decode().into())
     }
@@ -507,7 +515,7 @@ impl<'ebook> ManifestEntry<'ebook> for EpubManifestEntry<'ebook> {
     }
 }
 
-impl Debug for EpubManifestEntry<'_> {
+impl<A> Debug for EpubManifestEntryData<'_, A> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("EpubManifestEntry")
             .field("id", &self.id)
@@ -516,7 +524,7 @@ impl Debug for EpubManifestEntry<'_> {
     }
 }
 
-impl PartialEq for EpubManifestEntry<'_> {
+impl<A> PartialEq for EpubManifestEntryData<'_, A> {
     fn eq(&self, other: &Self) -> bool {
         self.id == other.id && self.data == other.data
     }

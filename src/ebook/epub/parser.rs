@@ -7,11 +7,11 @@ use crate::ebook::archive::Archive;
 use crate::ebook::epub::EpubConfig;
 use crate::ebook::epub::consts;
 use crate::ebook::epub::errors::EpubFormatError;
-use crate::ebook::epub::manifest::EpubManifestData;
+use crate::ebook::epub::manifest::InternalEpubManifest;
 use crate::ebook::epub::metadata::{EpubMetadataData, EpubVersion};
 use crate::ebook::epub::parser::package::TocLocation;
-use crate::ebook::epub::spine::EpubSpineData;
-use crate::ebook::epub::toc::EpubTocData;
+use crate::ebook::epub::spine::InternalEpubSpine;
+use crate::ebook::epub::toc::InternalEpubToc;
 use crate::ebook::errors::ArchiveError;
 use crate::parser::ParserResult;
 use crate::util::uri;
@@ -19,10 +19,10 @@ use crate::util::uri;
 pub(super) struct ParsedContent {
     pub(super) package_file: String,
     pub(super) metadata: EpubMetadataData,
-    pub(super) manifest: EpubManifestData,
-    pub(super) spine: EpubSpineData,
+    pub(super) manifest: InternalEpubManifest,
+    pub(super) spine: InternalEpubSpine,
     /// Encompasses landmarks & guide as well.
-    pub(super) toc: EpubTocData,
+    pub(super) toc: InternalEpubToc,
 }
 
 /// Resolver to turn relative uris into absolute.

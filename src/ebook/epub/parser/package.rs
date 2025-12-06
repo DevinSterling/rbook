@@ -6,11 +6,11 @@ mod spine;
 use crate::ebook::element::TextDirection;
 use crate::ebook::epub::consts::{self, bytes};
 use crate::ebook::epub::errors::EpubFormatError;
-use crate::ebook::epub::manifest::EpubManifestData;
+use crate::ebook::epub::manifest::InternalEpubManifest;
 use crate::ebook::epub::metadata::{EpubMetadataData, EpubVersion, EpubVersionData};
 use crate::ebook::epub::parser::EpubParser;
-use crate::ebook::epub::spine::EpubSpineData;
-use crate::ebook::epub::toc::EpubTocData;
+use crate::ebook::epub::spine::InternalEpubSpine;
+use crate::ebook::epub::toc::InternalEpubToc;
 use crate::ebook::metadata::Version;
 use crate::epub::parser::UriResolver;
 use crate::epub::parser::package::metadata::PendingRefinements;
@@ -41,16 +41,16 @@ pub(super) struct TocLocation {
 type ProcessedPackageData = (
     Vec<TocLocation>,
     EpubMetadataData,
-    EpubManifestData,
-    EpubSpineData,
-    EpubTocData,
+    InternalEpubManifest,
+    InternalEpubSpine,
+    InternalEpubToc,
 );
 
 type ProcessedOpfData = (
     Option<EpubMetadataData>,
-    Option<EpubManifestData>,
-    Option<EpubSpineData>,
-    Option<EpubTocData>,
+    Option<InternalEpubManifest>,
+    Option<InternalEpubSpine>,
+    Option<InternalEpubToc>,
 );
 
 pub(super) struct PackageContext<'a> {
@@ -80,15 +80,15 @@ impl EpubParser<'_> {
             self.config.parse_manifest,
             manifest,
             || EpubFormatError::NoManifestFound,
-            EpubManifestData::empty,
+            InternalEpubManifest::empty,
         )?;
         let spine = self.resolve_section(
             self.config.parse_spine,
             spine,
             || EpubFormatError::NoSpineFound,
-            EpubSpineData::empty,
+            InternalEpubSpine::empty,
         )?;
-        let toc_data = guide.unwrap_or_else(EpubTocData::empty);
+        let toc_data = guide.unwrap_or_else(InternalEpubToc::empty);
 
         // Post-processing
         // Retrieving the toc hrefs depends on the manifest being parsed
@@ -219,7 +219,7 @@ impl EpubParser<'_> {
     /// referenced manifest entry (if it doesn't contain it already).
     ///
     /// This is ignored for EPUB 3
-    fn handle_epub2_cover_image(metadata: &EpubMetadataData, manifest: &mut EpubManifestData) {
+    fn handle_epub2_cover_image(metadata: &EpubMetadataData, manifest: &mut InternalEpubManifest) {
         if let Some(properties) = metadata
             .by_group(consts::COVER)
             .and_then(|group| group.first())

@@ -40,7 +40,7 @@ use std::path::Path;
 /// ```
 /// # use rbook::ebook::errors::EbookResult;
 /// # use rbook::ebook::resource::Resource;
-/// # use rbook::{Ebook, Epub};
+/// # use rbook::{Ebook, Epub, SynchronousEbook};
 /// # fn main() -> EbookResult<()> {
 /// let cover_path = "/EPUB/cover.xhtml";
 /// let resource = Resource::from(cover_path);

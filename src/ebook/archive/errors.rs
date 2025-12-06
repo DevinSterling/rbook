@@ -2,7 +2,7 @@ use crate::ebook::resource::Resource;
 use std::io;
 use std::path::PathBuf;
 
-pub(super) type ArchiveResult<T> = Result<T, ArchiveError>;
+pub(crate) type ArchiveResult<T> = Result<T, ArchiveError>;
 
 /// Possible errors from an archive contained within an [`Ebook`](crate::Ebook).
 #[non_exhaustive]

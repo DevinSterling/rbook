@@ -1,6 +1,6 @@
 use crate::ebook::epub::consts::{self, bytes};
 use crate::ebook::epub::parser::EpubParser;
-use crate::ebook::epub::spine::{EpubSpineData, EpubSpineEntryData};
+use crate::ebook::epub::spine::{InternalEpubSpine, InternalEpubSpineEntry};
 use crate::ebook::spine::PageDirection;
 use crate::epub::parser::package::PackageContext;
 use crate::parser::ParserResult;
@@ -12,7 +12,7 @@ impl EpubParser<'_> {
         &self,
         ctx: &mut PackageContext,
         spine: &BytesStart,
-    ) -> ParserResult<EpubSpineData> {
+    ) -> ParserResult<InternalEpubSpine> {
         let mut entries = Vec::new();
         let page_direction = spine
             .get_attribute(consts::PAGE_PROGRESSION_DIRECTION)
@@ -39,7 +39,7 @@ impl EpubParser<'_> {
                 .and_then(|id| ctx.refinements.take_refinements(id))
                 .unwrap_or_default();
 
-            entries.push(EpubSpineEntryData {
+            entries.push(InternalEpubSpineEntry {
                 order: entries.len(),
                 attributes: attributes.try_into()?,
                 id,
@@ -49,6 +49,6 @@ impl EpubParser<'_> {
                 refinements,
             });
         }
-        Ok(EpubSpineData::new(page_direction, entries))
+        Ok(InternalEpubSpine::new(page_direction, entries))
     }
 }

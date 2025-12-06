@@ -1,8 +1,8 @@
 //! EPUB-specific table-of-contents content.
 
 use crate::ebook::element::{AttributeData, Attributes, Href};
-use crate::ebook::epub::manifest::{EpubManifestEntry, EpubManifestEntryProvider};
-use crate::ebook::epub::{EpubConfig, EpubVersion};
+use crate::ebook::epub::manifest::{EpubManifestEntryData, EpubManifestEntryProvider};
+use crate::ebook::epub::{EpubConfig, EpubVersion, SynchronousArchive};
 use crate::ebook::toc::{Toc, TocChildren, TocEntry, TocEntryKind};
 use std::collections::HashMap;
 use std::collections::hash_map::Iter as HashMapIter;
@@ -13,7 +13,7 @@ use std::slice::Iter as SliceIter;
 // PRIVATE API
 ////////////////////////////////////////////////////////////////////////////////
 
-pub(super) type TocGroups = HashMap<EpubTocKey<'static>, EpubTocEntryData>;
+pub(super) type TocGroups = HashMap<EpubTocKey<'static>, InternalEpubTocEntry>;
 
 #[derive(Debug, Hash, PartialEq, Eq)]
 pub(super) struct EpubTocKey<'a> {
@@ -32,7 +32,7 @@ impl<'a> EpubTocKey<'a> {
 }
 
 #[derive(Debug, PartialEq)]
-pub(super) struct EpubTocData {
+pub(super) struct InternalEpubToc {
     /// Despite a toc being required for EPUBs, allow
     /// leniency for those that don't if `strict` is
     /// disabled within [`EpubOpenOptions`](super::EpubOpenOptions).
@@ -42,7 +42,7 @@ pub(super) struct EpubTocData {
     toc_map: TocGroups,
 }
 
-impl EpubTocData {
+impl InternalEpubToc {
     pub(super) fn new(toc_map: TocGroups) -> Self {
         Self {
             toc_map,
@@ -56,7 +56,7 @@ impl EpubTocData {
         Self::new(HashMap::new())
     }
 
-    pub(super) fn from_guide(data: EpubTocEntryData) -> Self {
+    pub(super) fn from_guide(data: InternalEpubTocEntry) -> Self {
         let mut map = HashMap::new();
         map.insert(
             EpubTocKey::of(TocEntryKind::Landmarks, EpubVersion::EPUB2),
@@ -98,7 +98,7 @@ impl EpubTocData {
 }
 
 #[derive(Debug, Default, Hash, PartialEq)]
-pub(super) struct EpubTocEntryData {
+pub(super) struct InternalEpubTocEntry {
     pub(super) id: Option<String>,
     pub(super) order: usize,
     pub(super) depth: usize,
@@ -107,12 +107,19 @@ pub(super) struct EpubTocEntryData {
     pub(super) href: Option<String>,
     pub(super) href_raw: Option<String>,
     pub(super) attributes: Vec<AttributeData>,
-    pub(super) children: Vec<EpubTocEntryData>,
+    pub(super) children: Vec<InternalEpubTocEntry>,
 }
 
 ////////////////////////////////////////////////////////////////////////////////
 // PUBLIC API
 ////////////////////////////////////////////////////////////////////////////////
+
+/// todo
+pub type EpubToc<'ebook> = EpubTocData<'ebook, &'ebook SynchronousArchive>;
+/// todo
+pub type EpubTocEntry<'ebook> = EpubTocEntryData<'ebook, &'ebook SynchronousArchive>;
+/// todo
+pub type EpubTocChildren<'ebook> = EpubTocChildrenData<'ebook, &'ebook SynchronousArchive>;
 
 /// An EPUB table of contents, see [`Toc`] for additional details.
 ///
@@ -124,35 +131,35 @@ pub(super) struct EpubTocEntryData {
 /// - [`EpubToc::landmarks`] (`landmarks/guide`)
 /// - [`EpubToc::by_kind_version`]
 #[derive(Copy, Clone)]
-pub struct EpubToc<'ebook> {
-    provider: EpubManifestEntryProvider<'ebook>,
-    data: &'ebook EpubTocData,
+pub struct EpubTocData<'ebook, A> {
+    provider: EpubManifestEntryProvider<'ebook, A>,
+    data: &'ebook InternalEpubToc,
 }
 
-impl<'ebook> EpubToc<'ebook> {
+impl<'ebook, A: Copy> EpubTocData<'ebook, A> {
     pub(super) fn new(
-        provider: EpubManifestEntryProvider<'ebook>,
-        data: &'ebook EpubTocData,
+        provider: EpubManifestEntryProvider<'ebook, A>,
+        data: &'ebook InternalEpubToc,
     ) -> Self {
-        EpubToc { provider, data }
+        EpubTocData { provider, data }
     }
 
     fn by_toc_key(
         &self,
         kind: TocEntryKind<'ebook>,
         version: Option<EpubVersion>,
-    ) -> Option<EpubTocEntry<'ebook>> {
+    ) -> Option<EpubTocEntryData<'ebook, A>> {
         self.data
             .toc_map
             .get(&EpubTocKey::new(kind, version))
-            .map(|data| EpubTocEntry::new(data, self.provider))
+            .map(|data| EpubTocEntryData::new(data, self.provider))
     }
 
     /// The preferred **page list** format, mapping to the EPUB 2 or EPUB 3
     /// [`TocEntryKind::PageList`] format, if present.
     ///
     /// The default preferred format (EPUB 3) is configurable via [`EpubOpenOptions`](super::EpubOpenOptions).
-    pub fn page_list(&self) -> Option<EpubTocEntry<'ebook>> {
+    pub fn page_list(&self) -> Option<EpubTocEntryData<'ebook, A>> {
         self.by_toc_key(TocEntryKind::PageList, self.data.preferred_page_list)
     }
 
@@ -160,7 +167,7 @@ impl<'ebook> EpubToc<'ebook> {
     /// [`TocEntryKind::Landmarks`] format, if present.
     ///
     /// The default preferred format (EPUB 3) is configurable via [`EpubOpenOptions`](super::EpubOpenOptions).
-    pub fn landmarks(&self) -> Option<EpubTocEntry<'ebook>> {
+    pub fn landmarks(&self) -> Option<EpubTocEntryData<'ebook, A>> {
         self.by_toc_key(TocEntryKind::Landmarks, self.data.preferred_landmarks)
     }
 
@@ -182,7 +189,7 @@ impl<'ebook> EpubToc<'ebook> {
         &self,
         kind: impl Into<TocEntryKind<'ebook>>,
         version: EpubVersion,
-    ) -> Option<EpubTocEntry<'ebook>> {
+    ) -> Option<EpubTocEntryData<'ebook, A>> {
         // "Normalize" epub version as the contained value
         // may be different (e.g., "3.1", "3.2")
         // Version must be `2.0` or `3.0`
@@ -191,12 +198,15 @@ impl<'ebook> EpubToc<'ebook> {
 }
 
 #[allow(refining_impl_trait)]
-impl<'ebook> Toc<'ebook> for EpubToc<'ebook> {
-    fn contents(&self) -> Option<EpubTocEntry<'ebook>> {
+impl<'ebook, A: Copy> Toc<'ebook> for EpubTocData<'ebook, A> {
+    fn contents(&self) -> Option<EpubTocEntryData<'ebook, A>> {
         self.by_toc_key(TocEntryKind::Toc, self.data.preferred_toc)
     }
 
-    fn by_kind(&self, kind: impl Into<TocEntryKind<'ebook>>) -> Option<EpubTocEntry<'ebook>> {
+    fn by_kind(
+        &self,
+        kind: impl Into<TocEntryKind<'ebook>>,
+    ) -> Option<EpubTocEntryData<'ebook, A>> {
         let kind = kind.into();
         let preferred_version = match kind {
             TocEntryKind::Landmarks => self.data.preferred_landmarks,
@@ -207,12 +217,12 @@ impl<'ebook> Toc<'ebook> for EpubToc<'ebook> {
         self.by_toc_key(kind, preferred_version)
     }
 
-    fn kinds(&self) -> EpubTocIter<'ebook> {
+    fn kinds(&self) -> EpubTocIter<'ebook, A> {
         self.into_iter()
     }
 }
 
-impl Debug for EpubToc<'_> {
+impl<A> Debug for EpubTocData<'_, A> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("EpubToc")
             .field("data", self.data)
@@ -220,15 +230,15 @@ impl Debug for EpubToc<'_> {
     }
 }
 
-impl PartialEq for EpubToc<'_> {
+impl<A> PartialEq for EpubTocData<'_, A> {
     fn eq(&self, other: &Self) -> bool {
         self.data == other.data
     }
 }
 
-impl<'ebook> IntoIterator for &EpubToc<'ebook> {
-    type Item = (&'ebook TocEntryKind<'ebook>, EpubTocEntry<'ebook>);
-    type IntoIter = EpubTocIter<'ebook>;
+impl<'ebook, A: Copy> IntoIterator for &EpubTocData<'ebook, A> {
+    type Item = (&'ebook TocEntryKind<'ebook>, EpubTocEntryData<'ebook, A>);
+    type IntoIter = EpubTocIter<'ebook, A>;
 
     fn into_iter(self) -> Self::IntoIter {
         EpubTocIter {
@@ -238,9 +248,9 @@ impl<'ebook> IntoIterator for &EpubToc<'ebook> {
     }
 }
 
-impl<'ebook> IntoIterator for EpubToc<'ebook> {
-    type Item = (&'ebook TocEntryKind<'ebook>, EpubTocEntry<'ebook>);
-    type IntoIter = EpubTocIter<'ebook>;
+impl<'ebook, A: Copy> IntoIterator for EpubTocData<'ebook, A> {
+    type Item = (&'ebook TocEntryKind<'ebook>, EpubTocEntryData<'ebook, A>);
+    type IntoIter = EpubTocIter<'ebook, A>;
 
     fn into_iter(self) -> Self::IntoIter {
         (&self).into_iter()
@@ -266,30 +276,33 @@ impl<'ebook> IntoIterator for EpubToc<'ebook> {
 /// # Ok(())
 /// # }
 /// ```
-pub struct EpubTocIter<'ebook> {
-    provider: EpubManifestEntryProvider<'ebook>,
-    iter: HashMapIter<'ebook, EpubTocKey<'ebook>, EpubTocEntryData>,
+pub struct EpubTocIter<'ebook, A> {
+    provider: EpubManifestEntryProvider<'ebook, A>,
+    iter: HashMapIter<'ebook, EpubTocKey<'ebook>, InternalEpubTocEntry>,
 }
 
-impl<'ebook> Iterator for EpubTocIter<'ebook> {
-    type Item = (&'ebook TocEntryKind<'ebook>, EpubTocEntry<'ebook>);
+impl<'ebook, A: Copy> Iterator for EpubTocIter<'ebook, A> {
+    type Item = (&'ebook TocEntryKind<'ebook>, EpubTocEntryData<'ebook, A>);
 
     fn next(&mut self) -> Option<Self::Item> {
         self.iter
             .next()
-            .map(move |(kind, data)| (&kind.kind, EpubTocEntry::new(data, self.provider)))
+            .map(move |(kind, data)| (&kind.kind, EpubTocEntryData::new(data, self.provider)))
     }
 }
 
 /// An entry contained within an [`EpubToc`], encompassing associated metadata.
 #[derive(Copy, Clone)]
-pub struct EpubTocEntry<'ebook> {
-    data: &'ebook EpubTocEntryData,
-    provider: EpubManifestEntryProvider<'ebook>,
+pub struct EpubTocEntryData<'ebook, A> {
+    data: &'ebook InternalEpubTocEntry,
+    provider: EpubManifestEntryProvider<'ebook, A>,
 }
 
-impl<'ebook> EpubTocEntry<'ebook> {
-    fn new(data: &'ebook EpubTocEntryData, provider: EpubManifestEntryProvider<'ebook>) -> Self {
+impl<'ebook, A: Copy> EpubTocEntryData<'ebook, A> {
+    fn new(
+        data: &'ebook InternalEpubTocEntry,
+        provider: EpubManifestEntryProvider<'ebook, A>,
+    ) -> Self {
         Self { data, provider }
     }
 
@@ -331,10 +344,10 @@ impl<'ebook> EpubTocEntry<'ebook> {
     /// [`Self::href`] is recommended over this method unless access to the original
     /// raw `href` is required for analysis.
     /// Providing the raw value to a method such as
-    /// [`Ebook::read_resource_bytes`](crate::Ebook::read_resource_bytes) can fail.
+    /// [`SynchronousEbook::read_resource_bytes`](crate::SynchronousEbook::read_resource_bytes) can fail.
     ///
     /// # See Also
-    /// - [`Epub`](super::Epub) documentation of `read_resource_bytes` for normalization details.
+    /// - [`Epub`](super::EpubData) documentation of `read_resource_bytes` for normalization details.
     /// - [`Href::path`] to retrieve the href value without the query and fragment.
     pub fn href_raw(&self) -> Option<Href<'ebook>> {
         self.data.href_raw.as_deref().map(Into::into)
@@ -365,7 +378,7 @@ impl<'ebook> EpubTocEntry<'ebook> {
 }
 
 #[allow(refining_impl_trait)]
-impl<'ebook> TocEntry<'ebook> for EpubTocEntry<'ebook> {
+impl<'ebook, A: Copy> TocEntry<'ebook> for EpubTocEntryData<'ebook, A> {
     fn order(&self) -> usize {
         self.data.order
     }
@@ -382,17 +395,17 @@ impl<'ebook> TocEntry<'ebook> for EpubTocEntry<'ebook> {
         &self.data.kind
     }
 
-    fn children(&self) -> EpubTocChildren<'ebook> {
-        EpubTocChildren(*self)
+    fn children(&self) -> EpubTocChildrenData<'ebook, A> {
+        EpubTocChildrenData(*self)
     }
 
-    fn manifest_entry(&self) -> Option<EpubManifestEntry<'ebook>> {
+    fn manifest_entry(&self) -> Option<EpubManifestEntryData<'ebook, A>> {
         self.href()
             .and_then(|href| self.provider.by_href(href.path().as_str()))
     }
 }
 
-impl Debug for EpubTocEntry<'_> {
+impl<A> Debug for EpubTocEntryData<'_, A> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("EpubTocEntry")
             .field("data", self.data)
@@ -400,9 +413,9 @@ impl Debug for EpubTocEntry<'_> {
     }
 }
 
-impl<'a> IntoIterator for &EpubTocEntry<'a> {
-    type Item = EpubTocEntry<'a>;
-    type IntoIter = EpubTocEntryIter<'a>;
+impl<'a, A: Copy> IntoIterator for &EpubTocEntryData<'a, A> {
+    type Item = EpubTocEntryData<'a, A>;
+    type IntoIter = EpubTocEntryIter<'a, A>;
 
     fn into_iter(self) -> Self::IntoIter {
         EpubTocEntryIter {
@@ -412,9 +425,9 @@ impl<'a> IntoIterator for &EpubTocEntry<'a> {
     }
 }
 
-impl<'a> IntoIterator for EpubTocEntry<'a> {
+impl<'a, A: Copy> IntoIterator for EpubTocEntryData<'a, A> {
     type Item = Self;
-    type IntoIter = EpubTocEntryIter<'a>;
+    type IntoIter = EpubTocEntryIter<'a, A>;
 
     fn into_iter(self) -> Self::IntoIter {
         (&self).into_iter()
@@ -425,37 +438,37 @@ impl<'a> IntoIterator for EpubTocEntry<'a> {
 ///
 /// See [`TocChildren`] for more details.
 #[derive(Copy, Clone, Debug, PartialEq)]
-pub struct EpubTocChildren<'ebook>(EpubTocEntry<'ebook>);
+pub struct EpubTocChildrenData<'ebook, A>(EpubTocEntryData<'ebook, A>);
 
 #[allow(refining_impl_trait)]
-impl<'ebook> TocChildren<'ebook> for EpubTocChildren<'ebook> {
-    fn get(&self, index: usize) -> Option<EpubTocEntry<'ebook>> {
+impl<'ebook, A: Copy> TocChildren<'ebook> for EpubTocChildrenData<'ebook, A> {
+    fn get(&self, index: usize) -> Option<EpubTocEntryData<'ebook, A>> {
         self.0
             .data
             .children
             .get(index)
-            .map(|data| EpubTocEntry::new(data, self.0.provider))
+            .map(|data| EpubTocEntryData::new(data, self.0.provider))
     }
 
-    fn iter(&self) -> EpubTocEntryIter<'ebook> {
+    fn iter(&self) -> EpubTocEntryIter<'ebook, A> {
         self.into_iter()
     }
 
-    fn flatten(&self) -> impl Iterator<Item = EpubTocEntry<'ebook>> + 'ebook {
-        struct FlatEpubTocEntryIterator<'ebook> {
-            stack: Vec<&'ebook EpubTocEntryData>,
-            provider: EpubManifestEntryProvider<'ebook>,
+    fn flatten(&self) -> impl Iterator<Item = EpubTocEntryData<'ebook, A>> + 'ebook {
+        struct FlatEpubTocEntryIterator<'ebook, A> {
+            stack: Vec<&'ebook InternalEpubTocEntry>,
+            provider: EpubManifestEntryProvider<'ebook, A>,
         }
 
-        impl<'ebook> Iterator for FlatEpubTocEntryIterator<'ebook> {
-            type Item = EpubTocEntry<'ebook>;
+        impl<'ebook, A: Copy> Iterator for FlatEpubTocEntryIterator<'ebook, A> {
+            type Item = EpubTocEntryData<'ebook, A>;
 
             fn next(&mut self) -> Option<Self::Item> {
                 let entry = self.stack.pop()?;
 
                 // Push children in reverse order to maintain DFS order
                 self.stack.extend(entry.children.iter().rev());
-                Some(EpubTocEntry::new(entry, self.provider))
+                Some(EpubTocEntryData::new(entry, self.provider))
             }
         }
 
@@ -470,24 +483,24 @@ impl<'ebook> TocChildren<'ebook> for EpubTocChildren<'ebook> {
     }
 }
 
-impl PartialEq<Self> for EpubTocEntry<'_> {
+impl<A> PartialEq<Self> for EpubTocEntryData<'_, A> {
     fn eq(&self, other: &Self) -> bool {
         self.data == other.data
     }
 }
 
-impl<'ebook> IntoIterator for &EpubTocChildren<'ebook> {
-    type Item = EpubTocEntry<'ebook>;
-    type IntoIter = EpubTocEntryIter<'ebook>;
+impl<'ebook, A: Copy> IntoIterator for &EpubTocChildrenData<'ebook, A> {
+    type Item = EpubTocEntryData<'ebook, A>;
+    type IntoIter = EpubTocEntryIter<'ebook, A>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
     }
 }
 
-impl<'ebook> IntoIterator for EpubTocChildren<'ebook> {
-    type Item = EpubTocEntry<'ebook>;
-    type IntoIter = EpubTocEntryIter<'ebook>;
+impl<'ebook, A: Copy> IntoIterator for EpubTocChildrenData<'ebook, A> {
+    type Item = EpubTocEntryData<'ebook, A>;
+    type IntoIter = EpubTocEntryIter<'ebook, A>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.0.into_iter()
@@ -516,17 +529,17 @@ impl<'ebook> IntoIterator for EpubTocChildren<'ebook> {
 /// # Ok(())
 /// # }
 /// ```
-pub struct EpubTocEntryIter<'ebook> {
-    provider: EpubManifestEntryProvider<'ebook>,
-    iter: SliceIter<'ebook, EpubTocEntryData>,
+pub struct EpubTocEntryIter<'ebook, A> {
+    provider: EpubManifestEntryProvider<'ebook, A>,
+    iter: SliceIter<'ebook, InternalEpubTocEntry>,
 }
 
-impl<'ebook> Iterator for EpubTocEntryIter<'ebook> {
-    type Item = EpubTocEntry<'ebook>;
+impl<'ebook, A: Copy> Iterator for EpubTocEntryIter<'ebook, A> {
+    type Item = EpubTocEntryData<'ebook, A>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.iter
             .next()
-            .map(|data| EpubTocEntry::new(data, self.provider))
+            .map(|data| EpubTocEntryData::new(data, self.provider))
     }
 }

@@ -9,16 +9,15 @@
 //! module, allowing all formats to share the same "base" API.
 //!
 //! Traits such as [`Ebook`] allow formats to be handled generically.
-//! For example, retrieving the data of a cover image agnostic to the
-//! concrete format (e.g., [`Epub`]):
+//! For example, retrieving the title agnostic to the concrete format (e.g., [`Epub`]):
 //! ```
 //! # use rbook::Ebook;
-//! # use rbook::ebook::manifest::{Manifest, ManifestEntry};
+//! # use rbook::ebook::metadata::{Metadata, MetaEntry};
 //! // Here `ebook` may be of any supported format.
-//! fn cover_image_bytes<E: Ebook>(ebook: &E) -> Option<Vec<u8>> {
-//!     // 1 - An ebook may not have a `cover_image` entry, hence the try operator (`?`).
-//!     // 2 - `read_bytes` returns a `Result`; `ok()` converts the result into `Option`.
-//!     ebook.manifest().cover_image()?.read_bytes().ok()
+//! fn get_title<E: Ebook>(ebook: &E) -> Option<String> {
+//!     ebook.metadata().title().map(|title| {
+//!         format!("{}: {}", title.order(), title.value())
+//!     })
 //! }
 //! ```
 //!
@@ -93,7 +92,7 @@
 //! # use rbook::{Ebook, Epub};
 //! // Import traits (Alternatively, rbook::prelude::*)
 //! use rbook::ebook::manifest::ManifestEntry;
-//! use rbook::reader::{Reader, ReaderContent};
+//! use rbook::reader::{SynchronousReader, ReaderContent};
 //! # let epub = Epub::open("tests/ebooks/example_epub").unwrap();
 //!
 //! // Create a reader instance
@@ -126,11 +125,11 @@
 //!
 //! The simplest way to access and retrieve resources from an ebook is through the
 //! [`Manifest`](ebook::manifest::Manifest), specifically through its entries via
-//! [`ManifestEntry::read_str`](ebook::manifest::ManifestEntry::read_str) and
-//! [`ManifestEntry::read_bytes`](ebook::manifest::ManifestEntry::read_bytes):
+//! [`SynchronousManifestEntry::read_str`](ebook::manifest::SynchronousManifestEntry::read_str) and
+//! [`SynchronousManifestEntry::read_bytes`](ebook::manifest::SynchronousManifestEntry::read_bytes):
 //! ```
 //! # use rbook::ebook::errors::EbookResult;
-//! # use rbook::ebook::manifest::{Manifest, ManifestEntry};
+//! # use rbook::ebook::manifest::{Manifest, ManifestEntry, SynchronousManifestEntry};
 //! # use rbook::{Ebook, Epub};
 //! # fn main() -> EbookResult<()> {
 //! # let epub = Epub::open("tests/ebooks/example_epub")?;
@@ -144,12 +143,12 @@
 //!
 //! For finer grain control, the [`Ebook`] trait provides two methods
 //! that accept a [`Resource`](ebook::resource::Resource) as an argument:
-//! - [`Ebook::read_resource_str`] to retrieve the content as a UTF-8 string.
-//! - [`Ebook::read_resource_bytes`] to retrieve the content in the form of raw bytes.
+//! - [`SynchronousEbook::read_resource_str`] to retrieve the content as a UTF-8 string.
+//! - [`SynchronousEbook::read_resource_bytes`] to retrieve the content in the form of raw bytes.
 //! ```
 //! # use rbook::ebook::errors::EbookResult;
 //! # use rbook::ebook::manifest::{Manifest, ManifestEntry};
-//! # use rbook::{Ebook, Epub};
+//! # use rbook::{Ebook, Epub, SynchronousEbook};
 //! # fn main() -> EbookResult<()> {
 //! # let epub = Epub::open("tests/ebooks/example_epub")?;
 //! let manifest_entry = epub.manifest().cover_image().unwrap();
@@ -245,7 +244,7 @@
 //! ```no_run
 //! use std::{fs, path::Path};
 //! # use rbook::{Ebook, Epub};
-//! # use rbook::ebook::manifest::{Manifest, ManifestEntry};
+//! # use rbook::ebook::manifest::{Manifest, ManifestEntry, SynchronousManifestEntry};
 //! # let epub = Epub::open("tests/ebooks/example_epub").unwrap();
 //!
 //! // Create an output directory for the extracted images
@@ -286,15 +285,19 @@
 //! ```
 
 #![warn(missing_docs)]
-#![cfg_attr(docsrs, feature(doc_cfg))]
+// #![cfg_attr(docsrs, feature(doc_cfg))]
 
 mod parser;
 mod util;
 
+#[cfg(feature = "async-tokio")]
+pub mod async_ebook;
 pub mod ebook;
 pub mod reader;
 
-pub use self::{ebook::Ebook, epub::Epub};
+#[cfg(feature = "async-tokio")]
+pub use self::async_ebook::epub::AsyncEpub;
+pub use self::{ebook::Ebook, ebook::SynchronousEbook, epub::Epub};
 pub use crate::ebook::epub;
 
 /// The rbook prelude for convenient imports of the core
@@ -303,12 +306,14 @@ pub use crate::ebook::epub;
 /// This is a crate feature, `prelude`, that is enabled by default.
 #[cfg(feature = "prelude")]
 pub mod prelude {
+    #[cfg(feature = "async-tokio")]
+    pub use crate::async_ebook::{AsyncEbook, manifest::AsyncManifestEntry};
     pub use crate::ebook::{
-        Ebook,
-        manifest::{Manifest, ManifestEntry},
+        Ebook, SynchronousEbook,
+        manifest::{Manifest, ManifestEntry, SynchronousManifestEntry},
         metadata::{Contributor, Identifier, Language, MetaEntry, Metadata, Tag, Title},
         spine::{Spine, SpineEntry},
         toc::{Toc, TocChildren, TocEntry},
     };
-    pub use crate::reader::{Reader, ReaderContent};
+    pub use crate::reader::{Reader, ReaderContent, SynchronousReader};
 }

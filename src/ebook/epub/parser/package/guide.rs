@@ -1,7 +1,7 @@
 use crate::ebook::epub::consts;
 use crate::ebook::epub::consts::bytes;
 use crate::ebook::epub::parser::EpubParser;
-use crate::ebook::epub::toc::{EpubTocData, EpubTocEntryData};
+use crate::ebook::epub::toc::{InternalEpubToc, InternalEpubTocEntry};
 use crate::ebook::toc::TocEntryKind;
 use crate::epub::parser::package::PackageContext;
 use crate::parser::ParserResult;
@@ -13,11 +13,11 @@ impl EpubParser<'_> {
         &self,
         ctx: &mut PackageContext,
         guide: &BytesStart,
-    ) -> ParserResult<EpubTocData> {
-        let mut root = EpubTocEntryData {
+    ) -> ParserResult<InternalEpubToc> {
+        let mut root = InternalEpubTocEntry {
             kind: TocEntryKind::Landmarks,
             attributes: guide.bytes_attributes().try_into()?,
-            ..EpubTocEntryData::default()
+            ..InternalEpubTocEntry::default()
         };
 
         while let Some(el) = Self::simple_handler(&mut ctx.reader, bytes::GUIDE, bytes::REFERENCE)?
@@ -45,7 +45,7 @@ impl EpubParser<'_> {
             // Optional fields
             let id = attributes.take_attribute_value(consts::ID)?;
 
-            root.children.push(EpubTocEntryData {
+            root.children.push(InternalEpubTocEntry {
                 order: root.children.len() + 1,
                 href: Some(href),
                 href_raw: Some(href_raw),
@@ -57,6 +57,6 @@ impl EpubParser<'_> {
                 ..Default::default()
             });
         }
-        Ok(EpubTocData::from_guide(root))
+        Ok(InternalEpubToc::from_guide(root))
     }
 }

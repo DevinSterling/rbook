@@ -1,7 +1,7 @@
 use crate::ebook::epub::EpubVersion;
 use crate::ebook::epub::consts::{self, bytes};
 use crate::ebook::epub::errors::EpubFormatError;
-use crate::ebook::epub::manifest::{EpubManifestData, EpubManifestEntryData};
+use crate::ebook::epub::manifest::{InternalEpubManifest, InternalEpubManifestEntry};
 use crate::ebook::epub::parser::EpubParser;
 use crate::ebook::epub::parser::package::TocLocation;
 use crate::epub::parser::package::PackageContext;
@@ -13,7 +13,7 @@ impl EpubParser<'_> {
     pub(super) fn parse_manifest(
         &self,
         ctx: &mut PackageContext,
-    ) -> ParserResult<EpubManifestData> {
+    ) -> ParserResult<InternalEpubManifest> {
         let mut entries = HashMap::new();
 
         while let Some(el) = Self::simple_handler(&mut ctx.reader, bytes::MANIFEST, bytes::ITEM)? {
@@ -45,7 +45,7 @@ impl EpubParser<'_> {
             media_type.make_ascii_lowercase();
             entries.insert(
                 id,
-                EpubManifestEntryData {
+                InternalEpubManifestEntry {
                     attributes: attributes.try_into()?,
                     refinements,
                     href,
@@ -58,12 +58,12 @@ impl EpubParser<'_> {
             );
         }
 
-        Ok(EpubManifestData::new(entries))
+        Ok(InternalEpubManifest::new(entries))
     }
 
     pub(super) fn get_toc_hrefs(
         &self,
-        manifest: &EpubManifestData,
+        manifest: &InternalEpubManifest,
     ) -> ParserResult<Vec<TocLocation>> {
         let mut hrefs = Vec::new();
         let mut formats = vec![
@@ -111,7 +111,7 @@ impl EpubParser<'_> {
     }
 
     fn get_toc_href(
-        entry: &EpubManifestEntryData,
+        entry: &InternalEpubManifestEntry,
         type_key: &str,
         target_type: &str,
     ) -> Option<String> {

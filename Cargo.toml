@@ -16,12 +16,15 @@ keywords = ["ebook", "e-book", "epub", "epub2", "epub3"]
 default = ["threadsafe", "prelude"]
 threadsafe = []
 prelude = []
+async-tokio = ["tokio", "async-trait"]
 
 [dependencies]
 thiserror = "2.0.17"
 quick-xml = "0.38.4"
 percent-encoding = "2.3.2"
 zip = { version = "6.0.0", default-features = false, features = ["deflate"] }
+tokio = { version = "1.10", optional = true, default-features = false, features = ["io-util", "rt"] }
+async-trait = { version = "0.1.89", optional = true }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3.56"

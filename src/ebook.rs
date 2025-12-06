@@ -18,7 +18,7 @@
 //! - [`resource`]: Resource identification and handles.
 //! - [`element`]: Access to `XML`-related types.
 
-pub(super) mod archive;
+pub(crate) mod archive;
 pub mod element;
 pub mod epub;
 pub mod errors;
@@ -68,14 +68,17 @@ pub trait Ebook {
 
     /// The table of contents ([`Toc`]), encompassing navigation points.
     fn toc(&self) -> impl Toc<'_>;
+}
 
+/// todo
+pub trait SynchronousEbook: Ebook {
     /// Returns the specified [`Resource`] in the form of a string.
     ///
     /// # Errors
     /// [`ArchiveError`](errors::ArchiveError): When retrieval of the specified [`Resource`] fails.
     ///
     /// # See Also
-    /// - [`ManifestEntry::read_str`](manifest::ManifestEntry::read_str)
+    /// - [`SynchronousManifestEntry::read_str`](manifest::SynchronousManifestEntry::read_str)
     ///   to alternatively retrieve the data from a manifest entry.
     fn read_resource_str<'a>(&self, resource: impl Into<Resource<'a>>) -> EbookResult<String>;
 
@@ -85,7 +88,7 @@ pub trait Ebook {
     /// [`ArchiveError`](errors::ArchiveError): When retrieval of the specified [`Resource`] fails.
     ///
     /// # See Also
-    /// - [`ManifestEntry::read_bytes`](manifest::ManifestEntry::read_bytes)
+    /// - [`SynchronousManifestEntry::read_bytes`](manifest::SynchronousManifestEntry::read_bytes)
     ///   to alternatively retrieve the data from a manifest entry.
     fn read_resource_bytes<'a>(&self, resource: impl Into<Resource<'a>>) -> EbookResult<Vec<u8>>;
 }

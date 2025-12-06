@@ -33,8 +33,8 @@ use crate::ebook::resource::{Resource, ResourceKind};
 /// - Reading a resource from the manifest:
 /// ```
 /// # use rbook::ebook::errors::EbookResult;
-/// # use rbook::ebook::manifest::{Manifest, ManifestEntry};
-/// # use rbook::{Ebook, Epub};
+/// # use rbook::ebook::manifest::{Manifest, ManifestEntry, SynchronousManifestEntry};
+/// # use rbook::{Ebook, Epub, SynchronousEbook};
 /// # fn main() -> EbookResult<()> {
 /// let epub = Epub::open("tests/ebooks/example_epub")?;
 ///
@@ -185,15 +185,17 @@ pub trait ManifestEntry<'ebook> {
     /// The underlying [`Resource`] a manifest entry points to.
     ///
     /// # See Also
-    /// - [`Self::read_str`] to retrieve the string content of a manifest entry.
-    /// - [`Self::read_bytes`] to retrieve the raw byte content of a manifest entry.
+    /// - [`SynchronousManifestEntry::read_str`]
+    ///   to retrieve the string content of a manifest entry.
+    /// - [`SynchronousManifestEntry::read_bytes`]
+    ///   to retrieve the raw byte content of a manifest entry.
     ///
     /// # Examples
     /// - Reading a resource from the manifest:
     /// ```
     /// # use rbook::ebook::errors::EbookResult;
     /// # use rbook::ebook::manifest::{Manifest, ManifestEntry};
-    /// # use rbook::{Ebook, Epub};
+    /// # use rbook::{Ebook, Epub, SynchronousEbook};
     /// # fn main() -> EbookResult<()> {
     /// let epub = Epub::open("tests/ebooks/example_epub")?;
     ///
@@ -229,12 +231,15 @@ pub trait ManifestEntry<'ebook> {
     /// # }
     /// ```
     fn resource_kind(&self) -> ResourceKind<'ebook>;
+}
 
+/// todo
+pub trait SynchronousManifestEntry<'ebook>: ManifestEntry<'ebook> {
     /// Returns the associated content in the form of a string.
     ///
     /// This method is similar to calling
-    /// [`Ebook::read_resource_str`](super::Ebook::read_resource_str) and passing
-    /// [`Self::resource`] as the argument.
+    /// [`SynchronousEbook::read_resource_str`](super::SynchronousEbook::read_resource_str)
+    /// and passing [`ManifestEntry::resource`] as the argument.
     ///
     /// # Errors
     /// [`ArchiveError`]: When retrieval of the requested content fails.
@@ -243,8 +248,8 @@ pub trait ManifestEntry<'ebook> {
     /// - Retrieving the string content associated with a manifest entry:
     /// ```
     /// # use rbook::ebook::errors::EbookResult;
-    /// # use rbook::ebook::manifest::{Manifest, ManifestEntry};
-    /// # use rbook::{Ebook, Epub};
+    /// # use rbook::ebook::manifest::{Manifest, ManifestEntry, SynchronousManifestEntry};
+    /// # use rbook::{Ebook, Epub, SynchronousEbook};
     /// # fn main() -> EbookResult<()> {
     /// let epub = Epub::open("tests/ebooks/example_epub")?;
     /// let chapter_1 = epub.manifest().by_id("c1").unwrap();
@@ -263,8 +268,8 @@ pub trait ManifestEntry<'ebook> {
     /// Returns the associated content in the form of bytes.
     ///
     /// This method is similar to calling
-    /// [`Ebook::read_resource_bytes`](super::Ebook::read_resource_bytes) and passing
-    /// [`Self::resource`] as the argument.
+    /// [`SynchronousEbook::read_resource_str`](super::SynchronousEbook::read_resource_str)
+    /// and passing [`ManifestEntry::resource`] as the argument.
     ///
     /// # Errors
     /// [`ArchiveError`]: When retrieval of the requested content fails.
@@ -273,8 +278,8 @@ pub trait ManifestEntry<'ebook> {
     /// - Retrieving the byte contents of a [cover image](Manifest::cover_image):
     /// ```
     /// # use rbook::ebook::errors::EbookResult;
-    /// # use rbook::ebook::manifest::{Manifest, ManifestEntry};
-    /// # use rbook::{Ebook, Epub};
+    /// # use rbook::ebook::manifest::{Manifest, ManifestEntry, SynchronousManifestEntry};
+    /// # use rbook::{Ebook, Epub, SynchronousEbook};
     /// # fn main() -> EbookResult<()> {
     /// let epub = Epub::open("tests/ebooks/example_epub")?;
     /// let cover_image = epub.manifest().cover_image().unwrap();

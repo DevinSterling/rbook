@@ -120,7 +120,7 @@ pub trait TocEntry<'ebook> {
     /// ```
     /// # use rbook::ebook::errors::EbookResult;
     /// # use rbook::ebook::toc::{Toc, TocEntry};
-    /// # use rbook::{Ebook, Epub};
+    /// # use rbook::{Ebook, Epub, SynchronousEbook};
     /// # fn main() -> EbookResult<()> {
     /// let epub = Epub::open("tests/ebooks/example_epub")?;
     /// let main_toc_root = epub.toc().contents().unwrap();

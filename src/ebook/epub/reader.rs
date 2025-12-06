@@ -1,22 +1,28 @@
-//! [`Reader`]-specific implementations for the [`Epub`] format.
+//! [`Reader`]-specific implementations for the [`Epub`](EpubData) format.
 
 use crate::ebook::Ebook;
-use crate::ebook::epub::Epub;
 use crate::ebook::epub::errors::EpubFormatError;
-use crate::ebook::epub::manifest::EpubManifestEntry;
-use crate::ebook::epub::spine::EpubSpineEntry;
-use crate::ebook::manifest::ManifestEntry;
+use crate::ebook::epub::manifest::EpubManifestEntryData;
+use crate::ebook::epub::spine::EpubSpineEntryData;
+use crate::ebook::epub::{EpubData, SynchronousArchive};
 use crate::ebook::spine::{Spine, SpineEntry};
 use crate::reader::errors::{ReaderError, ReaderResult};
-use crate::reader::{Reader, ReaderContent, ReaderKey};
+use crate::reader::{Reader, ReaderContent, ReaderKey, SynchronousReader};
 use crate::util::IndexCursor;
 use std::cmp::PartialEq;
+use std::fmt::Debug;
 
-/// A [`Reader`] for an [`Epub`].
+use crate::ebook::manifest::SynchronousManifestEntry;
+use crate::epub::ArchiveLike;
+
+/// todo
+pub type SynchronousEpubReader<'ebook> = EpubReader<'ebook, &'ebook SynchronousArchive>;
+
+/// A [`Reader`] for an [`Epub`](EpubData).
 ///
 /// # Configuration
 /// Reading behavior, such as how to handle non-linear content,
-/// can be configured using [`Epub::reader_builder`] or [`EpubReaderOptions`].
+/// can be configured using [`EpubData::reader_builder`] or [`EpubReaderOptions`].
 ///
 /// # Examples
 /// - Retrieving a new EPUB reader instance with configuration:
@@ -44,13 +50,16 @@ use std::cmp::PartialEq;
 /// # }
 /// ```
 #[derive(Clone, Debug, PartialEq)]
-pub struct EpubReader<'ebook> {
-    entries: Vec<EpubSpineEntry<'ebook>>,
+pub struct EpubReader<'ebook, A> {
+    entries: Vec<EpubSpineEntryData<'ebook, A>>,
     cursor: IndexCursor,
 }
 
-impl<'ebook> EpubReader<'ebook> {
-    pub(super) fn new(epub: &'ebook Epub, config: EpubReaderConfig) -> Self {
+impl<'ebook, A: Copy> EpubReader<'ebook, A> {
+    pub(super) fn new<E>(epub: &'ebook EpubData<E>, config: EpubReaderConfig) -> Self
+    where
+        E: ArchiveLike<Item<'ebook> = A>,
+    {
         let entries = Self::get_entries(epub, config.linear_behavior);
 
         EpubReader {
@@ -60,7 +69,13 @@ impl<'ebook> EpubReader<'ebook> {
     }
 
     // If and when EpubReader grows, this method will be extracted to a submodule.
-    fn get_entries(epub: &'ebook Epub, behavior: LinearBehavior) -> Vec<EpubSpineEntry<'ebook>> {
+    fn get_entries<E>(
+        epub: &'ebook EpubData<E>,
+        behavior: LinearBehavior,
+    ) -> Vec<EpubSpineEntryData<'ebook, A>>
+    where
+        E: ArchiveLike<Item<'ebook> = A>,
+    {
         let iterator = epub.spine().entries();
         match behavior {
             LinearBehavior::Original => iterator.collect(),
@@ -72,7 +87,7 @@ impl<'ebook> EpubReader<'ebook> {
             }
             LinearBehavior::PrependNonLinear | LinearBehavior::AppendNonLinear => {
                 let (mut linear, mut non_linear) =
-                    iterator.partition::<Vec<_>, _>(EpubSpineEntry::is_linear);
+                    iterator.partition::<Vec<_>, _>(EpubSpineEntryData::is_linear);
 
                 if matches!(&behavior, LinearBehavior::AppendNonLinear) {
                     linear.extend(non_linear);
@@ -84,10 +99,12 @@ impl<'ebook> EpubReader<'ebook> {
             }
         }
     }
+}
 
+impl<'ebook> EpubReader<'ebook, &'ebook SynchronousArchive> {
     fn get_manifest_entry(
-        spine_entry: EpubSpineEntry<'ebook>,
-    ) -> ReaderResult<EpubManifestEntry<'ebook>> {
+        spine_entry: EpubSpineEntryData<'ebook, &'ebook SynchronousArchive>,
+    ) -> ReaderResult<EpubManifestEntryData<'ebook, &'ebook SynchronousArchive>> {
         spine_entry.manifest_entry().ok_or_else(|| {
             ReaderError::MalformedEbook(
                 EpubFormatError::MissingAttribute(format!(
@@ -106,14 +123,20 @@ impl<'ebook> EpubReader<'ebook> {
             .ok_or_else(|| ReaderError::NoMapping(idref.to_string()))
     }
 
-    fn find_entry_by_position(&self, position: usize) -> ReaderResult<EpubReaderContent<'ebook>> {
+    fn find_entry_by_position(
+        &self,
+        position: usize,
+    ) -> ReaderResult<EpubReaderContent<'ebook, &'ebook SynchronousArchive>> {
         let spine_entry = self.entries[position];
         let manifest_entry = Self::get_manifest_entry(spine_entry)?;
 
         Self::create_reader_content(position, spine_entry, manifest_entry)
     }
 
-    fn find_entry_by_str(&self, idref: &str) -> ReaderResult<(usize, EpubReaderContent<'ebook>)> {
+    fn find_entry_by_str(
+        &self,
+        idref: &str,
+    ) -> ReaderResult<(usize, EpubReaderContent<'ebook, &'ebook SynchronousArchive>)> {
         let position = self.find_entry_by_idref(idref)?;
         let spine_entry = self.entries[position];
         let manifest_entry = Self::get_manifest_entry(spine_entry)?;
@@ -126,9 +149,9 @@ impl<'ebook> EpubReader<'ebook> {
 
     fn create_reader_content(
         position: usize,
-        spine_entry: EpubSpineEntry<'ebook>,
-        manifest_entry: EpubManifestEntry<'ebook>,
-    ) -> ReaderResult<EpubReaderContent<'ebook>> {
+        spine_entry: EpubSpineEntryData<'ebook, &'ebook SynchronousArchive>,
+        manifest_entry: EpubManifestEntryData<'ebook, &'ebook SynchronousArchive>,
+    ) -> ReaderResult<EpubReaderContent<'ebook, &'ebook SynchronousArchive>> {
         Ok(EpubReaderContent {
             content: manifest_entry.read_str()?,
             position,
@@ -138,25 +161,41 @@ impl<'ebook> EpubReader<'ebook> {
     }
 }
 
-#[allow(refining_impl_trait)]
-impl<'ebook> Reader<'ebook> for EpubReader<'ebook> {
+impl<'ebook, A> Reader<'ebook> for EpubReader<'ebook, A> {
     fn reset(&mut self) {
         self.cursor.reset();
     }
 
-    fn read_next(&mut self) -> Option<ReaderResult<EpubReaderContent<'ebook>>> {
+    fn len(&self) -> usize {
+        self.entries.len()
+    }
+
+    fn current_position(&self) -> Option<usize> {
+        self.cursor.index()
+    }
+}
+
+#[allow(refining_impl_trait)]
+impl<'ebook> SynchronousReader<'ebook> for EpubReader<'ebook, &'ebook SynchronousArchive> {
+    fn read_next(
+        &mut self,
+    ) -> Option<ReaderResult<EpubReaderContent<'ebook, &'ebook SynchronousArchive>>> {
         self.cursor
             .increment()
             .map(|index| self.find_entry_by_position(index))
     }
 
-    fn read_prev(&mut self) -> Option<ReaderResult<EpubReaderContent<'ebook>>> {
+    fn read_prev(
+        &mut self,
+    ) -> Option<ReaderResult<EpubReaderContent<'ebook, &'ebook SynchronousArchive>>> {
         self.cursor
             .decrement()
             .map(|index| self.find_entry_by_position(index))
     }
 
-    fn read_current(&self) -> Option<ReaderResult<EpubReaderContent<'ebook>>> {
+    fn read_current(
+        &self,
+    ) -> Option<ReaderResult<EpubReaderContent<'ebook, &'ebook SynchronousArchive>>> {
         self.current_position()
             .map(|position| self.find_entry_by_position(position))
     }
@@ -164,7 +203,7 @@ impl<'ebook> Reader<'ebook> for EpubReader<'ebook> {
     fn read<'a>(
         &mut self,
         key: impl Into<ReaderKey<'a>>,
-    ) -> ReaderResult<EpubReaderContent<'ebook>> {
+    ) -> ReaderResult<EpubReaderContent<'ebook, &'ebook SynchronousArchive>> {
         match key.into() {
             ReaderKey::Value(idref) => {
                 let (index, content) = self.find_entry_by_str(idref)?;
@@ -201,7 +240,10 @@ impl<'ebook> Reader<'ebook> for EpubReader<'ebook> {
         }
     }
 
-    fn get<'a>(&self, key: impl Into<ReaderKey<'a>>) -> ReaderResult<EpubReaderContent<'ebook>> {
+    fn get<'a>(
+        &self,
+        key: impl Into<ReaderKey<'a>>,
+    ) -> ReaderResult<EpubReaderContent<'ebook, &'ebook SynchronousArchive>> {
         match key.into() {
             ReaderKey::Value(manifest_id) => self
                 .find_entry_by_str(manifest_id)
@@ -209,18 +251,10 @@ impl<'ebook> Reader<'ebook> for EpubReader<'ebook> {
             ReaderKey::Position(index) => self.find_entry_by_position(index),
         }
     }
-
-    fn len(&self) -> usize {
-        self.entries.len()
-    }
-
-    fn current_position(&self) -> Option<usize> {
-        self.cursor.index()
-    }
 }
 
-impl<'ebook> Iterator for EpubReader<'ebook> {
-    type Item = ReaderResult<EpubReaderContent<'ebook>>;
+impl<'ebook> Iterator for EpubReader<'ebook, &'ebook SynchronousArchive> {
+    type Item = ReaderResult<EpubReaderContent<'ebook, &'ebook SynchronousArchive>>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.read_next()
@@ -228,16 +262,25 @@ impl<'ebook> Iterator for EpubReader<'ebook> {
 }
 
 /// [`ReaderContent`] implementation for an [`EpubReader`].
-#[derive(Clone, Debug, PartialEq)]
-pub struct EpubReaderContent<'ebook> {
+#[derive(Clone, Debug)]
+pub struct EpubReaderContent<'ebook, A> {
     content: String,
     position: usize,
-    spine_entry: EpubSpineEntry<'ebook>,
-    manifest_entry: EpubManifestEntry<'ebook>,
+    spine_entry: EpubSpineEntryData<'ebook, A>,
+    manifest_entry: EpubManifestEntryData<'ebook, A>,
+}
+
+impl<'ebook, A: Copy> PartialEq for EpubReaderContent<'ebook, A> {
+    fn eq(&self, other: &Self) -> bool {
+        self.content == other.content
+            && self.position == other.position
+            && self.spine_entry == other.spine_entry
+            && self.manifest_entry == other.manifest_entry
+    }
 }
 
 #[allow(refining_impl_trait)]
-impl<'ebook> ReaderContent<'ebook> for EpubReaderContent<'ebook> {
+impl<'ebook, A: Copy> ReaderContent<'ebook> for EpubReaderContent<'ebook, A> {
     fn position(&self) -> usize {
         self.position
     }
@@ -246,32 +289,32 @@ impl<'ebook> ReaderContent<'ebook> for EpubReaderContent<'ebook> {
         self.content.as_str()
     }
 
-    fn spine_entry(&self) -> EpubSpineEntry<'ebook> {
+    fn spine_entry(&self) -> EpubSpineEntryData<'ebook, A> {
         self.spine_entry
     }
 
-    fn manifest_entry(&self) -> EpubManifestEntry<'ebook> {
+    fn manifest_entry(&self) -> EpubManifestEntryData<'ebook, A> {
         self.manifest_entry
     }
 }
 
-impl<'ebook> From<EpubReaderContent<'ebook>> for String {
-    fn from(value: EpubReaderContent<'ebook>) -> Self {
+impl<'ebook, A> From<EpubReaderContent<'ebook, A>> for String {
+    fn from(value: EpubReaderContent<'ebook, A>) -> Self {
         value.content
     }
 }
 
-impl<'ebook> From<EpubReaderContent<'ebook>> for Vec<u8> {
-    fn from(value: EpubReaderContent<'ebook>) -> Self {
+impl<'ebook, A> From<EpubReaderContent<'ebook, A>> for Vec<u8> {
+    fn from(value: EpubReaderContent<'ebook, A>) -> Self {
         value.content.into_bytes()
     }
 }
 
 /// Indicates arrangement/omission of `linear` and `non-linear` spine content
-/// within an [`Epub`].
+/// within an [`Epub`](EpubData).
 ///
 /// # See Also
-/// - [`EpubSpineEntry::is_linear`] for the difference between `linear` and `non-linear` content.
+/// - [`EpubSpineEntryData::is_linear`] for the difference between `linear` and `non-linear` content.
 ///
 /// Default: [`LinearBehavior::Original`]
 #[derive(Copy, Clone, Debug, Default, Hash, PartialEq, Eq)]
@@ -327,7 +370,7 @@ pub type EpubReaderSettingsBuilder = EpubReaderOptions;
 /// - [`linear_behavior`](EpubReaderOptions::linear_behavior)
 ///
 /// # See Also
-/// - [`Epub::reader_builder`] to create an [`EpubReader`] directly from an [`Epub`].
+/// - [`EpubData::reader_builder`] to create an [`EpubReader`] directly from an [`Epub`](EpubData).
 ///
 /// # Examples
 /// - Creating multiple [`EpubReader`] instances:
@@ -362,7 +405,7 @@ impl EpubReaderOptions {
     /// Creates a new builder with default values.
     ///
     /// # See Also
-    /// - [`Epub::reader_builder`] to build an [`EpubReader`] directly from an [`Epub`]
+    /// - [`EpubData::reader_builder`] to build an [`EpubReader`] directly from an [`Epub`](EpubData)
     pub fn new() -> Self {
         Self::default()
     }
@@ -379,8 +422,12 @@ impl EpubReaderOptions {
         self
     }
 
-    /// Consume this builder and create an [`EpubReader`] associated with the given [`Epub`].
-    pub fn create(self, epub: &Epub) -> EpubReader<'_> {
+    /// Consume this builder and create an [`EpubReader`] associated with the given [`Epub`](EpubData).
+    pub fn create<'ebook, A, E>(self, epub: &'ebook EpubData<E>) -> EpubReader<'ebook, A>
+    where
+        E: ArchiveLike<Item<'ebook> = A>,
+        A: Copy,
+    {
         EpubReader::new(epub, self.into())
     }
 
@@ -398,7 +445,7 @@ impl EpubReaderOptions {
     }
 }
 
-/// Builder to create an [`EpubReader`] associated with an [`Epub`].
+/// Builder to create an [`EpubReader`] associated with an [`Epub`](EpubData).
 ///
 /// # See Also
 /// - [`EpubReaderOptions`] to create multiple [`EpubReader`] instances with identical options.
@@ -417,13 +464,13 @@ impl EpubReaderOptions {
 /// # Ok(())
 /// # }
 /// ```
-pub struct EpubReaderBuilder<'ebook> {
-    epub: &'ebook Epub,
+pub struct EpubReaderBuilder<'ebook, A> {
+    epub: &'ebook EpubData<A>,
     settings: EpubReaderOptions,
 }
 
-impl<'ebook> EpubReaderBuilder<'ebook> {
-    pub(crate) fn new(epub: &'ebook Epub) -> Self {
+impl<'ebook, A: ArchiveLike> EpubReaderBuilder<'ebook, A> {
+    pub(crate) fn new(epub: &'ebook EpubData<A>) -> Self {
         Self {
             epub,
             settings: EpubReaderOptions::default(),
@@ -431,7 +478,7 @@ impl<'ebook> EpubReaderBuilder<'ebook> {
     }
 
     /// Consume this builder and create an [`EpubReader`].
-    pub fn create(self) -> EpubReader<'ebook> {
+    pub fn create(self) -> EpubReader<'ebook, A::Item<'ebook>> {
         self.settings.create(self.epub)
     }
 

@@ -22,7 +22,7 @@ use crate::reader::errors::ReaderResult;
 /// - Streaming over a reader's contents:
 /// ```
 /// # use rbook::{Ebook, Epub};
-/// # use rbook::reader::{Reader, ReaderContent};
+/// # use rbook::reader::{Reader, ReaderContent, SynchronousReader};
 /// # use std::error::Error;
 /// # fn main() -> Result<(), Box<dyn Error>> {
 /// let epub = Epub::open("tests/ebooks/example_epub")?;
@@ -42,7 +42,7 @@ use crate::reader::errors::ReaderResult;
 /// - Random access:
 /// ```
 /// # use rbook::{Ebook, Epub};
-/// # use rbook::reader::{Reader, ReaderContent};
+/// # use rbook::reader::{Reader, ReaderContent, SynchronousReader};
 /// # use std::error::Error;
 /// # fn main() -> Result<(), Box<dyn Error>> {
 /// let epub = Epub::open("tests/ebooks/example_epub")?;
@@ -70,7 +70,7 @@ pub trait Reader<'ebook> {
     /// - Assessing the current cursor position state:
     /// ```
     /// # use rbook::{Ebook, Epub};
-    /// # use rbook::reader::{Reader, ReaderContent};
+    /// # use rbook::reader::{Reader, ReaderContent, SynchronousReader};
     /// # use std::error::Error;
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// let epub = Epub::open("tests/ebooks/example_epub")?;
@@ -101,130 +101,10 @@ pub trait Reader<'ebook> {
     /// ```
     fn reset(&mut self);
 
-    /// Returns the next [`ReaderContent`] and increments the reader's cursor by one.
-    ///
-    /// # Cases
-    /// - `Some(Ok(content))`: Entry exists and reading it succeeded.  
-    /// - `Some(Err(e))`: Entry exists yet reading it failed
-    ///   (see [`ReaderError`](errors::ReaderError)).
-    /// - `None`: No next entries; ***in this case, the cursor is not incremented.***
-    ///
-    /// # Examples
-    /// - Observing how `read_next` affects the cursor position:
-    /// ```
-    /// # use rbook::{Ebook, Epub};
-    /// # use rbook::reader::Reader;
-    /// # use std::error::Error;
-    /// # fn main() -> Result<(), Box<dyn Error>> {
-    /// let epub = Epub::open("tests/ebooks/example_epub")?;
-    /// let mut reader = epub.reader();
-    ///
-    /// // Current cursor position
-    /// assert_eq!(None, reader.current_position());
-    /// // Iterate to the end
-    /// while let Some(Ok(content)) = reader.read_next() {
-    ///     // process content //
-    /// }
-    /// // The current cursor position is now at the end
-    /// assert_eq!(Some(4), reader.current_position());
-    ///
-    /// // No more next content
-    /// assert!(reader.read_next().is_none());
-    /// // The cursor is not updated
-    /// assert_eq!(Some(4), reader.current_position());
-    ///
-    /// # Ok(())
-    /// # }
-    /// ```
-    fn read_next(&mut self) -> Option<ReaderResult<impl ReaderContent<'ebook> + 'ebook>>;
-
-    /// Returns the previous [`ReaderContent`] and decrements the reader's cursor by one.
-    ///
-    /// # Cases
-    /// - `Some(Ok(content))`: Entry exists and reading it succeeded.  
-    /// - `Some(Err(e))`: Entry exists yet reading it failed
-    ///   (see [`ReaderError`](errors::ReaderError)).
-    /// - `None`: No previous entries; ***in this case, the cursor is not decremented.***
-    ///
-    /// # Examples
-    /// - Observing how `read_prev` affects the cursor position:
-    /// ```
-    /// # use rbook::{Ebook, Epub};
-    /// # use rbook::reader::Reader;
-    /// # use std::error::Error;
-    /// # fn main() -> Result<(), Box<dyn Error>> {
-    /// let epub = Epub::open("tests/ebooks/example_epub")?;
-    /// let mut reader = epub.reader();
-    ///
-    /// // Jump to the end
-    /// reader.seek(reader.len() - 1)?;
-    /// assert_eq!(Some(4), reader.current_position());
-    ///
-    /// // Iterate to the start
-    /// while let Some(Ok(content)) = reader.read_prev() {
-    ///     // ... //
-    /// }
-    /// // Current cursor position at the start
-    /// assert_eq!(Some(0), reader.current_position());
-    ///
-    /// // No more previous content
-    /// assert!(reader.read_prev().is_none());
-    /// // The cursor is not updated
-    /// assert_eq!(Some(0), reader.current_position());
-    ///
-    /// # Ok(())
-    /// # }
-    /// ```
-    fn read_prev(&mut self) -> Option<ReaderResult<impl ReaderContent<'ebook> + 'ebook>>;
-
-    /// Returns the [`ReaderContent`] that the reader's cursor is currently positioned at.
-    ///
-    /// # Cases
-    /// - `Some(Ok(content))`: Entry exists and reading it succeeded.  
-    /// - `Some(Err(e))`: Entry exists yet reading it failed
-    ///   (see [`ReaderError`](errors::ReaderError)).
-    /// - `None`: No current entry ([`Self::current_position`] is [`None`]).
-    fn read_current(&self) -> Option<ReaderResult<impl ReaderContent<'ebook> + 'ebook>>;
-
-    /// Returns the [`ReaderContent`] at the given [`ReaderKey`]
-    /// and moves the reader’s cursor to that position.
-    ///
-    /// Equivalent to [`Self::get`], except that this method updates the cursor.
-    ///
-    /// To re-iterate from the start, prefer [`Self::reset`]
-    /// over `read(0)`, as `reset` puts the cursor **before** the first entry.
-    ///
-    /// # Errors
-    /// See [`ReaderError`](errors::ReaderError).
-    fn read<'a>(
-        &mut self,
-        key: impl Into<ReaderKey<'a>>,
-    ) -> ReaderResult<impl ReaderContent<'ebook> + 'ebook>;
-
-    /// Moves the reader’s cursor **to** the given [`ReaderKey`]
-    /// and returns the resulting cursor position.
-    ///
-    /// To iterate from the start again, prefer [`Self::reset`]
-    /// over `seek(0)`, as `reset` positions the cursor **before** the first entry.
-    ///
-    /// # Errors
-    /// See [`ReaderError`](errors::ReaderError).
-    fn seek<'a>(&mut self, key: impl Into<ReaderKey<'a>>) -> ReaderResult<usize>;
-
-    /// Returns the [`ReaderContent`] at the given [`ReaderKey`]
-    /// without moving the reader's cursor.
-    ///
-    /// # Errors
-    /// See [`ReaderError`](errors::ReaderError).
-    fn get<'a>(
-        &self,
-        key: impl Into<ReaderKey<'a>>,
-    ) -> ReaderResult<impl ReaderContent<'ebook> + 'ebook>;
-
     /// The total number of traversable [`ReaderContent`] entries.
     ///
     /// This method returns the same value regardless of calls to methods that mutate
-    /// a reader's cursor such as [`Self::read`].
+    /// a reader's cursor such as [`SynchronousReader::read`].
     ///
     /// # See Also
     /// - [`Self::remaining`] to find out how many entries are left relative to a cursor.
@@ -240,7 +120,7 @@ pub trait Reader<'ebook> {
     /// - Retrieving the position upon navigating:
     /// ```
     /// # use rbook::{Ebook, Epub};
-    /// # use rbook::reader::{Reader, ReaderContent};
+    /// # use rbook::reader::{Reader, ReaderContent, SynchronousReader};
     /// # use std::error::Error;
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// let epub = Epub::open("tests/ebooks/example_epub")?;
@@ -277,7 +157,7 @@ pub trait Reader<'ebook> {
     /// - Observing the number of contents remaining:
     /// ```
     /// # use rbook::{Ebook, Epub};
-    /// # use rbook::reader::{Reader, ReaderContent};
+    /// # use rbook::reader::{Reader, ReaderContent, SynchronousReader};
     /// # use std::error::Error;
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// let epub = Epub::open("tests/ebooks/example_epub")?;
@@ -325,13 +205,136 @@ pub trait Reader<'ebook> {
     }
 }
 
+/// todo
+pub trait SynchronousReader<'ebook>: Reader<'ebook> {
+    /// Returns the next [`ReaderContent`] and increments the reader's cursor by one.
+    ///
+    /// # Cases
+    /// - `Some(Ok(content))`: Entry exists and reading it succeeded.
+    /// - `Some(Err(e))`: Entry exists yet reading it failed
+    ///   (see [`ReaderError`](errors::ReaderError)).
+    /// - `None`: No next entries; ***in this case, the cursor is not incremented.***
+    ///
+    /// # Examples
+    /// - Observing how `read_next` affects the cursor position:
+    /// ```
+    /// # use rbook::{Ebook, Epub};
+    /// # use rbook::reader::{Reader, SynchronousReader};
+    /// # use std::error::Error;
+    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// let epub = Epub::open("tests/ebooks/example_epub")?;
+    /// let mut reader = epub.reader();
+    ///
+    /// // Current cursor position
+    /// assert_eq!(None, reader.current_position());
+    /// // Iterate to the end
+    /// while let Some(Ok(content)) = reader.read_next() {
+    ///     // process content //
+    /// }
+    /// // The current cursor position is now at the end
+    /// assert_eq!(Some(4), reader.current_position());
+    ///
+    /// // No more next content
+    /// assert!(reader.read_next().is_none());
+    /// // The cursor is not updated
+    /// assert_eq!(Some(4), reader.current_position());
+    ///
+    /// # Ok(())
+    /// # }
+    /// ```
+    fn read_next(&mut self) -> Option<ReaderResult<impl ReaderContent<'ebook> + 'ebook>>;
+
+    /// Returns the previous [`ReaderContent`] and decrements the reader's cursor by one.
+    ///
+    /// # Cases
+    /// - `Some(Ok(content))`: Entry exists and reading it succeeded.
+    /// - `Some(Err(e))`: Entry exists yet reading it failed
+    ///   (see [`ReaderError`](errors::ReaderError)).
+    /// - `None`: No previous entries; ***in this case, the cursor is not decremented.***
+    ///
+    /// # Examples
+    /// - Observing how `read_prev` affects the cursor position:
+    /// ```
+    /// # use rbook::{Ebook, Epub};
+    /// # use rbook::reader::{Reader, SynchronousReader};
+    /// # use std::error::Error;
+    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// let epub = Epub::open("tests/ebooks/example_epub")?;
+    /// let mut reader = epub.reader();
+    ///
+    /// // Jump to the end
+    /// reader.seek(reader.len() - 1)?;
+    /// assert_eq!(Some(4), reader.current_position());
+    ///
+    /// // Iterate to the start
+    /// while let Some(Ok(content)) = reader.read_prev() {
+    ///     // ... //
+    /// }
+    /// // Current cursor position at the start
+    /// assert_eq!(Some(0), reader.current_position());
+    ///
+    /// // No more previous content
+    /// assert!(reader.read_prev().is_none());
+    /// // The cursor is not updated
+    /// assert_eq!(Some(0), reader.current_position());
+    ///
+    /// # Ok(())
+    /// # }
+    /// ```
+    fn read_prev(&mut self) -> Option<ReaderResult<impl ReaderContent<'ebook> + 'ebook>>;
+
+    /// Returns the [`ReaderContent`] that the reader's cursor is currently positioned at.
+    ///
+    /// # Cases
+    /// - `Some(Ok(content))`: Entry exists and reading it succeeded.
+    /// - `Some(Err(e))`: Entry exists yet reading it failed
+    ///   (see [`ReaderError`](errors::ReaderError)).
+    /// - `None`: No current entry ([`Reader::current_position`] is [`None`]).
+    fn read_current(&self) -> Option<ReaderResult<impl ReaderContent<'ebook> + 'ebook>>;
+
+    /// Returns the [`ReaderContent`] at the given [`ReaderKey`]
+    /// and moves the reader’s cursor to that position.
+    ///
+    /// Equivalent to [`Self::get`], except that this method updates the cursor.
+    ///
+    /// To re-iterate from the start, prefer [`Reader::reset`]
+    /// over `read(0)`, as `reset` puts the cursor **before** the first entry.
+    ///
+    /// # Errors
+    /// See [`ReaderError`](errors::ReaderError).
+    fn read<'a>(
+        &mut self,
+        key: impl Into<ReaderKey<'a>>,
+    ) -> ReaderResult<impl ReaderContent<'ebook> + 'ebook>;
+
+    /// Moves the reader’s cursor **to** the given [`ReaderKey`]
+    /// and returns the resulting cursor position.
+    ///
+    /// To iterate from the start again, prefer [`Reader::reset`]
+    /// over `seek(0)`, as `reset` positions the cursor **before** the first entry.
+    ///
+    /// # Errors
+    /// See [`ReaderError`](errors::ReaderError).
+    fn seek<'a>(&mut self, key: impl Into<ReaderKey<'a>>) -> ReaderResult<usize>;
+
+    /// Returns the [`ReaderContent`] at the given [`ReaderKey`]
+    /// without moving the reader's cursor.
+    ///
+    /// # Errors
+    /// See [`ReaderError`](errors::ReaderError).
+    fn get<'a>(
+        &self,
+        key: impl Into<ReaderKey<'a>>,
+    ) -> ReaderResult<impl ReaderContent<'ebook> + 'ebook>;
+}
+
 /// Content provided by a [`Reader`], encompassing associated data.
 ///
 /// # Examples
 /// - Retrieving the content of the same entry by different [`keys`](ReaderKey):
 /// ```
 /// # use rbook::{Ebook, Epub};
-/// # use rbook::reader::{Reader, ReaderContent};
+/// # use rbook::reader::{Reader, ReaderContent, SynchronousReader};
 /// # use rbook::ebook::manifest::ManifestEntry;
 /// # use std::error::Error;
 /// # fn main() -> Result<(), Box<dyn Error>> {
@@ -370,7 +373,7 @@ pub trait ReaderContent<'ebook>: PartialEq + Into<String> + Into<Vec<u8>> {
     /// # use rbook::{Ebook, Epub};
     /// # use rbook::ebook::spine::SpineEntry;
     /// # use rbook::epub::reader::LinearBehavior;
-    /// # use rbook::reader::{Reader, ReaderContent};
+    /// # use rbook::reader::{Reader, ReaderContent, SynchronousReader};
     /// # use std::error::Error;
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// let epub = Epub::open("tests/ebooks/example_epub")?;
@@ -418,7 +421,7 @@ pub trait ReaderContent<'ebook>: PartialEq + Into<String> + Into<Vec<u8>> {
     /// - Extracting the contained content in the form of a [`String`]:
     /// ```
     /// # use rbook::{Ebook, Epub};
-    /// # use rbook::reader::{Reader, ReaderContent};
+    /// # use rbook::reader::{Reader, ReaderContent, SynchronousReader};
     /// # use std::error::Error;
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// let epub = Epub::open("tests/ebooks/example_epub")?;
@@ -443,7 +446,7 @@ pub trait ReaderContent<'ebook>: PartialEq + Into<String> + Into<Vec<u8>> {
     /// - Extracting the contained content in the form of bytes:
     /// ```
     /// # use rbook::{Ebook, Epub};
-    /// # use rbook::reader::{Reader, ReaderContent};
+    /// # use rbook::reader::{Reader, ReaderContent, SynchronousReader};
     /// # use std::error::Error;
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// let epub = Epub::open("tests/ebooks/example_epub")?;

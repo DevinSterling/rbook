@@ -1,7 +1,7 @@
 use crate::ebook::epub::consts::{self, bytes};
 use crate::ebook::epub::errors::EpubFormatError;
 use crate::ebook::epub::parser::EpubParser;
-use crate::ebook::epub::toc::{EpubTocData, EpubTocEntryData, EpubTocKey};
+use crate::ebook::epub::toc::{EpubTocKey, InternalEpubToc, InternalEpubTocEntry};
 use crate::ebook::toc::TocEntryKind;
 use crate::epub::parser::UriResolver;
 use crate::epub::toc::TocGroups;
@@ -19,7 +19,7 @@ impl EpubParser<'_> {
         &self,
         resolver: &UriResolver,
         data: &[u8],
-    ) -> ParserResult<EpubTocData> {
+    ) -> ParserResult<InternalEpubToc> {
         let toc_groups = self.handle_toc(resolver, data)?;
 
         // Perform assertions
@@ -27,7 +27,7 @@ impl EpubParser<'_> {
             self.assert_toc(&toc_groups)?;
         }
 
-        Ok(EpubTocData::new(toc_groups))
+        Ok(InternalEpubToc::new(toc_groups))
     }
 
     pub(super) fn handle_toc(
@@ -104,7 +104,7 @@ impl EpubParser<'_> {
         &self,
         el: &BytesStart,
         order: usize,
-        stack: &mut Vec<EpubTocEntryData>,
+        stack: &mut Vec<InternalEpubTocEntry>,
     ) -> ParserResult<()> {
         let mut attributes = el.bytes_attributes();
         let mut root = Self::new_toc_entry(order, stack.len(), &mut attributes)?;
@@ -119,7 +119,7 @@ impl EpubParser<'_> {
         &self,
         el: &BytesStart,
         order: usize,
-        stack: &mut Vec<EpubTocEntryData>,
+        stack: &mut Vec<InternalEpubTocEntry>,
         reader: &mut ByteReader<'b>,
     ) -> ParserResult<Option<Event<'b>>> {
         let mut attributes = el.bytes_attributes();
@@ -148,7 +148,7 @@ impl EpubParser<'_> {
         Ok(continue_from_event)
     }
 
-    fn handle_pop(&self, toc_groups: &mut TocGroups, stack: &mut Vec<EpubTocEntryData>) {
+    fn handle_pop(&self, toc_groups: &mut TocGroups, stack: &mut Vec<InternalEpubTocEntry>) {
         let Some(nav_entry) = stack.pop() else {
             return;
         };
@@ -169,7 +169,7 @@ impl EpubParser<'_> {
         resolver: &UriResolver,
         el: &BytesStart,
         is_start: bool,
-        stack: &mut [EpubTocEntryData],
+        stack: &mut [InternalEpubTocEntry],
         reader: &mut ByteReader,
     ) -> ParserResult<()> {
         let Some(nav_entry) = stack.last_mut() else {
@@ -246,8 +246,8 @@ impl EpubParser<'_> {
         order: usize,
         depth: usize,
         attributes: &mut BytesAttributes,
-    ) -> ParserResult<EpubTocEntryData> {
-        Ok(EpubTocEntryData {
+    ) -> ParserResult<InternalEpubTocEntry> {
+        Ok(InternalEpubTocEntry {
             id: attributes.take_attribute_value(consts::ID)?,
             order,
             depth,

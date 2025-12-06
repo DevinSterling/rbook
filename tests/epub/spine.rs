@@ -54,7 +54,7 @@ fn test_skip_spine() {
 #[test]
 #[wasm_bindgen_test]
 fn test_reader_skip_spine() {
-    use rbook::reader::Reader;
+    use rbook::reader::{Reader, SynchronousReader};
 
     let epub = open_example_epub_file_with(EpubOpenOptions::new().skip_spine(true));
     let mut reader = epub.reader();

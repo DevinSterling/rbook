@@ -1,5 +1,5 @@
 pub(super) mod directory;
-pub(super) mod errors;
+pub(crate) mod errors;
 pub(super) mod zip;
 
 use crate::ebook::archive::directory::DirectoryArchive;
