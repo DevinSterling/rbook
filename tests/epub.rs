@@ -1,6 +1,7 @@
 /// EPUB integration tests
 mod epub {
     mod manifest;
+    mod metadata;
     mod reader;
     mod spine;
     mod toc;

@@ -98,7 +98,7 @@ impl EpubParser<'_> {
             // Could opt for a strategy pattern in the future
             let mut meta = match kind {
                 EpubMetaEntryKind::DublinCore {} => {
-                    Self::handle_dublin_core(reader, &package, &el, &mut attributes, is_start)?
+                    self.handle_dublin_core(reader, &package, &el, &mut attributes, is_start)?
                 }
                 EpubMetaEntryKind::Meta { version } => {
                     self.handle_meta(reader, &package, version, &el, &mut attributes, is_start)?
@@ -148,6 +148,7 @@ impl EpubParser<'_> {
 
     // Handle `<dc:*>` elements
     fn handle_dublin_core(
+        &self,
         reader: &mut ByteReader,
         package: &PackageData,
         el: &BytesStart,
@@ -158,6 +159,8 @@ impl EpubParser<'_> {
         // Dublin core elements must not be self-closing; <dc:title/> is invalid.
         let value = if is_start {
             reader.get_text_simple(el)?
+        } else if !self.config.strict {
+            String::new()
         } else {
             return Err(EpubFormatError::MissingValue(property).into());
         };
