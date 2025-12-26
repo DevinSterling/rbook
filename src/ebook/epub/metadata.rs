@@ -45,8 +45,8 @@ impl EpubMetadataData {
         }
     }
 
-    pub(super) fn by_group(&self, group: &str) -> Option<&Vec<EpubMetaEntryData>> {
-        self.entries.get(group)
+    pub(super) fn by_group(&self, group: &str) -> Option<&[EpubMetaEntryData]> {
+        self.entries.get(group).map(Vec::as_slice)
     }
 }
 
@@ -188,8 +188,7 @@ impl EpubMetaEntryData {
 /// Refinement chains of arbitrary length are supported as well.
 ///
 /// Elements and id references within the `<package>` element are **not** required
-/// to be in chronological order.
-/// Meaning, refinements may come before parent elements.
+/// to be in chronological order, so refinements are allowed to come before parent elements.
 ///
 /// # Legacy Metadata Attributes
 /// [Legacy `opf:*` attributes](https://www.w3.org/submissions/2017/SUBM-epub-packages-20170125/#sec-shared-attrs)

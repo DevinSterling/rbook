@@ -201,7 +201,12 @@ impl<'ebook> EpubToc<'ebook> {
     /// The preferred **page list** format, mapping to the EPUB 2 or EPUB 3
     /// [`TocEntryKind::PageList`] format, if present.
     ///
-    /// The default preferred format (EPUB 3) is configurable via [`EpubOpenOptions`](super::EpubOpenOptions).
+    /// The default preferred format (EPUB 3) is configurable via
+    /// [`EpubOpenOptions::preferred_page_list`](super::EpubOpenOptions::preferred_page_list).
+    ///
+    /// # Note
+    /// This method is identical to calling [`Toc::by_kind`]
+    /// with [`TocEntryKind::PageList`] as the argument.
     pub fn page_list(&self) -> Option<EpubTocEntry<'ebook>> {
         self.by_kind(TocEntryKind::PageList)
     }
@@ -209,7 +214,12 @@ impl<'ebook> EpubToc<'ebook> {
     /// The preferred **guide/landmarks** format, mapping to the EPUB 2 (Guide) or EPUB 3
     /// [`TocEntryKind::Landmarks`] format, if present.
     ///
-    /// The default preferred format (EPUB 3) is configurable via [`EpubOpenOptions`](super::EpubOpenOptions).
+    /// The default preferred format (EPUB 3) is configurable via
+    /// [`EpubOpenOptions::preferred_landmarks`](super::EpubOpenOptions::preferred_landmarks).
+    ///
+    /// # Note
+    /// This method is identical to calling [`Toc::by_kind`]
+    /// with [`TocEntryKind::Landmarks`] as the argument.
     pub fn landmarks(&self) -> Option<EpubTocEntry<'ebook>> {
         self.by_kind(TocEntryKind::Landmarks)
     }
@@ -228,6 +238,9 @@ impl<'ebook> EpubToc<'ebook> {
     /// - [`TocEntryKind::Toc`]
     /// - [`TocEntryKind::Landmarks`]
     /// - [`TocEntryKind::PageList`]
+    ///
+    /// # See Also
+    /// - [`Toc::by_kind`] to retrieve the toc root for a given [`TocEntryKind`].
     pub fn by_kind_version(
         &self,
         kind: impl Into<TocEntryKind<'ebook>>,

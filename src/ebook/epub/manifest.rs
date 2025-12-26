@@ -205,7 +205,7 @@ impl<'ebook> EpubManifest<'ebook> {
         self.ctx
             .data
             .iter()
-            .filter(move |(_, data)| data.properties.has_property(property))
+            .filter(|(_, data)| data.properties.has_property(property))
             .map(move |(id, data)| ctx.create_entry(id, data))
     }
 
@@ -547,16 +547,16 @@ impl<'ebook> EpubManifestEntry<'ebook> {
     /// let webm_cover = epub.manifest().cover_image().unwrap();
     /// assert_eq!("image/webm", webm_cover.media_type());
     ///
-    /// // If the app does not support `webm`; fallback
+    /// // If `webm` is unsupported, fallback
     /// let mut fallbacks = webm_cover.fallbacks();
     /// let avif_cover = fallbacks.next().unwrap();
     /// assert_eq!("image/avif", avif_cover.media_type());
     ///
-    /// // If the app does not support `avif`; fallback
+    /// // If `avif` is unsupported, fallback
     /// let png_cover = fallbacks.next().unwrap();
     /// assert_eq!("image/png", png_cover.media_type());
     ///
-    /// // No more fallbacks
+    /// // No fallbacks remaining
     /// assert_eq!(None, fallbacks.next());
     /// # Ok(())
     /// # }

@@ -680,7 +680,10 @@ impl PartialEq for ResourceKind<'_> {
     fn eq(&self, other: &Self) -> bool {
         fn extract_type<'a>(kind: &'a ResourceKind) -> (&'a str, bool) {
             let mut split = kind.0.split(';');
-            let full_type = split.next().unwrap().trim(); // Split guarantees at least one entry
+            let full_type = split
+                .next()
+                .expect("`split` guarantees at least one entry")
+                .trim();
             let has_params = split.next().is_some();
             (full_type, has_params)
         }

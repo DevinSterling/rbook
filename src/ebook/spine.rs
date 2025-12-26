@@ -124,14 +124,14 @@ pub trait SpineEntry<'ebook>: Ord {
     ///
     /// Returns [`None`] if the spine entry references a non-existent
     /// [`ManifestEntry`] within the [`Manifest`](super::Manifest),
-    /// indicating a malformed EPUB file.
+    /// indicating a malformed ebook file.
     fn manifest_entry(&self) -> Option<impl ManifestEntry<'ebook> + 'ebook>;
 
     /// The textual [`Resource`] intended for end-user reading an entry points to.
     ///
     /// Returns [`None`] if the spine entry references a non-existent
     /// [`ManifestEntry`] within the [`Manifest`](super::Manifest),
-    /// preventing resource retrieval and indicating a malformed EPUB file.
+    /// preventing resource retrieval and indicating a malformed ebook file.
     fn resource(&self) -> Option<Resource<'ebook>> {
         self.manifest_entry().map(|entry| entry.resource())
     }

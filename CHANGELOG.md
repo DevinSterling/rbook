@@ -1,4 +1,17 @@
 # Changelog
+## 0.6.11 (2025-02-06)
+### Changes　**⟳**
+- Refine documentation for enhanced clarity.
+
+### Fixes　**✓**
+- Fix compilation error caused by `zip` dependency;
+  Cow `AsRef` ambiguity in `ResourceKind::as_static` from transitive `typed_path` dependency.
+  ([#5](https://github.com/DevinSterling/rbook/pull/5))
+
+### Changes　**⟳**
+- Update `zip` dependency: 7.0.0 → 7.3.0
+- Internal refactoring in preparation for the upcoming write/modify API (v.7.0).
+
 ## 0.6.10 (2025-12-20)
 ### Additions　**＋**
 - New methods for `Href`:

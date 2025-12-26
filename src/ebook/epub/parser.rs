@@ -51,7 +51,7 @@ impl<'a> EpubParser<'a> {
         let package_resolver = UriResolver::new(uri::parent(&package_file));
 
         // Parse "package.opf"
-        let package_content = self.read_resource(package_file.as_str())?;
+        let package_content = self.read_resource(&package_file)?;
         let (toc_hrefs, metadata, manifest, spine, mut toc) =
             self.parse_opf(package_resolver, &package_content)?;
 

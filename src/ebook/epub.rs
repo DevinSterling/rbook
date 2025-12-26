@@ -41,7 +41,8 @@ use std::path::Path;
 /// # Configuration
 /// Parsing can be configured using [`EpubOpenOptions`].
 ///
-/// Enabling `threadsafe` makes [`Epub`] implement `Send + Sync`:
+/// Toggling the crate feature `threadsafe` (enabled by default)
+/// makes [`Epub`] implement `Send + Sync`:
 /// ```toml
 /// [dependencies]
 /// rbook = { version = "...", features = ["threadsafe"] }
@@ -96,11 +97,12 @@ impl Epub {
     /// # use rbook::epub::metadata::EpubVersion;
     /// # fn main() -> EbookResult<()> {
     /// let epub = Epub::options()
-    ///     .store_all(true)
     ///     .strict(false)
+    ///     .store_all(true)
+    ///     .skip_metadata(true)
+    ///     .skip_spine(true)
     ///     .preferred_page_list(EpubVersion::EPUB2)
     ///     .preferred_landmarks(EpubVersion::EPUB2)
-    ///     .preferred_toc(EpubVersion::EPUB3)
     ///     .open("tests/ebooks/example_epub")?;
     /// # Ok(())
     /// # }
@@ -223,7 +225,7 @@ impl Epub {
         uri::parent(&self.package_file).into()
     }
 
-    /// Opens an [`Epub`] from the given [`Path`] with the specified [`EpubOpenOptions`].
+    /// Deprecated in favor of [`EpubOpenOptions::read`], accessible via [`Epub::open`].
     #[deprecated(
         since = "0.6.8",
         note = "Use `Epub::options`, then call `EpubOpenOptions::open` instead."
@@ -235,16 +237,7 @@ impl Epub {
         options.into().open(path)
     }
 
-    /// With the specified [`EpubOpenOptions`],
-    /// opens an EPUB from any implementation of [`Read`] + [`Seek`].
-    ///
-    /// # Thread-safety
-    /// [`Send`] + [`Sync`] are required constraints if the
-    /// `threadsafe` feature is enabled (**enabled by default**).
-    ///
-    /// Thread-safety can be disabled in a project's `Cargo.toml` file.
-    /// See the [base documentation](crate)
-    /// for a list of the default crate features and an example.
+    /// Deprecated in favor of [`EpubOpenOptions::read`], accessible via [`Epub::options`].
     #[deprecated(
         since = "0.6.8",
         note = "Use `Epub::options`, then call `EpubOpenOptions::read` instead."
@@ -259,8 +252,7 @@ impl Epub {
         options.into().read(reader)
     }
 
-    /// Returns a new [`EpubReader`] to sequentially read over the [`EpubSpine`]
-    /// contents of an ebook with the specified [`EpubReaderOptions`].
+    /// Deprecated in favor of [`Epub::reader_builder`] / [`EpubReaderOptions::create`].
     #[deprecated(
         since = "0.6.8",
         note = "Use `Epub::reader_builder` or `EpubReaderOptions::create` instead."
@@ -685,6 +677,10 @@ impl EpubOpenOptions {
     /// **This setting does not validate that an EPUB conforms entirely to the spec.
     /// However, it will refuse further processing if malformations are found.**
     ///
+    /// # See Also
+    /// - [`EpubFormatError`](errors::EpubFormatError) to see which
+    ///   format errors are ignored when strict mode disabled.
+    ///
     /// Default: `true`
     pub fn strict(mut self, strict: bool) -> Self {
         self.strict = strict;
@@ -729,8 +725,8 @@ impl EpubOpenOptions {
     ///
     /// - **Manifest Entries & Resources**:
     ///   Methods that resolve to a manifest entry or [`Resource`] **will** return [`None`] (e.g.,
-    ///   [`EpubSpineEntry::manifest_entry`](crate::ebook::spine::SpineEntry::manifest_entry),
-    ///   [`EpubTocEntry::resource`](crate::ebook::toc::TocEntry::resource)).
+    ///   [`EpubSpineEntry::manifest_entry`](super::spine::SpineEntry::manifest_entry),
+    ///   [`EpubTocEntry::resource`](super::toc::TocEntry::resource)).
     ///
     /// - **Reader Content**:
     ///   Accessing content from an [`EpubReader`]

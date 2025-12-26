@@ -87,7 +87,7 @@ impl<'a> Href<'a> {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn extension(&self) -> Option<&str> {
+    pub fn extension(&self) -> Option<&'a str> {
         self.name().0.rsplit_once('.').map(|(_, ext)| ext)
     }
 
@@ -153,8 +153,12 @@ impl<'a> Href<'a> {
     /// # }
     /// ```
     pub fn name(&self) -> Self {
-        // rsplit guarantees at least one entry; `unwrap` is safe here
-        self.path().0.rsplit('/').next().unwrap().into()
+        self.path()
+            .0
+            .rsplit('/')
+            .next()
+            .expect("`rsplit` guarantees at least one entry")
+            .into()
     }
 
     /// The content of a fragment (`#`) within an href.

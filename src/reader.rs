@@ -128,7 +128,7 @@ pub trait Reader<'ebook> {
     /// // The current cursor position is now at the end
     /// assert_eq!(Some(4), reader.current_position());
     ///
-    /// // No more next content
+    /// // No next content
     /// assert!(reader.read_next().is_none());
     /// // The cursor is not updated
     /// assert_eq!(Some(4), reader.current_position());
@@ -167,7 +167,7 @@ pub trait Reader<'ebook> {
     /// // Current cursor position at the start
     /// assert_eq!(Some(0), reader.current_position());
     ///
-    /// // No more previous content
+    /// // No previous content
     /// assert!(reader.read_prev().is_none());
     /// // The cursor is not updated
     /// assert_eq!(Some(0), reader.current_position());

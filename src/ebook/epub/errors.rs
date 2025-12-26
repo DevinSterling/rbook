@@ -2,32 +2,32 @@
 
 /// Possible format errors from a [`Epub`](super::Epub).
 ///
-/// Most of these errors are ignored when
+/// # Variants
+/// Error variants flagged with `*` are ignored when
 /// [`EpubOpenOptions::strict`](super::EpubOpenOptions::strict)
 /// is disabled.
 ///
-/// # Variants
-/// ## Container Errors (`META-INF/container.xml`)
-/// Occurs within the `META-INF/container.xml` file:
+/// ## Container Errors (`container.xml`)
+/// Occurs within `/META-INF/container.xml`:
 /// - [`NoOpfReference`](EpubFormatError::NoOpfReference)
 /// ## Package Errors (`.opf`)
 /// Occurs within the package `.opf` file:
-/// - [`UnknownVersion`](EpubFormatError::UnknownVersion)
-/// - [`MissingMeta`](EpubFormatError::MissingMeta)
+/// - [`UnknownVersion`](EpubFormatError::UnknownVersion)*
+/// - [`MissingMeta`](EpubFormatError::MissingMeta)*
 /// - [`CyclicMeta`](EpubFormatError::CyclicMeta)
-/// - [`NoTocReference`](EpubFormatError::NoTocReference)
+/// - [`NoTocReference`](EpubFormatError::NoTocReference)*
 /// - [`NoPackageFound`](EpubFormatError::NoPackageFound)
-/// - [`NoMetadataFound`](EpubFormatError::NoMetadataFound)
-/// - [`NoManifestFound`](EpubFormatError::NoManifestFound)
-/// - [`NoSpineFound`](EpubFormatError::NoSpineFound)
+/// - [`NoMetadataFound`](EpubFormatError::NoMetadataFound)*
+/// - [`NoManifestFound`](EpubFormatError::NoManifestFound)*
+/// - [`NoSpineFound`](EpubFormatError::NoSpineFound)*
 /// ## Toc Errors (`.ncx/.xhtml`)
 /// Occurs within toc `.ncx` or `.xhtml` files:
-/// - [`NoTocFound`](EpubFormatError::NoTocFound)
+/// - [`NoTocFound`](EpubFormatError::NoTocFound)*
 /// ## General Errors
 /// Occurs in any file:
-/// - [`MissingAttribute`](EpubFormatError::MissingAttribute)
-/// - [`MissingValue`](EpubFormatError::MissingValue)
-/// - [`InvalidHref`](EpubFormatError::InvalidHref)
+/// - [`MissingAttribute`](EpubFormatError::MissingAttribute)*
+/// - [`MissingValue`](EpubFormatError::MissingValue)*
+/// - [`InvalidHref`](EpubFormatError::InvalidHref)*
 #[non_exhaustive]
 #[derive(thiserror::Error, Debug)]
 pub enum EpubFormatError {
@@ -83,6 +83,7 @@ pub enum EpubFormatError {
     /// A cycle has been detected through a refinement `<meta>` chain.
     ///
     /// # Example
+    /// - Each `<meta>` element depends on each other:
     /// ```xml
     /// <meta id="r1" refines="#r2" property="my-property-1">data1</meta>
     /// <meta id="r2" refines="#r1" property="my-property-2">data2</meta>

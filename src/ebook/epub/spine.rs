@@ -47,6 +47,7 @@ pub(super) struct EpubSpineEntryData {
 
 #[derive(Copy, Clone)]
 struct EpubSpineContext<'ebook> {
+    /// Provider for resource lookup within spine entries
     provider: EpubManifestEntryProvider<'ebook>,
 }
 
@@ -67,7 +68,6 @@ impl<'ebook> EpubSpineContext<'ebook> {
 /// An EPUB spine, see [`Spine`] for more details.
 #[derive(Copy, Clone)]
 pub struct EpubSpine<'ebook> {
-    /// Manifest entry provider for resource lookup within the spine itself
     ctx: EpubSpineContext<'ebook>,
     data: &'ebook EpubSpineData,
 }

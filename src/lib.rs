@@ -49,7 +49,7 @@
 //! For example, omitting the `prelude` while retaining the `threadsafe` feature:
 //! ```toml
 //! [dependencies]
-//! rbook = { version = "0.6.10", default-features = false, features = ["threadsafe"] }
+//! rbook = { version = "0.6.11", default-features = false, features = ["threadsafe"] }
 //! ```
 //!
 //! # Opening an [`Ebook`]
@@ -199,7 +199,7 @@
 //! For example, omitting the `prelude` while retaining the `threadsafe` feature:
 //! ```toml
 //! [dependencies]
-//! rbook = { version = "0.6.10", default-features = false, features = ["threadsafe"] }
+//! rbook = { version = "0.6.11", default-features = false, features = ["threadsafe"] }
 //! ```
 //!
 //! # Examples
@@ -273,15 +273,15 @@
 //! let kind = webm_cover.resource_kind();
 //! assert_eq!(("image", "webm"), (kind.maintype(), kind.subtype()));
 //!
-//! // If the app does not support `webm`; fallback
+//! // If the program does not support `webm`, fallback
 //! let avif_cover = webm_cover.fallback().unwrap();
 //! assert_eq!("image/avif", avif_cover.media_type());
 //!
-//! // If the app does not support `avif`; fallback
+//! // If the program does not support `avif`, fallback
 //! let png_cover = avif_cover.fallback().unwrap();
 //! assert_eq!("image/png", png_cover.media_type());
 //!
-//! // No more fallbacks
+//! // No fallbacks remaining
 //! assert_eq!(None, png_cover.fallback());
 //! ```
 

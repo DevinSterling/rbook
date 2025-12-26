@@ -14,11 +14,10 @@ use crate::util::sync::Shared;
 use quick_xml::events::{BytesStart, Event};
 use std::cell::Cell;
 use std::collections::{HashMap, HashSet};
-use std::ops::Deref;
 
 struct IdMetaWithDepth {
     depth: Cell<u8>,
-    meta: EpubMetaEntryData,
+    data: EpubMetaEntryData,
 }
 
 impl IdMetaWithDepth {
@@ -26,19 +25,11 @@ impl IdMetaWithDepth {
     /// Flag to detect cycles in malformed epubs.
     const IN_PROGRESS: u8 = u8::MAX - 1;
 
-    fn new(meta: EpubMetaEntryData) -> Self {
+    fn new(data: EpubMetaEntryData) -> Self {
         Self {
             depth: Cell::new(Self::UNSET),
-            meta,
+            data,
         }
-    }
-}
-
-impl Deref for IdMetaWithDepth {
-    type Target = EpubMetaEntryData;
-
-    fn deref(&self) -> &Self::Target {
-        &self.meta
     }
 }
 
@@ -156,7 +147,7 @@ impl EpubParser<'_> {
         is_start: bool,
     ) -> ParserResult<EpubMetaEntryData> {
         let property = String::from_utf8(el.name().as_ref().to_vec())?;
-        // Dublin core elements must not be self-closing; <dc:title/> is invalid.
+        // Dublin core elements should not be self-closing; <dc:title/> is invalid.
         let value = if is_start {
             reader.get_text_simple(el)?
         } else if !self.config.strict {
@@ -344,7 +335,7 @@ impl EpubParser<'_> {
             // Set marker
             meta.depth.set(IdMetaWithDepth::IN_PROGRESS);
 
-            let depth = match meta.refines.as_deref() {
+            let depth = match meta.data.refines.as_deref() {
                 Some(parent_id) => 1 + compute_depth(parent_id, id_map)?,
                 None => 0,
             };
@@ -363,14 +354,14 @@ impl EpubParser<'_> {
         let mut depths = (0..=max_depth + 1).map(|_| Vec::new()).collect::<Vec<_>>();
 
         for meta in no_id_refinements {
-            let refines = meta.refines.as_deref().expect("`refines` should be Some");
+            let refines = meta.refines.as_deref().expect("`refines` must be Some");
             let depth = 1 + id_meta.get(refines).map_or(0, |parent| parent.depth.get());
             depths[depth as usize].push(meta);
         }
-        for (id, IdMetaWithDepth { depth, mut meta }) in id_meta {
+        for (id, IdMetaWithDepth { depth, mut data }) in id_meta {
             // transfer id
-            meta.id.replace(id);
-            depths[depth.get() as usize].push(meta);
+            data.id.replace(id);
+            depths[depth.get() as usize].push(data);
         }
 
         Ok(depths)
@@ -407,7 +398,7 @@ impl EpubParser<'_> {
             // All children are guaranteed to have the `refines` attribute
             for child in refinements {
                 // Add child metadata to parent metadata
-                let parent_id = child.refines.as_deref().expect("`refines` should be Some");
+                let parent_id = child.refines.as_deref().expect("`refines` must be Some");
 
                 // Find the parent metadata element. If none, malformed meta
                 // The number of parents at N depth is generally small (< 10);
@@ -450,8 +441,9 @@ impl EpubParser<'_> {
                 group
             } else {
                 meta_groups.insert(meta.property.clone(), Vec::new());
-                // Calling `unwrap` is safe here as `meta.property` was just added as a key
-                meta_groups.get_mut(&meta.property).unwrap()
+                meta_groups
+                    .get_mut(&meta.property)
+                    .expect("`meta.property` was just added as a key")
             }
             .push(meta);
         }

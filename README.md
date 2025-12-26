@@ -44,8 +44,8 @@ enabled by default in a project's `Cargo.toml` file:
 `rbook` can be used by adding it as a dependency in a project's `Cargo.toml` file:
 ```toml
 [dependencies]
-rbook = "0.6.10"                                           # With default features
-# rbook = { version = "0.6.10", default-features = false } # Excluding default features
+rbook = "0.6.11"                                           # With default features
+# rbook = { version = "0.6.11", default-features = false } # Excluding default features
 ```
 
 ## WebAssembly
@@ -154,7 +154,8 @@ fn main() {
 }
 ```
 
-More examples are available in the documentation: <https://docs.rs/rbook>
+> [!TIP]
+> More examples are available in the documentation: <https://docs.rs/rbook>
 
 ## License
 Licensed under [**Apache License, Version 2.0**](LICENSE).
