@@ -362,7 +362,7 @@ impl ResourceKind<'_> {
     }
 
     fn as_static(&self) -> ResourceKind<'static> {
-        ResourceKind(Cow::Owned(String::from(self.0.as_ref())))
+        ResourceKind(Cow::Owned(self.0.to_string()))
     }
 
     /// The raw underlying string of a resource kind.
@@ -617,7 +617,7 @@ impl ResourceKind<'_> {
 
         let subtype = self.subtype();
         // Legacy/obsolete MIME handling
-        subtype.starts_with_ignore_case("font-") 
+        subtype.starts_with_ignore_case("font-")
             || subtype.starts_with_ignore_case("x-font")
             // Special cases regarding EPUB core media
             || subtype.eq_ignore_ascii_case("vnd.ms-fontobject")
