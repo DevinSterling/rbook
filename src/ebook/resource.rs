@@ -1,16 +1,23 @@
 //! Format-agnostic [`Resource`] types for ebooks.
 
+pub(crate) mod consts;
+#[cfg(feature = "write")]
+pub(crate) mod write;
+
 use crate::ebook::element::Href;
-use crate::util::{StrExt, StringExt};
+use crate::util::str::{StrExt, StringExt};
 use std::borrow::Cow;
-use std::fmt::{Debug, Display, Formatter};
+use std::fmt::{Debug, Display};
 use std::path::Path;
+
+#[cfg(feature = "write")]
+pub use write::ResourceContent;
 
 /// A resource within an [`Ebook`](crate::Ebook), pointing to where associated content is stored.
 ///
 /// Each resource consists of:
 /// 1. A [`ResourceKey`], which locates the data, such as a relative path (`"OEBPS/ch1.xhtml"`).
-/// 2. A [`ResourceKind`], indicating the data’s kind, such as determining if it's a `PNG` file.
+/// 2. A [`ResourceKind`], indicating the data’s kind, such as determining if it is a `PNG` file.
 ///
 /// # Examples
 /// - Creating a [`Resource`] using [`Into`] ([`From`] is usable as well):
@@ -38,10 +45,9 @@ use std::path::Path;
 /// ```
 /// - Providing a [`Resource`] as an argument:
 /// ```
-/// # use rbook::ebook::errors::EbookResult;
+/// # use rbook::Epub;
 /// # use rbook::ebook::resource::Resource;
-/// # use rbook::{Ebook, Epub};
-/// # fn main() -> EbookResult<()> {
+/// # fn main() -> rbook::ebook::errors::EbookResult<()> {
 /// let cover_path = "/EPUB/cover.xhtml";
 /// let resource = Resource::from(cover_path);
 ///
@@ -95,7 +101,7 @@ impl<'a> Resource<'a> {
 }
 
 impl Display for Resource<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{:?}@{:?}", self.kind, self.key)
     }
 }
@@ -178,7 +184,7 @@ impl ResourceKey<'_> {
     /// ```
     pub fn value(&self) -> Option<&str> {
         match self {
-            Self::Value(value) => Some(value.as_ref()),
+            Self::Value(value) => Some(value),
             Self::Position(_) => None,
         }
     }
@@ -201,28 +207,71 @@ impl ResourceKey<'_> {
     }
 }
 
-impl<'a> From<Href<'a>> for ResourceKey<'a> {
-    fn from(value: Href<'a>) -> Self {
-        value.path().as_str().into()
+/// It is expected that the given `path` is UTF-8 compliant.
+/// Otherwise, the associated resource will never be found within an ebook.
+///
+/// For fallible operations, prefer [`Path::to_str`],
+/// which ensures the given string is UTF-8 compliant:
+/// ```
+/// # use rbook::Epub;
+/// # use rbook::ebook::resource::Resource;
+/// # use std::path::PathBuf;
+/// # fn main() -> rbook::ebook::errors::EbookResult<()> {
+/// let epub = Epub::open("tests/ebooks/example_epub")?;
+/// let mut path = PathBuf::from("/EPUB");
+/// path.push("c1.xhtml");
+///
+/// // `path` is implicitly turned into a `Resource`
+/// let bytes_a = epub.read_resource_bytes(&*path)?;
+///
+/// if let Some(utf8_value) = path.to_str() {
+///     // Explicitly providing a `Resource`
+///     let resource = Resource::from(utf8_value);
+///     let bytes_b = epub.read_resource_bytes(resource)?;
+///     assert_eq!(bytes_a, bytes_b);
+/// }
+/// # Ok(())
+/// # }
+/// ```
+///
+/// # Windows
+/// This conversion allocates on Windows operating systems to convert path separators, if needed.
+/// Specifically, replacing back-slashes (`\`) with forward-slashes (`/`).
+///
+/// For example: `path\to\content.xhtml` → `path/to/content.xhtml`
+impl<'a> From<&'a Path> for ResourceKey<'a> {
+    fn from(path: &'a Path) -> Self {
+        let mut value = path.to_string_lossy();
+
+        if cfg!(windows) && value.contains('\\') {
+            value = Cow::Owned(value.replace('\\', "/"));
+        }
+
+        Self::Value(value)
     }
 }
 
-impl<'a> From<&'a Path> for ResourceKey<'a> {
-    fn from(value: &'a Path) -> Self {
-        // It is EXPECTED that the path given is UTF-8 compliant
-        Self::Value(value.to_string_lossy())
+impl<'a> From<Href<'a>> for ResourceKey<'a> {
+    fn from(value: Href<'a>) -> Self {
+        Self::Value(Cow::Borrowed(value.path().as_str()))
     }
 }
 
 impl<'a> From<&'a str> for ResourceKey<'a> {
     fn from(value: &'a str) -> Self {
-        Self::Value(value.into())
+        Self::Value(Cow::Borrowed(value))
+    }
+}
+
+impl<'a> From<&'a String> for ResourceKey<'a> {
+    fn from(value: &'a String) -> Self {
+        Self::Value(Cow::Borrowed(value))
     }
 }
 
 impl<'a> From<String> for ResourceKey<'a> {
     fn from(value: String) -> Self {
-        Self::Value(value.into())
+        Self::Value(Cow::Owned(value))
     }
 }
 
@@ -300,7 +349,7 @@ impl<'a> From<&'a Self> for ResourceKey<'a> {
 ///
 /// // Getting the parameters
 /// assert_eq!(Some("charset=UTF-8"), ncx_kind.params());
-/// assert_eq!(Some("UTF-8"), ncx_kind.get_param("charset"));
+/// assert_eq!(Some("UTF-8"), ncx_kind.by_param("charset"));
 /// assert_eq!([("charset", "UTF-8")], *ncx_kind.params_iter().collect::<Vec<_>>());
 /// ```
 #[derive(Clone, Debug, Hash, Eq)]
@@ -378,7 +427,7 @@ impl ResourceKind<'_> {
     /// assert_eq!("audio/webm", other_kind.as_str());
     /// ```
     pub fn as_str(&self) -> &str {
-        self.0.as_ref()
+        &self.0
     }
 
     /// The maintype of a resource kind.
@@ -515,11 +564,11 @@ impl ResourceKind<'_> {
     /// # use rbook::ebook::resource::ResourceKind;
     /// let kind = ResourceKind::from("audio/ogg; codecs=opus; other_param=value");
     ///
-    /// assert_eq!(Some("value"), kind.get_param("other_param"));
-    /// assert_eq!(Some("opus"), kind.get_param("codecs"));
-    /// assert_eq!(None, kind.get_param("codec"));
+    /// assert_eq!(Some("value"), kind.by_param("other_param"));
+    /// assert_eq!(Some("opus"), kind.by_param("codecs"));
+    /// assert_eq!(None, kind.by_param("codec"));
     /// ```
-    pub fn get_param(&self, param_key: &str) -> Option<&str> {
+    pub fn by_param(&self, param_key: &str) -> Option<&str> {
         self.params_iter()
             .find_map(|(key, value)| (param_key == key).then_some(value))
     }
@@ -722,7 +771,7 @@ impl PartialEq for ResourceKind<'_> {
 }
 
 impl Display for ResourceKind<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.as_str())
     }
 }
@@ -757,6 +806,6 @@ impl<'a> From<Cow<'a, str>> for ResourceKind<'a> {
 
 impl<'a> From<&'a Self> for ResourceKind<'a> {
     fn from(value: &'a Self) -> Self {
-        Self(Cow::Borrowed(value.0.as_ref()))
+        Self(Cow::Borrowed(&*value.0))
     }
 }

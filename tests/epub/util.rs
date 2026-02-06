@@ -30,12 +30,13 @@ pub enum TestEpub {
 }
 
 impl TestEpub {
-    pub fn open(self) -> Epub {
-        self.build(|b| b)
+    pub fn open_strict(self) -> Epub {
+        self.build(|b| b.strict(true))
     }
 
-    pub fn build(self, builder: impl Fn(EpubOpenOptions) -> EpubOpenOptions) -> Epub {
-        let options = builder(EpubOpenOptions::new());
+    pub fn build(self, builder: impl Fn(&mut EpubOpenOptions) -> &mut EpubOpenOptions) -> Epub {
+        let mut options = EpubOpenOptions::default();
+        builder(&mut options);
 
         // File bytes
         if matches!(self, Self::Epub3File) {

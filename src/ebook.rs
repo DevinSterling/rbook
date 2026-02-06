@@ -28,6 +28,7 @@ pub mod resource;
 pub mod spine;
 pub mod toc;
 
+use crate::ebook::archive::errors::ArchiveResult;
 use crate::ebook::errors::EbookResult;
 use crate::ebook::manifest::Manifest;
 use crate::ebook::metadata::Metadata;
@@ -35,6 +36,8 @@ use crate::ebook::resource::Resource;
 use crate::ebook::spine::Spine;
 use crate::ebook::toc::Toc;
 use crate::reader::Reader;
+use crate::util::Sealed;
+use std::io::Write;
 
 /// Trait that represents the core properties of an ebook.
 ///
@@ -50,14 +53,16 @@ use crate::reader::Reader;
 /// # Lifetime
 /// All views, such as [`Reader`], [`Manifest`], [`Metadata`], [`Spine`], [`Toc`], etc. are
 /// tied to the lifetime of the owned [`Ebook`] instance (`'ebook`).
-pub trait Ebook {
+pub trait Ebook: Sealed {
     /// Returns a new [`Reader`] to sequentially read over the [`Spine`] contents of an ebook.
     fn reader(&self) -> impl Reader<'_>;
 
-    /// Attributes associated with an ebook, such as title and author information.
+    /// Data associated with an ebook, such as
+    /// [title](Metadata::title) and [author](Metadata::creators) information.
     fn metadata(&self) -> impl Metadata<'_>;
 
-    /// The [`Manifest`], encompassing the [`resources`](Resource) contained within an ebook.
+    /// The [`Manifest`], encompassing the publication [`resources`](Resource)
+    /// contained within an ebook.
     fn manifest(&self) -> impl Manifest<'_>;
 
     /// The [`Spine`], encompassing the canonical reading-order sequence.
@@ -69,23 +74,46 @@ pub trait Ebook {
     /// The table of contents ([`Toc`]), encompassing navigation points.
     fn toc(&self) -> impl Toc<'_>;
 
-    /// Returns the specified [`Resource`] in the form of a string.
+    /// Copies the content of a [`Resource`] into the given `writer`,
+    /// returning the total number of bytes written on success.
+    ///
+    /// # Errors
+    /// [`ArchiveError`](errors::ArchiveError): When copying the content of a [`Resource`] fails.
+    ///
+    /// # See Also
+    /// - [`ManifestEntry::copy_bytes`](manifest::ManifestEntry::copy_bytes)
+    ///   to copy the content directly from a manifest entry.
+    fn copy_resource<'a>(
+        &self,
+        resource: impl Into<Resource<'a>>,
+        writer: &mut impl Write,
+    ) -> ArchiveResult<u64>;
+
+    /// Returns the content of a [`Resource`] as a string.
     ///
     /// # Errors
     /// [`ArchiveError`](errors::ArchiveError): When retrieval of the specified [`Resource`] fails.
     ///
     /// # See Also
     /// - [`ManifestEntry::read_str`](manifest::ManifestEntry::read_str)
-    ///   to alternatively retrieve the data from a manifest entry.
-    fn read_resource_str<'a>(&self, resource: impl Into<Resource<'a>>) -> EbookResult<String>;
+    ///   to retrieve the content directly from a manifest entry.
+    fn read_resource_str<'a>(&self, resource: impl Into<Resource<'a>>) -> ArchiveResult<String> {
+        let resource = resource.into();
 
-    /// Returns the specified [`Resource`] in the form of bytes.
+        archive::into_utf8_string(&resource, self.read_resource_bytes(&resource)?)
+    }
+
+    /// Returns the content of a [`Resource`] as bytes.
     ///
     /// # Errors
     /// [`ArchiveError`](errors::ArchiveError): When retrieval of the specified [`Resource`] fails.
     ///
     /// # See Also
     /// - [`ManifestEntry::read_bytes`](manifest::ManifestEntry::read_bytes)
-    ///   to alternatively retrieve the data from a manifest entry.
-    fn read_resource_bytes<'a>(&self, resource: impl Into<Resource<'a>>) -> EbookResult<Vec<u8>>;
+    ///   to retrieve the content directly from a manifest entry.
+    fn read_resource_bytes<'a>(&self, resource: impl Into<Resource<'a>>) -> ArchiveResult<Vec<u8>> {
+        let mut vec = Vec::new();
+        self.copy_resource(resource, &mut vec)?;
+        Ok(vec)
+    }
 }

@@ -11,29 +11,43 @@
         <text>Contents</text>
     </docTitle>
     <navMap rbook:test="epub2-feature">
-        <navPoint playOrder="1" class="h1 cover start">
+        <navPoint id="p1" playOrder="1" class="h1 cover start">
             <navLabel>
                 <text>The Cover</text>
             </navLabel>
             <content src="EPUB/cover.xhtml"/>
         </navPoint>
-        <navPoint playOrder="2">
+        <navPoint id="p2" playOrder="2">
             <navLabel>
                 <text>rbook Chapter 1</text>
             </navLabel>
             <content src="EPUB/c1.xhtml?q=1#start"/>
-            <navPoint playOrder="3">
+            <navPoint id="p3" playOrder="3">
                 <navLabel>
                     <text>rbook Chapter 1a</text>
                 </navLabel>
                 <content src="EPUB/c1a.xhtml"/>
             </navPoint>
         </navPoint>
-        <navPoint playOrder="4">
+        <navPoint id="p4" playOrder="4">
             <navLabel>
                 <text>rbook Chapter 2</text>
             </navLabel>
             <content src="EPUB/c2.xhtml"/>
         </navPoint>
     </navMap>
+    <pageList>
+        <pageTarget type="normal" value="1">
+            <navLabel>
+                <text>1</text>
+            </navLabel>
+            <content src="EPUB/c1.xhtml"/>
+        </pageTarget>
+        <pageTarget type="normal" value="2">
+            <navLabel>
+                <text>2</text>
+            </navLabel>
+            <content src="EPUB/c2.xhtml"/>
+        </pageTarget>
+   </pageList>
 </ncx>

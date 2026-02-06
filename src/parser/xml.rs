@@ -1,39 +1,117 @@
-use crate::ebook::element::AttributeData;
+//! UTF-8 XML parsing
+
+use crate::ebook::element::{Attribute, AttributesData};
 use crate::ebook::errors::FormatError;
 use crate::parser::ParserResult;
-use crate::util::StringExt;
-use quick_xml::Reader;
+use crate::util::str::StringExt;
+use quick_xml::Decoder;
 use quick_xml::encoding::EncodingError;
 use quick_xml::escape;
-use quick_xml::events::attributes::Attribute;
-use quick_xml::events::{BytesCData, BytesRef, BytesStart, BytesText, Event};
+use quick_xml::events::attributes::Attribute as QuickXmlAttribute;
+use quick_xml::events::{BytesCData, BytesEnd, BytesRef, BytesStart, BytesText, Event};
 use std::borrow::Cow;
 use std::str;
-use std::string::FromUtf8Error;
 
-pub(crate) type ByteReader<'a> = Reader<&'a [u8]>;
-
-impl From<quick_xml::Error> for FormatError {
-    fn from(error: quick_xml::Error) -> Self {
-        Self::Unparsable(Box::new(error))
-    }
-}
-
+#[doc(hidden)]
 impl From<EncodingError> for FormatError {
     fn from(error: EncodingError) -> Self {
         Self::Unparsable(Box::new(error))
     }
 }
 
-pub(crate) trait XmlReader<'a> {
+pub(crate) enum XmlEvent<'a> {
+    /// Represent a start element:
+    /// - `<start x="y"></start>`
+    /// - `<start x="y"/>`
+    Start(XmlStartElement<'a>),
+    End(BytesEnd<'a>),
+    Text(BytesText<'a>),
+    CData(BytesCData<'a>),
+    GeneralRef(BytesRef<'a>),
+    Eof,
+    /// Skipped events:
+    /// - [`quick_xml::events::Comment`]
+    /// - [`quick_xml::events::Decl`]
+    /// - [`quick_xml::events::PI`]
+    /// - [`quick_xml::events::DocType`]
+    Skipped,
+}
+
+impl<'a> XmlEvent<'a> {
+    fn new(ctx: XmlReaderContext, event: Event<'a>) -> Self {
+        match event {
+            // `Start` and `Empty` are merged for convenience.
+            // - `XmlStartElement::is_self_closing` indicates if the element is empty.
+            Event::Start(e) => XmlEvent::Start(XmlStartElement::new(ctx, e, false)),
+            Event::Empty(e) => XmlEvent::Start(XmlStartElement::new(ctx, e, true)),
+            Event::End(e) => XmlEvent::End(e),
+            Event::Text(e) => XmlEvent::Text(e),
+            Event::CData(e) => XmlEvent::CData(e),
+            Event::GeneralRef(e) => XmlEvent::GeneralRef(e),
+            Event::Eof => XmlEvent::Eof,
+            _ => XmlEvent::Skipped,
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
+pub(crate) struct XmlReaderContext {
+    decoder: Decoder,
+    strict: bool,
+}
+
+impl XmlReaderContext {
+    fn unescape_value(&self, bytes: &[u8]) -> ParserResult<String> {
+        let decoded = self.decoder.decode(bytes)?;
+
+        match escape::unescape(&decoded) {
+            Ok(unescaped) => Ok(unescaped.into_owned()),
+            Err(error) if self.strict => Err(FormatError::Unparsable(Box::new(error))),
+            Err(_) => Ok(decoded.into_owned()),
+        }
+    }
+}
+
+pub(crate) struct XmlReader<'a> {
+    reader: quick_xml::Reader<&'a [u8]>,
+    strict: bool,
+}
+
+impl<'a> XmlReader<'a> {
+    pub(crate) fn from_bytes(strict: bool, reader: &'a [u8]) -> Self {
+        Self {
+            reader: quick_xml::Reader::from_reader(reader),
+            strict,
+        }
+    }
+
+    fn ctx(&self) -> XmlReaderContext {
+        XmlReaderContext {
+            decoder: self.reader.decoder(),
+            strict: self.strict,
+        }
+    }
+
     /// Iterator-like method to read the next [`Event`].
-    fn next(&mut self) -> Option<ParserResult<Event<'a>>>;
+    pub(crate) fn next(&mut self) -> Option<ParserResult<XmlEvent<'a>>> {
+        match self
+            .reader
+            .read_event()
+            .map(|event| XmlEvent::new(self.ctx(), event))
+        {
+            Ok(XmlEvent::Eof) => None,
+            result => Some(result.map_err(|error| FormatError::Unparsable(Box::new(error)))),
+        }
+    }
 
     /// If `event` is [`Some`], takes the [`Event`] and returns it,
     /// otherwise invokes [`Self::next`].
     ///
     /// After this call, `event` **will** have a value of [`None`].
-    fn take_or_next(&mut self, event: &mut Option<Event<'a>>) -> Option<ParserResult<Event<'a>>> {
+    pub(crate) fn take_or_next(
+        &mut self,
+        event: &mut Option<XmlEvent<'a>>,
+    ) -> Option<ParserResult<XmlEvent<'a>>> {
         event.take().map(Ok).or_else(|| self.next())
     }
 
@@ -45,8 +123,8 @@ pub(crate) trait XmlReader<'a> {
     /// As such, returns the [`Event`] that caused the stop and text.
     fn get_text(
         &mut self,
-        mut is_stop: impl FnMut(&Event) -> bool,
-    ) -> ParserResult<(Option<Event<'a>>, String)> {
+        mut is_stop: impl FnMut(&XmlEvent) -> bool,
+    ) -> ParserResult<(Option<XmlEvent<'a>>, String)> {
         let mut value = String::new();
         let mut consumed_event = None;
 
@@ -59,9 +137,11 @@ pub(crate) trait XmlReader<'a> {
                 break;
             }
             match event {
-                Event::Text(mut text) => handle_text(&mut value, &mut text)?,
-                Event::CData(cdata) => handle_cdata(&mut value, &cdata)?,
-                Event::GeneralRef(general_ref) => handle_general_ref(&mut value, &general_ref)?,
+                XmlEvent::Text(mut text) => Self::handle_text(&mut value, &mut text)?,
+                XmlEvent::CData(cdata) => Self::handle_cdata(&mut value, &cdata)?,
+                XmlEvent::GeneralRef(general_ref) => {
+                    self.handle_general_ref(&mut value, &general_ref)?;
+                }
                 _ => {}
             }
         }
@@ -69,74 +149,230 @@ pub(crate) trait XmlReader<'a> {
     }
 
     /// Retrieve consolidated text for a specified element up to its end tag.
-    fn get_text_simple(&mut self, start: &BytesStart) -> ParserResult<String> {
-        self.get_text(|event| matches!(event, Event::End(el) if el.name() == start.name()))
-            .map(|x| x.1)
+    pub(crate) fn get_element_text(&mut self, start: &XmlStartElement<'_>) -> ParserResult<String> {
+        self.get_text(|event| matches!(event, XmlEvent::End(el) if el.name().0 == start.name()))
+            .map(|(_, text)| text)
     }
 
     /// See [`Self::get_text`]
-    fn get_text_till_either(
+    pub(crate) fn get_text_till_either(
         &mut self,
-        start: &BytesStart,
-        till: &BytesStart,
-    ) -> ParserResult<(Option<Event<'a>>, String)> {
+        start: &[u8],
+        till: &[u8],
+    ) -> ParserResult<(Option<XmlEvent<'a>>, String)> {
         self.get_text(|event| {
-            let predicate = |el| el == start.name() || el == till.name();
+            let predicate = |el| el == start || el == till;
 
             match event {
-                Event::Start(el) | Event::Empty(el) if predicate(el.name()) => true,
-                Event::End(el) if predicate(el.name()) => true,
+                XmlEvent::Start(el) if predicate(el.name()) => true,
+                XmlEvent::End(el) if predicate(el.name().0) => true,
                 _ => false,
             }
         })
     }
+
+    fn handle_general_ref(&self, value: &mut String, general_ref: &BytesRef) -> ParserResult<()> {
+        fn push_unsupported(value: &mut String, reference: &str) {
+            // Unsupported custom entity/character reference
+            // - This is a rare scenario if there are non-standard entities/char refs.
+            // - NOTE: Despite this being a safe option when parsing,
+            //   when writing back, the unresolved entity/ref will be double-escaped.
+            value.push('&');
+            value.push_str(reference);
+            value.push(';');
+        }
+
+        if general_ref.is_char_ref() {
+            match general_ref.resolve_char_ref() {
+                Ok(Some(resolved)) => value.push(resolved),
+                // The `None` case should never happen as
+                // `is_char_ref` was called before resolving
+                Ok(None) => (),
+                // An invalid char ref is given
+                Err(quick_xml::Error::Escape(_)) if !self.strict => {
+                    push_unsupported(value, &general_ref.decode()?);
+                }
+                Err(error) => return Err(FormatError::Unparsable(Box::new(error))),
+            }
+        } else {
+            let decoded = general_ref.decode()?;
+
+            // Resolve xml/html entity
+            match escape::resolve_predefined_entity(&decoded) {
+                Some(resolved) => value.push_str(resolved),
+                None => push_unsupported(value, &decoded),
+            }
+        }
+        Ok(())
+    }
+
+    fn handle_cdata(value: &mut String, cdata: &BytesCData) -> ParserResult<()> {
+        value.push_str(cdata.decode()?.trim());
+        Ok(())
+    }
+
+    fn handle_text(value: &mut String, text: &mut BytesText) -> ParserResult<()> {
+        // Determine when to add spacing
+        let has_padding_start = text.try_trim_start();
+        let has_padding_end = text.try_trim_end();
+        let last_char = value.chars().last().unwrap_or_default();
+
+        // Check "start" spacing
+        if (text.is_empty() || has_padding_start) && last_char != ' ' {
+            // Only add spacing if there's content
+            if !value.is_empty() {
+                // Add a space to ensure all text doesn't squeeze together
+                value.push(' ');
+            }
+            // Return early if there is no text to process
+            if text.is_empty() {
+                return Ok(());
+            }
+        }
+        let text = text.decode()?;
+
+        // Consolidate into a single paragraph
+        for text in text.lines().map(str::trim).filter(|s| !s.is_empty()) {
+            value.push_str(text);
+            value.push(' ');
+        }
+        // If there should be no end spacing, remove the last space added by the loop
+        if !has_padding_end {
+            value.pop();
+        }
+        Ok(())
+    }
 }
 
-impl<'a> XmlReader<'a> for ByteReader<'a> {
-    fn next(&mut self) -> Option<ParserResult<Event<'a>>> {
-        match self.read_event() {
-            Ok(Event::Eof) => None,
-            result => Some(result.map_err(|error| FormatError::Unparsable(Box::new(error)))),
+pub(crate) struct XmlStartElement<'a> {
+    ctx: XmlReaderContext,
+    element: BytesStart<'a>,
+    is_self_closing: bool,
+}
+
+impl<'a> XmlStartElement<'a> {
+    fn new(ctx: XmlReaderContext, element: BytesStart<'a>, is_self_closing: bool) -> Self {
+        Self {
+            ctx,
+            element,
+            is_self_closing,
         }
     }
-}
 
-pub(crate) trait XmlElement<'a> {
-    fn is_local_name(&self, local_name: impl AsRef<[u8]>) -> bool;
-
-    fn is_prefix(&self, prefix: impl AsRef<[u8]>) -> bool;
-
-    fn get_attribute(&self, key: impl AsRef<[u8]>) -> Option<Cow<'_, [u8]>>;
-
-    fn has_attribute(&self, key: impl AsRef<[u8]>) -> bool;
-
-    fn bytes_attributes(&self) -> BytesAttributes<'_>;
-}
-
-impl<'a> XmlElement<'a> for BytesStart<'a> {
-    fn is_local_name(&self, target_local_name: impl AsRef<[u8]>) -> bool {
-        self.local_name().as_ref() == target_local_name.as_ref()
+    pub(crate) fn name(&self) -> &[u8] {
+        self.element.name().0
     }
 
-    fn is_prefix(&self, target_prefix: impl AsRef<[u8]>) -> bool {
-        self.name()
+    pub(crate) fn name_decoded(&self) -> ParserResult<Cow<'_, str>> {
+        self.ctx
+            .decoder
+            .decode(self.name())
+            .map_err(|error| FormatError::Unparsable(Box::new(error)))
+    }
+
+    pub(crate) fn local_name(&self) -> &[u8] {
+        self.element.local_name().into_inner()
+    }
+
+    pub(crate) fn is_local_name(&self, target_local_name: impl AsRef<[u8]>) -> bool {
+        self.local_name() == target_local_name.as_ref()
+    }
+
+    pub(crate) fn is_prefix(&self, target_prefix: impl AsRef<[u8]>) -> bool {
+        self.element
+            .name()
             .prefix()
             .is_some_and(|p| p.as_ref() == target_prefix.as_ref())
     }
 
-    fn get_attribute(&self, key: impl AsRef<[u8]>) -> Option<Cow<'_, [u8]>> {
-        match self.try_get_attribute(key) {
-            Ok(option) => option.map(|attribute| attribute.value),
-            Err(_) => None,
+    pub(crate) fn is_self_closing(&self) -> bool {
+        self.is_self_closing
+    }
+
+    /// Returns the raw attribute value
+    pub(crate) fn get_attribute_raw(
+        &self,
+        key: impl AsRef<[u8]>,
+    ) -> ParserResult<Option<Cow<'_, [u8]>>> {
+        match self.element.try_get_attribute(key) {
+            Ok(option) => Ok(option.map(|attribute| attribute.value)),
+            Err(error) if self.ctx.strict => Err(FormatError::Unparsable(Box::new(error))),
+            Err(_) => Ok(None),
         }
     }
 
-    fn has_attribute(&self, key: impl AsRef<[u8]>) -> bool {
-        self.try_get_attribute(key).ok().flatten().is_some()
+    pub(crate) fn get_attribute(&self, key: impl AsRef<[u8]>) -> ParserResult<Option<String>> {
+        self.get_attribute_raw(key).and_then(|value| match value {
+            Some(value) => self.ctx.unescape_value(&value).map(Some),
+            None => Ok(None),
+        })
     }
 
-    fn bytes_attributes(&self) -> BytesAttributes<'_> {
-        BytesAttributes(self.attributes().filter_map(Result::ok).collect())
+    pub(crate) fn has_attribute(&self, key: impl AsRef<[u8]>) -> ParserResult<bool> {
+        match self.element.try_get_attribute(key) {
+            Ok(attribute) => Ok(attribute.is_some()),
+            Err(error) if self.ctx.strict => Err(FormatError::Unparsable(Box::new(error))),
+            Err(_) => Ok(false),
+        }
+    }
+
+    pub(crate) fn attributes(&self) -> ParserResult<XmlAttributes<'_>> {
+        let attributes = self
+            .element
+            .attributes()
+            .filter_map(|result| match result {
+                Ok(_) => Some(result),
+                Err(_) if self.ctx.strict => Some(result),
+                // Skip the attribute if not `strict`
+                Err(_) => None,
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|error| FormatError::Unparsable(Box::new(error)))?;
+
+        Ok(XmlAttributes {
+            ctx: self.ctx,
+            attributes,
+        })
+    }
+}
+
+pub(crate) struct XmlAttributes<'a> {
+    ctx: XmlReaderContext,
+    attributes: Vec<QuickXmlAttribute<'a>>,
+}
+
+impl XmlAttributes<'_> {
+    /// Removes and returns the value of the attribute by `name`.
+    pub(crate) fn remove(&mut self, name: impl AsRef<[u8]>) -> ParserResult<Option<String>> {
+        let name = name.as_ref();
+
+        self.attributes
+            .iter()
+            .position(|attribute| attribute.key.as_ref() == name)
+            .map(|i| {
+                let raw = &self.attributes.swap_remove(i).value;
+                self.ctx.unescape_value(raw)
+            })
+            .transpose()
+    }
+}
+
+impl TryFrom<XmlAttributes<'_>> for AttributesData {
+    type Error = FormatError;
+
+    fn try_from(attributes: XmlAttributes<'_>) -> Result<Self, Self::Error> {
+        attributes
+            .attributes
+            .iter()
+            .map(|attribute| {
+                let name = str::from_utf8(attribute.key.as_ref())
+                    .map_err(|err| FormatError::Unparsable(Box::new(err)))?
+                    .to_owned();
+                let value = attributes.ctx.unescape_value(&attribute.value)?;
+                Ok(Attribute::create(name, value))
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .map(AttributesData::from)
     }
 }
 
@@ -162,118 +398,15 @@ impl XmlText for BytesText<'_> {
     }
 }
 
-pub(crate) struct BytesAttributes<'a>(Vec<Attribute<'a>>);
-
-impl BytesAttributes<'_> {
-    /// Removes and returns the value of the attribute by `name`.
-    pub(crate) fn remove(
-        &mut self,
-        name: impl AsRef<[u8]>,
-    ) -> Result<Option<String>, FromUtf8Error> {
-        let name = name.as_ref();
-
-        self.0
-            .iter()
-            .position(|attribute| attribute.key.as_ref() == name)
-            .map(|i| String::from_utf8(self.0.swap_remove(i).value.into_owned()))
-            .transpose()
-    }
-}
-
-impl TryFrom<BytesAttributes<'_>> for Vec<AttributeData> {
-    type Error = FromUtf8Error;
-
-    fn try_from(attributes: BytesAttributes<'_>) -> Result<Self, Self::Error> {
-        attributes
-            .0
-            .into_iter()
-            .map(AttributeData::try_from)
-            .collect()
-    }
-}
-
-impl TryFrom<Attribute<'_>> for AttributeData {
-    type Error = FromUtf8Error;
-
-    fn try_from(attribute: Attribute<'_>) -> Result<Self, Self::Error> {
-        let name = attribute.key.0;
-        let value = attribute.value.into_owned();
-
-        Ok(Self::new(
-            str::from_utf8(name)
-                .map(Cow::Borrowed)
-                // fallback; this generally should never occur
-                .or_else(|_| String::from_utf8(name.to_vec()).map(Cow::Owned))?,
-            String::from_utf8(value)?,
-        ))
-    }
-}
-
-// Helper methods
-fn handle_general_ref(value: &mut String, general_ref: &BytesRef) -> ParserResult<()> {
-    if general_ref.is_char_ref() {
-        if let Some(resolved) = general_ref.resolve_char_ref()? {
-            value.push(resolved);
-        }
-    } else {
-        let decoded = general_ref.decode()?;
-
-        match escape::resolve_xml_entity(decoded.as_ref()) {
-            Some(resolved) => value.push_str(resolved.as_ref()),
-            // Unsupported entity
-            None => value.push_str(format!("&{decoded};").as_ref()),
-        }
-    }
-
-    Ok(())
-}
-
-fn handle_cdata(value: &mut String, cdata: &BytesCData) -> ParserResult<()> {
-    value.push_str(cdata.decode()?.trim());
-    Ok(())
-}
-
-fn handle_text(value: &mut String, text: &mut BytesText) -> ParserResult<()> {
-    // Determine when to add spacing
-    let has_padding_start = text.try_trim_start();
-    let has_padding_end = text.try_trim_end();
-    let last_char = value.chars().last().unwrap_or_default();
-
-    // Check "start" spacing
-    if (text.is_empty() || has_padding_start) && last_char != ' ' {
-        // Only add spacing if there's content
-        if !value.is_empty() {
-            // Add a space to ensure all text doesn't squeeze together
-            value.push(' ');
-        }
-        // Return early if there is no text to process
-        if text.is_empty() {
-            return Ok(());
-        }
-    }
-    let text = text.decode()?;
-
-    // Consolidate into a single paragraph
-    for text in text.lines().map(str::trim).filter(|s| !s.is_empty()) {
-        value.push_str(text);
-        value.push(' ');
-    }
-    // If there should be no end spacing, remove the last space added by the loop
-    if !has_padding_end {
-        value.pop();
-    }
-
-    Ok(())
-}
-
 #[cfg(test)]
 mod tests {
+    use super::XmlReader;
     use quick_xml::events::BytesText;
 
     #[test]
     fn test_text_to_str() {
         let mut s = String::new();
-        super::handle_text(
+        XmlReader::handle_text(
             &mut s,
             &mut BytesText::from_escaped(" \n \t \r  data1 &amp; data2  \n\r \n  \t "),
         )
@@ -281,13 +414,13 @@ mod tests {
         // If there is whitespace at the end, a single `space` must replace it all.
         assert_eq!("data1 &amp; data2 ", s);
 
-        super::handle_text(&mut s, &mut BytesText::from_escaped("data3 ")).unwrap();
+        XmlReader::handle_text(&mut s, &mut BytesText::from_escaped("data3 ")).unwrap();
         assert_eq!("data1 &amp; data2 data3 ", s);
 
-        super::handle_text(&mut s, &mut BytesText::from_escaped("  data4")).unwrap();
+        XmlReader::handle_text(&mut s, &mut BytesText::from_escaped("  data4")).unwrap();
         assert_eq!("data1 &amp; data2 data3 data4", s);
 
-        super::handle_text(&mut s, &mut BytesText::from_escaped("data5")).unwrap();
+        XmlReader::handle_text(&mut s, &mut BytesText::from_escaped("data5")).unwrap();
         assert_eq!("data1 &amp; data2 data3 data4data5", s);
     }
 }

@@ -1,20 +1,20 @@
 //! Format-agnostic table-of-contents; [`Toc`]-related content.
 //!
 //! # See Also
-//! - [`epub::toc`][crate::epub::toc] for the epub-specific toc module.
+//! - [`epub::toc`][crate::epub::toc] for the epub-specific ToC module.
 
 use crate::ebook::manifest::ManifestEntry;
 use crate::ebook::resource::Resource;
 use crate::ebook::toc::macros::toc_entry_kind;
-use std::borrow::Cow;
-use std::fmt::{Display, Formatter};
+use crate::util::Sealed;
+use std::fmt::Display;
 
 /// The table of contents, aiding navigation throughout an ebook [`Ebook`](super::Ebook).
 ///
 /// Each [`TocEntry`] returned by [`Toc`] is a top-level root containing
-/// [`TocEntry::children`].
+/// [children](TocEntry::iter).
 ///
-/// The methods [`Self::by_kind`] and [`Self::kinds`] can be used to retrieve TOC variants,
+/// The methods [`Self::by_kind`] and [`Self::iter`] can be used to retrieve TOC variants,
 /// such as [`landmarks`](TocEntryKind::Landmarks), [`page-list`](TocEntryKind::PageList), etc.
 ///
 /// # See Also
@@ -23,13 +23,11 @@ use std::fmt::{Display, Formatter};
 /// # Examples
 /// - Iterating over the table of contents:
 /// ```
-/// # use rbook::ebook::errors::EbookResult;
-/// # use rbook::ebook::toc::{Toc, TocChildren, TocEntry};
-/// # use rbook::{Ebook, Epub};
-/// # fn main() -> EbookResult<()> {
+/// # use rbook::Epub;
+/// # fn main() -> rbook::ebook::errors::EbookResult<()> {
 /// let epub = Epub::open("tests/ebooks/example_epub")?;
 /// let root = epub.toc().contents().unwrap();
-/// let mut children = root.children().iter();
+/// let mut children = root.iter();
 ///
 /// // A for loop may also be used alternatively
 /// assert_eq!("The Cover", children.next().unwrap().label());
@@ -39,7 +37,7 @@ use std::fmt::{Display, Formatter};
 /// # Ok(())
 /// # }
 /// ```
-pub trait Toc<'ebook> {
+pub trait Toc<'ebook>: Sealed {
     /// Returns the **root** [`TocEntry`] of the primary TOC, or [`None`] if it does not exist.
     ///
     /// See the [trait-level example](Toc) for how to traverse the hierarchy.
@@ -51,21 +49,22 @@ pub trait Toc<'ebook> {
     /// # Examples
     /// - Retrieving different table of contents by kind:
     /// ```
-    /// # use rbook::ebook::errors::EbookResult;
-    /// # use rbook::ebook::toc::{Toc, TocEntryKind};
-    /// # use rbook::{Ebook, Epub};
-    /// # fn main() -> EbookResult<()> {
+    /// # use rbook::ebook::toc::TocEntryKind;
+    /// # use rbook::Epub;
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
     /// let epub = Epub::open("tests/ebooks/example_epub")?;
     /// let toc = epub.toc();
     ///
     /// // Providing a string as input:
     /// let contents = toc.by_kind("toc");
+    /// let pagelist = toc.by_kind("page-list");
     /// // Providing an enum as input:
     /// let landmarks = toc.by_kind(TocEntryKind::Landmarks);
     ///
     /// assert_eq!(contents, toc.by_kind(TocEntryKind::Toc));
+    /// assert_eq!(pagelist, toc.by_kind(TocEntryKind::PageList));
     /// assert_eq!(landmarks, toc.by_kind("landmarks"));
-    /// assert_eq!(None, toc.by_kind(TocEntryKind::PageList));
+    /// assert_eq!(None, toc.by_kind(TocEntryKind::ListOfIllustrations));
     /// # Ok(())
     /// # }
     /// ```
@@ -74,38 +73,59 @@ pub trait Toc<'ebook> {
         kind: impl Into<TocEntryKind<'ebook>>,
     ) -> Option<impl TocEntry<'ebook> + 'ebook>;
 
-    /// Returns an iterator over all **root** [`entries`](TocEntry).
-    /// Each `Item` within the iterator is a tuple containing the
-    /// `toc kind` and `root toc entry`.
+    /// Returns an iterator over all **root** [entries](TocEntry).
     ///
-    /// Tuple structure: ([`TocEntryKind`], [`TocEntry`])
-    fn kinds(
-        &self,
-    ) -> impl Iterator<Item = (&'ebook TocEntryKind<'ebook>, impl TocEntry<'ebook> + 'ebook)> + 'ebook;
+    /// # See Also
+    /// - [`TocEntry::kind`] to retrieve the [`TocEntryKind`] of each root.
+    ///
+    /// # Examples
+    /// - Iterating over roots and observing their kind:
+    /// ```
+    /// # use rbook::ebook::toc::TocEntryKind;
+    /// # use rbook::Epub;
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
+    /// let epub = Epub::open("tests/ebooks/example_epub")?;
+    /// let mut roots = epub.toc().iter();
+    ///
+    /// let contents = roots.next().unwrap();
+    /// assert_eq!(TocEntryKind::Toc, contents.kind());
+    ///
+    /// let landmarks = roots.next().unwrap();
+    /// assert_eq!(TocEntryKind::Landmarks, landmarks.kind());
+    ///
+    /// let pagelist = roots.next().unwrap();
+    /// assert_eq!(TocEntryKind::PageList, pagelist.kind());
+    ///
+    /// // No remaining roots
+    /// assert_eq!(None, roots.next());
+    /// # Ok(())
+    /// # }
+    /// ```
+    fn iter(&self) -> impl Iterator<Item = impl TocEntry<'ebook>> + 'ebook;
 }
 
 /// An entry contained within a [`Toc`], encompassing associated metadata.
 ///
+/// Provides two forms of iterators:
+/// - [`TocEntry::iter`]: Direct children (nested form).
+/// - [`TocEntry::flatten`]: **All** children recursively.
+///
 /// # See Also
 /// - [`EpubTocEntry`](crate::epub::toc::EpubTocEntry) for epub-specific entry information.
-pub trait TocEntry<'ebook> {
-    /// The display order of an entry (`0 = first item`).
-    fn order(&self) -> usize;
-
+pub trait TocEntry<'ebook>: Sealed {
     /// The depth of an entry relative to the root ([`0 = root`](Self::is_root)).
     fn depth(&self) -> usize;
 
     /// The human-readable label.
+    ///
+    /// The label is the text displayed to the user in a reading system's navigation menu.
     fn label(&self) -> &'ebook str;
 
     /// The semantic kind of content associated with an entry.
     ///
     /// For example, an entry may point to the
     /// [`appendix`](TocEntryKind::Appendix) or [`cover page`](TocEntryKind::Cover).
-    fn kind(&self) -> &'ebook TocEntryKind<'ebook>;
-
-    /// The nested children (toc entries) associated with an entry.
-    fn children(&self) -> impl TocChildren<'ebook> + 'ebook;
+    fn kind(&self) -> TocEntryKind<'ebook>;
 
     /// The [`ManifestEntry`] associated with a [`TocEntry`].
     ///
@@ -113,15 +133,13 @@ pub trait TocEntry<'ebook> {
     /// [`ManifestEntry`] within the [`Manifest`](super::Manifest).
     fn manifest_entry(&self) -> Option<impl ManifestEntry<'ebook> + 'ebook>;
 
-    /// The [`Resource`] intended to navigate from an entry.
+    /// The [`Resource`] intended to navigate to from an entry.
     ///
     /// # Examples
     /// - Retrieving the resource associated with an entry:
     /// ```
-    /// # use rbook::ebook::errors::EbookResult;
-    /// # use rbook::ebook::toc::{Toc, TocEntry};
-    /// # use rbook::{Ebook, Epub};
-    /// # fn main() -> EbookResult<()> {
+    /// # use rbook::Epub;
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
     /// let epub = Epub::open("tests/ebooks/example_epub")?;
     /// let main_toc_root = epub.toc().contents().unwrap();
     ///
@@ -142,15 +160,35 @@ pub trait TocEntry<'ebook> {
         self.manifest_entry().map(|entry| entry.resource())
     }
 
+    /// Returns the associated direct child [`TocEntry`] if the given `index` is less than
+    /// [`Self::len`], otherwise [`None`].
+    fn get(&self, index: usize) -> Option<impl TocEntry<'ebook> + 'ebook>;
+
+    /// Returns an iterator over direct child entries
+    /// (whose [`depth`](TocEntry::depth) is one greater than the parent).
+    ///
+    /// # See Also
+    /// - [`Self::flatten`] for ***all*** children recursively.
+    fn iter(&self) -> impl Iterator<Item = impl TocEntry<'ebook> + 'ebook> + 'ebook;
+
+    /// Returns a recursive iterator over **all** children.
+    fn flatten(&self) -> impl Iterator<Item = impl TocEntry<'ebook> + 'ebook> + 'ebook;
+
+    /// The total number of direct [`children`](Self::iter) a toc entry has.
+    fn len(&self) -> usize;
+
+    /// Returns `true` if there are no children.
+    fn is_empty(&self) -> bool {
+        self.len() == 0
+    }
+
     /// Returns `true` if the depth of a toc entry is `0`, indicating the root.
     ///
     /// # Examples
     /// - Assessing if an entry is a root:
     /// ```
-    /// # use rbook::ebook::errors::EbookResult;
-    /// # use rbook::ebook::toc::{Toc, TocEntry};
-    /// # use rbook::{Ebook, Epub};
-    /// # fn main() -> EbookResult<()> {
+    /// # use rbook::Epub;
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
     /// let epub = Epub::open("tests/ebooks/example_epub")?;
     /// let main_toc_root = epub.toc().contents().unwrap();
     ///
@@ -170,18 +208,18 @@ pub trait TocEntry<'ebook> {
     /// Calculates and returns the **maximum** depth relative to an entry.
     /// In other words, how many levels deep is the most-nested child?
     ///
-    /// Child [`entries`](TocEntry) have a maximum depth less than the parent.
+    /// Child [entries](TocEntry) have a maximum depth less than the parent.
     /// For example, if an entry has a maximum depth of `5`,
-    /// then its immediate children will have a maximum depth of **at most** `4`.
+    /// then its direct children will have a maximum depth of **at most** `4`.
     ///
     /// # Scenarios
     /// The maximum depth indicates the following:
     ///
-    /// | Max Depth | Indication                                                         |
-    /// |-----------|--------------------------------------------------------------------|
-    /// | 0         | No immediate children (Equivalent to [`TocChildren::is_empty`]).   |
-    /// | 1         | Only immediate children (Children do not contain nested children). |
-    /// | \>1       | At least one immediate child contains nested children.             |
+    /// | Max Depth | Indication                                                      |
+    /// |-----------|-----------------------------------------------------------------|
+    /// | 0         | No direct children (Equivalent to [`TocEntry::is_empty`]).      |
+    /// | 1         | Only direct children (Children do not contain nested children). |
+    /// | \>1       | At least one direct child contains nested children.             |
     ///
     /// # See Also
     /// - [`Self::depth`] for the pre-computed depth relative to the root.
@@ -189,10 +227,8 @@ pub trait TocEntry<'ebook> {
     /// # Examples
     /// - Comparing the calculated maximum depth with [`Self::depth`]:
     /// ```
-    /// # use rbook::ebook::errors::EbookResult;
-    /// # use rbook::ebook::toc::{Toc, TocEntry, TocChildren};
-    /// # use rbook::{Ebook, Epub};
-    /// # fn main() -> EbookResult<()> {
+    /// # use rbook::Epub;
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
     /// let epub = Epub::open("tests/ebooks/example_epub")?;
     /// let main_toc_root = epub.toc().contents().unwrap();
     ///
@@ -201,7 +237,7 @@ pub trait TocEntry<'ebook> {
     /// // Calculated maximum depth - deepest child entry within the hierarchy
     /// assert_eq!(2, main_toc_root.max_depth());
     ///
-    /// let child = main_toc_root.children().get(0).unwrap();
+    /// let child = main_toc_root.get(0).unwrap();
     ///
     /// // Current depth relative to the root
     /// assert_eq!(1, child.depth());
@@ -211,78 +247,45 @@ pub trait TocEntry<'ebook> {
     /// # }
     /// ```
     fn max_depth(&self) -> usize {
-        self.children()
-            .iter()
+        self.iter()
             .fold(0, |depth, child| depth.max(1 + child.max_depth()))
     }
 
-    /// Calculates and returns the **total** number of all (immediate and nested)
+    /// Calculates and returns the **total** number of all (direct and nested)
     /// children relative to an entry.
     ///
     /// # Scenarios
     /// The total number of children indicates the following:
     ///
-    /// | Total Children         | Indication                                                         |
-    /// |------------------------|--------------------------------------------------------------------|
-    /// | 0                      | No immediate children (Equivalent to [`TocChildren::is_empty`]).   |
-    /// | [`TocChildren::len`]   | Only immediate children (Children do not contain nested children). |
-    /// | \>[`TocChildren::len`] | At least one immediate child contains nested children.             |
+    /// | Total Children  | Indication                                                      |
+    /// |-----------------|-----------------------------------------------------------------|
+    /// | 0               | No direct children (Equivalent to [`Self::is_empty`]).          |
+    /// | [`Self::len`]   | Only direct children (Children do not contain nested children). |
+    /// | \>[`Self::len`] | At least one direct child contains nested children.             |
     ///
     /// # Examples
-    /// - Comparing the calculated total length with [`TocChildren::len`]:
+    /// - Comparing the calculated total length with [`Self::len`]:
     /// ```
-    /// # use rbook::ebook::errors::EbookResult;
-    /// # use rbook::ebook::toc::{Toc, TocEntry, TocChildren};
-    /// # use rbook::{Ebook, Epub};
-    /// # fn main() -> EbookResult<()> {
+    /// # use rbook::Epub;
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
     /// let epub = Epub::open("tests/ebooks/example_epub")?;
     /// let main_toc_root = epub.toc().contents().unwrap();
     ///
-    /// assert_eq!(3, main_toc_root.children().len());
+    /// assert_eq!(3, main_toc_root.len());
     /// // The `4` indicates that there is a single nested
-    /// // child that's not an immediate child of the root.
+    /// // child that's not a direct child of the root.
     /// assert_eq!(4, main_toc_root.total_len());
     ///
-    /// let child = main_toc_root.children().get(1).unwrap();
+    /// let child = main_toc_root.get(1).unwrap();
     ///
-    /// assert_eq!(1, child.children().len());
+    /// assert_eq!(1, child.len());
     /// assert_eq!(1, child.total_len());
     /// # Ok(())
     /// # }
     /// ```
     fn total_len(&self) -> usize {
-        self.children()
-            .iter()
+        self.iter()
             .fold(0, |total, child| total + child.total_len() + 1)
-    }
-}
-
-/// A collection of child [`entries`](TocEntry) retrieved from [`TocEntry::children`].
-///
-/// Provides two forms of iterators:
-/// - [`TocChildren::iter`]: Immediate children (nested form).
-/// - [`TocChildren::flatten`]: All children sorted in ascending [`order`](TocEntry::order).
-pub trait TocChildren<'ebook> {
-    /// Returns the associated immediate child [`TocEntry`] if the given `index` is less than
-    /// [`Self::len`], otherwise [`None`].
-    fn get(&self, index: usize) -> Option<impl TocEntry<'ebook> + 'ebook>;
-
-    /// Returns an iterator over immediate child entries
-    /// (whose [`depth`](TocEntry::depth) is one greater than the parent).
-    ///
-    /// # See Also
-    /// - [`Self::flatten`] for ***all*** children, sorted by their [`order`](TocEntry::order).
-    fn iter(&self) -> impl Iterator<Item = impl TocEntry<'ebook> + 'ebook> + 'ebook;
-
-    /// Returns a recursive iterator over **all** children in ascending [`order`](TocEntry::order).
-    fn flatten(&self) -> impl Iterator<Item = impl TocEntry<'ebook> + 'ebook> + 'ebook;
-
-    /// The total number of immediate [`children`](Self::iter) a toc entry has.
-    fn len(&self) -> usize;
-
-    /// Returns `true` if there are no children.
-    fn is_empty(&self) -> bool {
-        self.len() == 0
     }
 }
 
@@ -292,12 +295,14 @@ toc_entry_kind! {
     Appendix => "appendix",
     BackMatter => "backmatter",
     Bibliography => "bibliography",
-    BodyMatter => "bodymatter",
+    // https://idpf.org/epub/20/spec/OPF_2.0_final_spec.html#Section2.6
+    // specifies "text" as **First "real" page of content (e.g. "Chapter 1")**.
+    BodyMatter => "bodymatter" | "text",
     Chapter => "chapter",
     Colophon => "colophon",
     Conclusion => "conclusion",
     Contributors => "contributors",
-    CopyrightPage => "copyright-page",
+    CopyrightPage => "copyright-page" | "copyright",
     Cover => "cover",
     Dedication => "dedication",
     Endnotes => "endnotes",
@@ -312,13 +317,17 @@ toc_entry_kind! {
     Index => "index",
     Introduction => "introduction",
     Landmarks => "landmarks",
+    ListOfIllustrations => "loi",
+    ListOfAudio => "loa",
+    ListOfTables => "lot",
+    ListOfVideos => "lov",
     PageList => "page-list",
     Part => "part",
     Preamble => "preamble",
     Preface => "preface",
     Prologue => "prologue",
     Qna => "qna",
-    TitlePage => "titlepage",
+    TitlePage => "titlepage" | "title-page",
     Toc => "toc",
     Volume => "volume",
 }
@@ -326,10 +335,10 @@ toc_entry_kind! {
 mod macros {
     macro_rules! toc_entry_kind {
         {
-            $($map_enum:ident => $map_string:literal,)*
+            $($map_enum:ident => $map_string:literal $(| $additional_mapping:literal)*,)*
         } => {
             /// The kinds of content that may be associated with table of content
-            /// [`entries`](TocEntry).
+            /// [entries](TocEntry).
             ///
             /// The variants are based on the EPUB 3 Structural Semantics Vocabulary.
             /// See more at: <https://www.w3.org/TR/epub-ssv-11>
@@ -337,11 +346,13 @@ mod macros {
             /// Uncommon semantics not directly included here are retrievable
             /// through [`TocEntryKind::Other`].
             #[non_exhaustive]
-            #[derive(Clone, Debug, Default, Hash, PartialEq, Eq)]
+            #[derive(Copy, Clone, Debug, Default, Hash, PartialEq, Eq)]
             pub enum TocEntryKind<'ebook> {
                 $(
-                /// Maps to
-                #[doc = concat!("`", $map_string, "`.")]
+                #[doc = concat!("Maps to `", $map_string, "`.")]
+                $(
+                #[doc = concat!("- `", $additional_mapping, "` → `", $map_string, "`")]
+                )*
                 ///
                 /// More details at:
                 #[doc = concat!("<https://www.w3.org/TR/epub-ssv-11/#", $map_string, ">.")]
@@ -367,7 +378,7 @@ mod macros {
                 #[default]
                 Unknown,
                 /// An entry kind not mapped to any other variants.
-                Other(Cow<'ebook, str>),
+                Other(&'ebook str),
             }
 
             impl TocEntryKind<'_> {
@@ -383,22 +394,21 @@ mod macros {
                 /// assert_eq!("titlepage", title_page_kind.as_str());
                 /// assert_eq!("chapter", chapter_kind.as_str());
                 /// ```
-                #[must_use]
                 pub fn as_str(&self) -> &str {
                     match self {
                         $(Self::$map_enum => $map_string,)*
                         Self::Unknown => "unknown",
-                        Self::Other(value) => value.as_ref(),
+                        Self::Other(value) => value,
                     }
                 }
             }
 
-            impl<'ebook, T: Into<Cow<'ebook, str>>> From<T> for TocEntryKind<'ebook> {
-                fn from(value: T) -> Self {
-                    let value = value.into();
+            impl<'ebook, S: AsRef<str> + ?Sized> From<&'ebook S> for TocEntryKind<'ebook> {
+                fn from(value: &'ebook S) -> Self {
+                    let value = value.as_ref();
 
-                    match value.as_ref() {
-                        $($map_string => Self::$map_enum,)*
+                    match value {
+                        $($map_string $(| $additional_mapping)* => Self::$map_enum,)*
                         "" => Self::Unknown,
                         _ => Self::Other(value)
                     }
@@ -410,13 +420,13 @@ mod macros {
                     match value {
                         $(Self::$map_enum => Self::$map_enum,)*
                         Self::Unknown => Self::Unknown,
-                        Self::Other(cow) => Self::Other(Cow::Borrowed(cow.as_ref()))
+                        Self::Other(other) => Self::Other(other)
                     }
                 }
             }
 
             impl Display for TocEntryKind<'_> {
-                fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                     f.write_str(self.as_str())
                 }
             }

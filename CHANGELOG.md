@@ -1,4 +1,82 @@
 # Changelog
+## 0.7.0 (2025-02-24)
+### Major Release: Write Support
+This release expands `rbook` into a read/write library,
+introducing a comprehensive API for creating EPUBs from scratch and modifying
+existing ones, including metadata, manifest, spine, and table of contents.
+
+The summary below highlights the key changes.
+All new APIs and examples are documented at: https://docs.rs/rbook/latest/rbook/
+
+### Additions　**＋**
+- New feature flag: `write` (enabled by default).
+  - Adds support for saving `Epub` instances to disk/memory.
+  - Adds fluent builders to greatly ease creation and modification (e.g., `EpubEditor`, `EpubWriteOptions`).
+  - Adds all mutation APIs (`_mut` accessors).
+- New `Epub` methods and associated functions:
+  - `new`: Creates a new empty in-memory EPUB.
+  - `builder`: Returns an `EpubEditor` to build an EPUB from scratch.
+  - `edit`: Returns an `EpubEditor` to modify an existing EPUB.
+  - `write`: Returns `EpubWriteOptions` to configure how to write an EPUB to disk/memory.
+  - New `_mut` accessors: 
+    - `metadata_mut`, `manifest_mut`, `spine_mut`, `toc_mut`
+- New **Mutator** types for fine-grained control:
+  - `EpubMetadataMut`, `EpubMetaEntryMut`, `EpubRefinementsMut`
+  - `EpubManifestMut`, `EpubManifestEntryMut`
+  - `EpubSpineMut`, `EpubSpineEntryMut`
+  - `EpubTocMut`, `EpubTocEntryMut`
+  - `AttributesMut`, `PropertiesMut`
+- New **Detached** types for constructing entries independent of an `Epub`:
+  - `DetachedEpubMetaEntry` + associated `marker` types for type-safety
+  - `DetachedEpubManifestEntry`
+  - `DetachedEpubSpineEntry`
+  - `DetachedEpubTocEntry`
+- Helper Traits:
+  - `Many`: Enables methods to accept single items, arrays, or vectors uniformly.
+  - `IntoOption`: Simplifies passing optional arguments (e.g., `id("xyz")` vs `id(Some("xyz"))`).
+- Core ebook trait methods are now inherent on the concrete EPUB types.
+  Importing traits is no longer required.
+
+### Changes　**⟳**
+- Update `quick-xml` dependency: 0.39.0 → 0.39.2
+- Update `zip` dependency: 7.4.0 → 8.1.0
+- Update `wasm-bindgen-test` dev dependency: 0.3.58 → 0.3.62
+- Refine documentation for enhanced clarity.
+- `EpubOpenOptions::strict` is now **`false`** by default.
+- Optimization: Reduced the memory footprint of internal metadata entry structures.
+- `EpubReaderOptions` is now generic, supporting both one-shot and reusable patterns.
+- Rename `EpubOpenOptions::store_all` to `EpubOpenOptions::retain_variants` for clarity.
+- Rename `EpubFormatError` to `EpubError`.
+- Rename `EpubReaderBuilder` to `EpubReaderOptions<&Epub>`.
+- Rename `ResourceKind::get_param` to `ResourceKind::by_param` for API consistency.
+- Rename `Manifest::by_resource_kind` to `Manifest::by_kind`.
+- Rename `Manifest::entries` to `Manifest::iter`.
+- Rename `ManifestEntry::resource_kind` to `ManifestEntry::kind`.
+- Rename `Metadata::entries` to `Metadata::iter`.
+- Rename `Metadata::publication_date` to `Metadata::published`.
+- Rename `Metadata::modified_date` to `Metadata::modified`.
+- Rename `Spine::by_order` to `Spine::get`.
+- Rename `Spine::entries` to `Spine::iter`.
+- Rename `Toc::kinds` to `Toc::iter`.
+- Rename `ReaderError::MalformedEbook` to `ReaderError::Format` for clarity.
+- Merge `Manifest::by_resource_kinds` into `Manifest::by_kind`.
+- Merge traits `TocEntry` and `TocEntryChildren` for ease-of-use.
+- Implement `Copy` for `TocEntryKind`.
+- Methods returning `Attributes` return `&Attributes` instead.
+- Methods returning `Properties` return `&Properties` instead.
+- `Toc::kinds` return type Item changed from `(&TocEntryKind, impl TocEntry)` to `impl TocEntry`.
+  If the kind is needed, see `TocEntry::kind`. 
+
+### Removals　**−**
+- Remove all deprecated APIs.
+- Remove struct `EpubReaderBuilder` as it is now unified with `EpubReaderOptions`.
+- Remove method `ManifestEntry::key` as it served no purpose.
+- Remove method `preferred_landmarks` and `preferred_page_list` from `EpubOpenOptions`.
+- Remove enum variant `FormatError::InvalidUtf8`.
+- Remove enum variant `ReaderError::InvalidEbookContent`.
+- Remove `TocEntry::order` in favor of `TocEntry::flatten` paired with `Iterator::enumerate`,
+  ensuring the order remains accurate after ToC modifications.
+
 ## 0.6.12 (2025-02-06)
 ## Additions　**＋**
 - Clarify MSRV as `1.88.0`
@@ -17,7 +95,7 @@
 
 ### Changes　**⟳**
 - Refine documentation for enhanced clarity.
-- Internal refactoring in preparation for the upcoming write/modify API (v.7.0).
+- Internal refactoring in preparation for the upcoming write/modify API (v0.7.0).
 
 ## 0.6.10 (2025-12-20)
 ### Additions　**＋**

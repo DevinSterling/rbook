@@ -27,7 +27,7 @@
 //!
 //! | Feature                                   | Overview                                                                                                        |
 //! |-------------------------------------------|-----------------------------------------------------------------------------------------------------------------|
-//! | [**EPUB 2 and 3**](epub)                  | Read-only (for now) view of EPUB `2` and `3` formats.                                                           |
+//! | [**EPUB 2 and 3**](epub)                  | Read/write view of EPUB `2` and `3` formats.                                                                    |
 //! | [**Streaming Reader**](reader)            | Random‐access or sequential iteration over readable content.                                                    |
 //! | **Detailed Types**                        | Abstractions built on expressive traits and types.                                                              |
 //! | [**Metadata**](ebook::metadata)           | Typed access to titles, creators, publishers, languages, tags, roles, attributes, and more.                     |
@@ -42,14 +42,15 @@
 //!
 //! | Feature                | Description                                             |
 //! |------------------------|---------------------------------------------------------|
+//! | **write**              | Creation and modification of EPUB `2` and `3` formats.  |
 //! | [**prelude**](prelude) | Convenience prelude ***only*** including common traits. |
 //! | **threadsafe**         | Enables `Send` + `Sync` constraint for `Epub`.          |
 //!
 //! Default features can be disabled and toggled selectively.
-//! For example, omitting the `prelude` while retaining the `threadsafe` feature:
+//! For example, only retaining the `threadsafe` default feature:
 //! ```toml
 //! [dependencies]
-//! rbook = { version = "0.6.12", default-features = false, features = ["threadsafe"] }
+//! rbook = { version = "0.7.0", default-features = false, features = ["threadsafe"] }
 //! ```
 //!
 //! # Opening an [`Ebook`]
@@ -78,7 +79,7 @@
 //! ```
 //! # use rbook::Epub;
 //! let epub = Epub::options()
-//!     .strict(false) // Disable strict checks (`true` by default)
+//!     .strict(true) // Enable strict checks (`false` by default)
 //!     // If only metadata is needed, skipping helps quicken parsing time and reduce space.
 //!     .skip_toc(true) // Skips ToC-related parsing, such as toc.ncx (`false` by default)
 //!     .skip_manifest(true) // Skips manifest-related parsing (`false` by default)
@@ -90,28 +91,24 @@
 //! Reading the contents of an ebook is handled by a [`Reader`](reader::Reader),
 //! which traverses end-user-readable resources in canonical order:
 //! ```
-//! # use rbook::{Ebook, Epub};
-//! // Import traits (Alternatively, rbook::prelude::*)
-//! use rbook::ebook::manifest::ManifestEntry;
-//! use rbook::reader::{Reader, ReaderContent};
+//! # use rbook::Epub;
 //! # let epub = Epub::open("tests/ebooks/example_epub").unwrap();
-//!
 //! // Create a reader instance
 //! let mut reader = epub.reader();
 //!
 //! // Print the readable content
 //! while let Some(Ok(data)) = reader.read_next() {
-//!     let resource_kind = data.manifest_entry().resource_kind();
+//!     let kind = data.manifest_entry().kind();
 //!
-//!     assert_eq!("application/xhtml+xml", resource_kind.as_str());
-//!     assert_eq!("xhtml", resource_kind.subtype());
+//!     assert_eq!("application/xhtml+xml", kind.as_str());
+//!     assert_eq!("xhtml", kind.subtype());
 //!     println!("{}", data.content());
 //! }
 //! ```
 //! Prior to creation, a reader can receive options to control its behavior,
 //! such as [linearity](epub::reader::EpubReaderOptions::linear_behavior):
 //! ```
-//! # use rbook::{Ebook, Epub};
+//! # use rbook::Epub;
 //! use rbook::epub::reader::LinearBehavior;
 //!
 //! # let epub = Epub::open("tests/ebooks/example_epub").unwrap();
@@ -125,14 +122,16 @@
 //! All files such as text, images, and video are accessible within an ebook programmatically.
 //!
 //! The simplest way to access and retrieve resources from an ebook is through the
-//! [`Manifest`](ebook::manifest::Manifest), specifically through its entries via
-//! [`ManifestEntry::read_str`](ebook::manifest::ManifestEntry::read_str) and
-//! [`ManifestEntry::read_bytes`](ebook::manifest::ManifestEntry::read_bytes):
+//! [`Manifest`](ebook::manifest::Manifest), specifically through its entries via:
+//! - [`ManifestEntry::copy_bytes`](ebook::manifest::ManifestEntry::copy_bytes)
+//!   to copy the content directly into any [`Write`](std::io::Write) implementation.
+//! - [`ManifestEntry::read_bytes`](ebook::manifest::ManifestEntry::read_bytes)
+//!   to retrieve the content as bytes ([`Vec<u8>`](Vec)).
+//! - [`ManifestEntry::read_str`](ebook::manifest::ManifestEntry::read_str)
+//!   to retrieve the content as a [`String`].
 //! ```
-//! # use rbook::ebook::errors::EbookResult;
-//! # use rbook::ebook::manifest::{Manifest, ManifestEntry};
-//! # use rbook::{Ebook, Epub};
-//! # fn main() -> EbookResult<()> {
+//! # use rbook::Epub;
+//! # fn main() -> rbook::ebook::errors::EbookResult<()> {
 //! # let epub = Epub::open("tests/ebooks/example_epub")?;
 //! let manifest_entry = epub.manifest().cover_image().unwrap();
 //! let cover_image_bytes = manifest_entry.read_bytes()?;
@@ -144,13 +143,12 @@
 //!
 //! For finer grain control, the [`Ebook`] trait provides two methods
 //! that accept a [`Resource`](ebook::resource::Resource) as an argument:
-//! - [`Ebook::read_resource_str`] to retrieve the content as a UTF-8 string.
-//! - [`Ebook::read_resource_bytes`] to retrieve the content in the form of raw bytes.
+//! - [`Ebook::copy_resource`]
+//! - [`Ebook::read_resource_bytes`]
+//! - [`Ebook::read_resource_str`]
 //! ```
-//! # use rbook::ebook::errors::EbookResult;
-//! # use rbook::ebook::manifest::{Manifest, ManifestEntry};
-//! # use rbook::{Ebook, Epub};
-//! # fn main() -> EbookResult<()> {
+//! # use rbook::Epub;
+//! # fn main() -> rbook::ebook::errors::EbookResult<()> {
 //! # let epub = Epub::open("tests/ebooks/example_epub")?;
 //! let manifest_entry = epub.manifest().cover_image().unwrap();
 //!
@@ -166,47 +164,13 @@
 //! resources will return an [`EbookError::Archive`](ebook::errors::EbookError::Archive) error.
 //!
 //! ## See Also
-//! - [`Epub`] documentation of `read_resource_*` methods for normalization details.
-//!
-//! # The [`prelude`]
-//! `rbook` provides a prelude consisting **only** of traits for convenience.
-//! It circumvents manually importing each trait and helps keep imports lean:
-//! ```no_run
-//! // Without the prelude (Verbose; manually importing each trait):
-//! /*1*/ use rbook::Ebook;
-//! /*2*/ use rbook::ebook::manifest::ManifestEntry;
-//! /*3*/ use rbook::ebook::spine::{Spine, SpineEntry};
-//! # use rbook::ebook::errors::EbookResult;
-//!
-//! // With the prelude, lines 1, 2, and 3 can be consolidated into `use rbook::prelude::*;`
-//!
-//! # fn main() -> EbookResult<()> {
-//! # use rbook::ebook::errors::EbookResult;
-//! // Retrieve the manifest entry associated with a spine entry:
-//! let epub = rbook::Epub::open("tests/ebooks/example_epub")?;
-//! let spine_entry = epub.spine().by_order(2).unwrap();
-//! let manifest_entry_a = spine_entry.manifest_entry().unwrap();
-//!
-//! assert_eq!("c1", spine_entry.idref());
-//! assert_eq!("c1", manifest_entry_a.id());
-//! # Ok(())
-//! # }
-//! ```
-//!
-//! The idea of libraries providing a prelude is subjective and may not be desirable.
-//! As such, it is set as a default crate feature that can be disabled inside a
-//! project's `Cargo.toml` file.
-//! For example, omitting the `prelude` while retaining the `threadsafe` feature:
-//! ```toml
-//! [dependencies]
-//! rbook = { version = "0.6.12", default-features = false, features = ["threadsafe"] }
-//! ```
+//! - [`Epub::copy_resource`] for normalization details.
 //!
 //! # Examples
 //! ## Accessing [`Metadata`](ebook::metadata::Metadata): Retrieving the main title
 //! ```
-//! # use rbook::{Ebook, Epub};
-//! # use rbook::ebook::metadata::{Metadata, MetaEntry, Title, TitleKind, LanguageKind};
+//! # use rbook::Epub;
+//! # use rbook::ebook::metadata::{TitleKind, LanguageKind};
 //! # let epub = Epub::open("tests/ebooks/example_epub").unwrap();
 //! // Retrieve the main title (all titles retrievable via `titles()`)
 //! let title = epub.metadata().title().unwrap();
@@ -219,11 +183,18 @@
 //! assert_eq!("ja", alternate_script.language().scheme().code());
 //! assert_eq!(LanguageKind::Bcp47, alternate_script.language().kind());
 //! ```
-//! ## Accessing [`Metadata`](ebook::metadata::Metadata): Retrieving the first creator
+//! ## Accessing [`Metadata`](ebook::metadata::Metadata): Retrieving the date and first creator
 //! ```
-//! # use rbook::{Ebook, Epub};
-//! # use rbook::ebook::metadata::{Metadata, MetaEntry, Contributor, LanguageKind};
+//! # use rbook::Epub;
+//! # use rbook::ebook::metadata::LanguageKind;
 //! # let epub = Epub::open("tests/ebooks/example_epub").unwrap();
+//! // Retrieve the publication year
+//! let published = epub.metadata().published().unwrap();
+//! assert_eq!(2023, published.date().year());
+//! assert_eq!(1, published.date().month());
+//! assert_eq!(25, published.date().day());
+//! assert!(published.time().is_local());
+//!
 //! // Retrieve the first creator
 //! let creator = epub.metadata().creators().next().unwrap();
 //! assert_eq!("John Doe", creator.value());
@@ -243,9 +214,9 @@
 //! ```
 //! ## Extracting images from the [`Manifest`](ebook::manifest::Manifest)
 //! ```no_run
-//! use std::{fs, path::Path};
-//! # use rbook::{Ebook, Epub};
-//! # use rbook::ebook::manifest::{Manifest, ManifestEntry};
+//! use std::fs::{self, File};
+//! use std::path::Path;
+//! # use rbook::Epub;
 //! # let epub = Epub::open("tests/ebooks/example_epub").unwrap();
 //!
 //! // Create an output directory for the extracted images
@@ -253,24 +224,21 @@
 //! fs::create_dir_all(&out).unwrap();
 //!
 //! for image in epub.manifest().images() {
-//!     // Retrieve the raw image bytes
-//!     let bytes = image.read_bytes().unwrap();
-//!
 //!     // Extract the filename from the href and write to disk
-//!     let filename = image.href().name().decode(); // Decode as EPUB hrefs may be URL-encoded
-//!     fs::write(out.join(&*filename), bytes).unwrap();
+//!     let filename = image.href().name().decode(); // Decode EPUB hrefs are percent-encoded
+//!
+//!     // Copy the raw image bytes
+//!     let mut file = File::create(out.join(&*filename)).unwrap();
+//!     image.copy_bytes(&mut file).unwrap();
 //! }
 //! ```
 //! ## Accessing [`EpubManifest`](epub::manifest::EpubManifest) fallbacks
 //! ```
-//! # use rbook::{Ebook, Epub};
-//! # use rbook::ebook::errors::EbookResult;
-//! # use rbook::ebook::manifest::{Manifest, ManifestEntry};
-//! # use rbook::ebook::metadata::MetaEntry;
+//! # use rbook::Epub;
 //! # let epub = Epub::open("tests/ebooks/example_epub").unwrap();
 //! // Fallbacks
 //! let webm_cover = epub.manifest().cover_image().unwrap();
-//! let kind = webm_cover.resource_kind();
+//! let kind = webm_cover.kind();
 //! assert_eq!(("image", "webm"), (kind.maintype(), kind.subtype()));
 //!
 //! // If the program does not support `webm`, fallback
@@ -284,23 +252,132 @@
 //! // No fallbacks remaining
 //! assert_eq!(None, png_cover.fallback());
 //! ```
+//! ## [Editing](Epub::edit) an [`Epub`]
+//! ```no_run
+//! # #[cfg(feature = "write")]
+//! # {
+//! # use rbook::Epub;
+//! # fn main() -> rbook::ebook::errors::EbookResult<()> {
+//! Epub::open("old.epub")?
+//!     .edit()
+//!     .contributor("Jane Doe") // Adding a contributor
+//!     .write()
+//!     .compression(9)
+//!     .save("new.epub")
+//! # }
+//! # }
+//! ```
+//! ### Creating a backwards-compatible EPUB 3 file
+//!
+//! > This example uses the high-level builder API.
+//! > See the [`epub`] module for lower-level control over the manifest, spine, etc.
+//!
+//! ```no_run
+//! # #[cfg(feature = "write")]
+//! # {
+//! # use rbook::Epub;
+//! # use rbook::ebook::errors::EbookResult;
+//! use rbook::ebook::toc::TocEntryKind;
+//! use rbook::epub::EpubChapter;
+//! use std::path::Path;
+//!
+//! const XHTML: &[u8] = b"<xhtml>...</xhtml>"; // Example data
+//!
+//! # fn main() -> EbookResult<()> {
+//! Epub::builder()
+//!     .identifier("urn:example")
+//!     .title("Doe Story")
+//!     .creator(["John Doe", "Jane Doe"])
+//!     .language("en")
+//!     // Reference a file stored on disk or provide in-memory bytes
+//!     .cover_image(("cover.png", Path::new("local/file/cover.png")))
+//!     .chapter([
+//!         // Standard Chapter (Auto-generates href/filename "volume_i.xhtml")
+//!         EpubChapter::new("Volume I").xhtml(XHTML).children(
+//!             // Providing an explicit href (v1c1.xhtml)
+//!             EpubChapter::new("I: Intro")
+//!                 .kind(TocEntryKind::Introduction)
+//!                 .href("v1c1.xhtml")
+//!                 .xhtml_body("<p>Basic text</p>"),
+//!         ),
+//!         EpubChapter::new("Volume II").children([
+//!             // Referencing an XHTML file stored on the OS file system
+//!             EpubChapter::new("I").href("v2/c1.xhtml").xhtml(Path::new("path/to/c1.xhtml")),
+//!             // Navigation-only entry linking to a fragment in another chapter
+//!             EpubChapter::new("Section 1").href("v2/c1.xhtml#section-1"),
+//!             // Resource included in spine/manifest but omitted from ToC
+//!             EpubChapter::unlisted("v3extras.xhtml").xhtml(XHTML),
+//!         ]),
+//!     ])
+//!     .write()
+//!     .compression(0)
+//!     .save("doe_story.epub") // Save to file or alternative write to memory
+//! # }
+//! # }
+//! ```
 
 #![warn(missing_docs)]
 #![cfg_attr(docsrs, feature(doc_cfg))]
 
+////////////////////////////////////////////////////////////////////////////////
+// PRIVATE API
+////////////////////////////////////////////////////////////////////////////////
+
 mod parser;
 mod util;
+#[cfg(feature = "write")]
+mod writer;
+
+////////////////////////////////////////////////////////////////////////////////
+// PUBLIC API
+////////////////////////////////////////////////////////////////////////////////
 
 pub mod ebook;
+pub mod input;
 pub mod reader;
 
-pub use self::{ebook::Ebook, epub::Epub};
+#[doc(inline)]
 pub use crate::ebook::epub;
+pub use {ebook::Ebook, epub::Epub};
 
 /// The rbook prelude for convenient imports of the core
 /// [`ebook`] and [`reader`] **traits**.
 ///
 /// This is a crate feature, `prelude`, that is enabled by default.
+///
+/// The prelude circumvents manually importing each trait and helps keep imports lean:
+/// ```no_run
+/// // Without the prelude (Verbose; manually importing each trait):
+/// /*1*/ use rbook::Ebook;
+/// /*2*/ use rbook::ebook::manifest::ManifestEntry;
+/// /*3*/ use rbook::ebook::spine::{Spine, SpineEntry};
+///
+/// // With the prelude, lines 1, 2, and 3 can be consolidated into:
+/// use rbook::prelude::*;
+///
+/// # fn main() -> rbook::ebook::errors::EbookResult<()> {
+/// // Retrieve the manifest entry associated with a spine entry:
+/// fn analyze<E: Ebook>(ebook: E) {
+///     let spine_entry = ebook.spine().get(2).unwrap();
+///     let manifest_entry = spine_entry.manifest_entry().unwrap();
+///     let resource = manifest_entry.resource();
+///
+///     assert_eq!(2, spine_entry.order());
+///     assert_eq!("xhtml", resource.kind().subtype());
+///     assert_eq!("/EPUB/c1.xhtml", resource.key().value().unwrap());
+/// }
+/// # analyze(rbook::Epub::open("tests/ebooks/example_epub")?);
+/// # Ok(())
+/// # }
+/// ```
+/// The idea of libraries providing a prelude is subjective and may not be desirable.
+/// As such, it is set as a default crate feature that can be disabled inside a
+/// project's `Cargo.toml` file.
+/// For example, omitting the `prelude` while retaining the `threadsafe` and `write` feature:
+/// ```toml
+/// [dependencies]
+/// rbook = { version = "0.7.0", default-features = false, features = ["threadsafe", "write"] }
+/// ```
 #[cfg(feature = "prelude")]
 pub mod prelude {
     pub use crate::ebook::{
@@ -308,7 +385,7 @@ pub mod prelude {
         manifest::{Manifest, ManifestEntry},
         metadata::{Contributor, Identifier, Language, MetaEntry, Metadata, Tag, Title},
         spine::{Spine, SpineEntry},
-        toc::{Toc, TocChildren, TocEntry},
+        toc::{Toc, TocEntry},
     };
     pub use crate::reader::{Reader, ReaderContent};
 }

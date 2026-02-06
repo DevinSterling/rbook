@@ -9,18 +9,18 @@
     <h1>Contents</h1>
     <ol>
         <li>
-            <a href="EPUB/cover.xhtml" class="h1 cover start">The Cover</a>
+            <a id="p1" href="EPUB/cover.xhtml" class="h1 cover start">The Cover</a>
         </li>
         <li>
-            <a href="EPUB/c1.xhtml?q=1#start">rbook Chapter 1</a>
+            <a id="p2" href="EPUB/c1.xhtml?q=1#start">rbook Chapter 1</a>
             <ol>
                 <li>
-                    <a href="EPUB/c1a.xhtml">rbook Chapter 1a</a>
+                    <a id="p3" href="EPUB/c1a.xhtml">rbook Chapter 1a</a>
                 </li>
             </ol>
         </li>
         <li>
-            <a href="EPUB/c2.xhtml">rbook Chapter 2</a>
+            <a id="p4" href="EPUB/c2.xhtml">rbook Chapter 2</a>
         </li>
     </ol>
 </nav>
@@ -35,6 +35,17 @@
         </li>
         <li>
             <a epub:type="bodymatter" href="EPUB/c1.xhtml">Start Here</a>
+        </li>
+    </ol>
+</nav>
+<nav epub:type="page-list" hidden="hidden">
+    <h2>Page List</h2>
+    <ol>
+        <li>
+            <a href="EPUB/c1.xhtml">1</a>
+        </li>
+        <li>
+            <a href="EPUB/c2.xhtml">2</a>
         </li>
     </ol>
 </nav>

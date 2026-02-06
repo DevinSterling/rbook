@@ -39,6 +39,6 @@
         <item href="scripts/3.js" id="script-3" media-type="text/javascript" />
         <item href="scripts/4.js" id="script-4" media-type="application/javascript" />
     </manifest>
-    <spine page-progression-direction="rtl">
+    <spine toc="nav" page-progression-direction="rtl">
     </spine>
 </package>

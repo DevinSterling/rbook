@@ -18,6 +18,9 @@
         <item href="nav.ncx" id="nav" media-type="application/x-dtbncx+xml"/>
         <!-- Literally empty files; but useful for tests -->
         <item href="cover.jpg" id="cover-image1" media-type="image/jpg"/>
+        
+        <!-- `../../` resolves to outside the EPUB container, so it's treated as `../` instead -->
+        <item href="../../file%20name%20with%20spaces.css" id="style" media-type="text/css"/>
     </manifest>
     <spine toc="nav" page-progression-direction="rtl">
     </spine>

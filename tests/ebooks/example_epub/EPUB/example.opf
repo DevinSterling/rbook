@@ -22,11 +22,14 @@
         <!-- <meta id="cycle2" refines="#cycle1" property="my-cycle1">cycle2</meta> -->
 
         <meta refines="#subtitle" property="title-type">subtitle</meta>
+        <meta refines="#title" property="title-type">main</meta>
 
-        <dc:title opf:alt-rep="サンプルEPUB" opf:alt-rep-lang="ja">Example EPUB</dc:title>
+        <dc:title>This is not the main title</dc:title>
         <dc:title id="subtitle">A subtitle</dc:title>
+        <dc:title id="title" opf:alt-rep="サンプルEPUB" opf:alt-rep-lang="ja">Example EPUB</dc:title>
+
         <dc:creator id="author" opf:role="aut" opf:file-as="Doe, John">John Doe</dc:creator>
-        <dc:source>rbook</dc:source>
+        <dc:source extra="&nbsp;esc&lt;aped&amp;attr&gt;ibute&quot;value&apos;">rbook</dc:source>
         <dc:date>2023-01-25</dc:date>
         <meta property="dcterms:modified">2023-01-25T10:11:35Z</meta>
         <dc:language>en</dc:language>
@@ -45,7 +48,7 @@
 
         <meta name="cover" content="cover-image1"></meta>
         <meta name="test" content="data"/>
-        
+
         <link id="example-link" href="https://github.com/devinsterling/rbook" rel="external" />
         <link id="example-link2" href="https://github.com/devinsterling/rbook" rel="external">ignored</link>
     </metadata>
@@ -63,11 +66,9 @@
         <item href="img/cover.png" id="cover-image3" fallback="ignored" media-type="image/png"/>
         <item href="overlay/chapter1_audio.smil" id="c1_audio" media-type="application/smil+xml"/>
         <item href="overlay/chapter2_audio.smil" id="c2_audio" media-type="application/smil+xml"/>
-
-        <!-- `../../` resolves to outside the EPUB container, so it's treated as `../` instead -->
-        <item href="../../file%20name%20with%20spaces.css" id="style" media-type="text/css"/>
+        <item href="../file%20name%20with%20spaces.css" id="style" media-type="text/css"/>
     </manifest>
-    <spine page-progression-direction="ltr">
+    <spine toc="toc-ncx" page-progression-direction="ltr">
         <itemref idref="cover" linear="no"/>
         <itemref id="spine-toc" idref="toc"/>
         <itemref idref="c1" linear="yes" properties="page-spread-left"/>
@@ -77,6 +78,6 @@
     <guide rbook:test="epub2-feature">
         <reference href="cover.xhtml" title="Cover" type="cover"/>
         <reference href="../toc.xhtml" title="Table of Contents" type="toc"/>
-        <reference href="c1.xhtml" title="Start Here" type="bodymatter"/>
+        <reference href="c1.xhtml" title="Start Here" type="text"/>
     </guide>
 </package>

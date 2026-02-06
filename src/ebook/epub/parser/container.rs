@@ -1,37 +1,33 @@
-use crate::ebook::epub::consts;
-use crate::ebook::epub::errors::EpubFormatError;
-use crate::ebook::epub::parser::EpubParser;
+use crate::ebook::epub::consts::ocf;
+use crate::ebook::epub::errors::EpubError;
+use crate::ebook::epub::parser::{EpubParser, EpubParserValidator};
+use crate::ebook::resource::consts::mime;
 use crate::parser::ParserResult;
-use crate::parser::xml::{XmlElement, XmlReader};
-use quick_xml::Reader;
-use quick_xml::events::Event;
+use crate::parser::xml::{XmlEvent, XmlReader};
+use crate::util::uri;
 
 impl EpubParser<'_> {
     /// Parses `META-INF/container.xml` and retrieves the package `.opf` file location.
     pub(super) fn parse_container(&self, data: &[u8]) -> ParserResult<String> {
-        let mut reader = Reader::from_reader(data);
+        let mut reader = XmlReader::from_bytes(self.is_strict(), data);
 
         while let Some(event) = reader.next() {
             let el = match event? {
-                Event::Empty(el) | Event::Start(el) if el.is_local_name(consts::ROOT_FILE) => el,
+                XmlEvent::Start(el) if el.is_local_name(ocf::ROOT_FILE) => el,
                 _ => continue,
             };
             // Although rare, multiple package.opf locations could exist.
             // Only accept the first path as it is the default
-            let (Some(consts::bytes::PACKAGE_TYPE), Some(full_path)) = (
-                el.get_attribute(consts::MEDIA_TYPE).as_deref(),
-                el.get_attribute(consts::FULL_PATH),
+            let (Some(mime::bytes::OEBPS_PACKAGE), Some(package_file)) = (
+                el.get_attribute_raw(ocf::MEDIA_TYPE)?.as_deref(),
+                el.get_attribute(ocf::FULL_PATH)?,
             ) else {
                 continue;
             };
 
-            let mut package_file = String::from_utf8(full_path.to_vec())?;
             // Make location absolute
-            if !package_file.starts_with('/') {
-                package_file.insert(0, '/');
-            }
-            return self.require_encoded(package_file);
+            return self.require_href(uri::into_absolute(package_file));
         }
-        Err(EpubFormatError::NoOpfReference.into())
+        Err(EpubError::NoOpfReference.into())
     }
 }

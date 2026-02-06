@@ -1,16 +1,13 @@
 use crate::epub::util::TestEpub::{Epub2Dir, Epub3File};
-use rbook::Ebook;
-use rbook::ebook::manifest::{Manifest, ManifestEntry};
-use rbook::ebook::metadata::MetaEntry;
 use rbook::ebook::resource::ResourceKey;
 use wasm_bindgen_test::wasm_bindgen_test;
 
 #[test]
 #[wasm_bindgen_test]
 fn test_manifest() {
-    let epub = Epub3File.open();
+    let epub = Epub3File.open_strict();
     let manifest = epub.manifest();
-    let mut entries = manifest.entries().collect::<Vec<_>>();
+    let mut entries = manifest.iter().collect::<Vec<_>>();
     // sort by `id` as entries are in arbitrary order
     entries.sort_by_key(|entry| entry.id());
 
@@ -46,7 +43,7 @@ fn test_manifest() {
         // Ensure the resource matches
         let resource = entry.resource();
         assert_eq!(expected.media_type, resource.kind().as_str());
-        assert_eq!(resource.kind(), &entry.resource_kind());
+        assert_eq!(resource.kind(), &entry.kind());
 
         match resource.key() {
             ResourceKey::Value(key) => assert_eq!(expected.href, key),
@@ -58,9 +55,9 @@ fn test_manifest() {
 #[test]
 #[wasm_bindgen_test]
 fn test_manifest_entry_refinements() {
-    let epub = Epub3File.open();
+    let epub = Epub3File.open_strict();
     let manifest = epub.manifest();
-    let mut entries = manifest.entries().collect::<Vec<_>>();
+    let mut entries = manifest.iter().collect::<Vec<_>>();
     // sort by `id` as entries are in arbitrary order
     entries.sort_by_key(|entry| entry.id());
 
@@ -107,7 +104,7 @@ fn test_skip_manifest() {
 
     assert_eq!(0, manifest.len());
     assert!(manifest.is_empty());
-    assert!(manifest.entries().next().is_none());
+    assert!(manifest.iter().next().is_none());
     assert!(manifest.images().next().is_none());
     assert!(manifest.readable_content().next().is_none());
     assert!(manifest.by_id("c1a").is_none());
@@ -115,9 +112,9 @@ fn test_skip_manifest() {
     assert!(manifest.by_property("nav").next().is_none());
     assert!(manifest.cover_image().is_none());
     #[rustfmt::skip]
-    assert!(manifest.by_resource_kind(ResourceKind::APPLICATION).next().is_none());
+    assert!(manifest.by_kind(ResourceKind::APPLICATION).next().is_none());
     #[rustfmt::skip]
-    assert!(manifest.by_resource_kinds(
+    assert!(manifest.by_kind(
         [ResourceKind::APPLICATION, ResourceKind::IMAGE]).next().is_none()
     );
 }
@@ -127,8 +124,7 @@ fn test_skip_manifest() {
 fn test_reader_skip_manifest() {
     use super::spine::EXPECTED_SPINE;
     use rbook::ebook::errors::FormatError;
-    use rbook::epub::errors::EpubFormatError;
-    use rbook::reader::Reader;
+    use rbook::epub::errors::EpubError;
     use rbook::reader::errors::ReaderError;
 
     let epub = Epub3File.build(|b| b.skip_manifest(true));
@@ -143,18 +139,10 @@ fn test_reader_skip_manifest() {
         let err = content_result.expect_err("Content retrieval must fail without a manifest");
 
         match err {
-            ReaderError::MalformedEbook(FormatError::Epub(EpubFormatError::MissingAttribute(
-                msg,
-            ))) => {
-                assert_eq!(
-                    format!(
-                        "Invalid spine idref - Resource with id of `{}` not found within the manifest",
-                        expected.idref
-                    ),
-                    msg
-                )
+            ReaderError::Format(FormatError::Epub(EpubError::InvalidIdref(idref))) => {
+                assert_eq!(expected.idref, idref);
             }
-            _ => unreachable!("Error must not be unexpected"),
+            _ => unreachable!("Any other error should not occur"),
         }
     }
 }
@@ -163,7 +151,7 @@ fn test_reader_skip_manifest() {
 #[test]
 #[wasm_bindgen_test]
 fn test_toc_skip_manifest() {
-    use rbook::ebook::toc::{Toc, TocEntryKind};
+    use rbook::ebook::toc::TocEntryKind;
     use rbook::epub::metadata::EpubVersion;
 
     let epub = Epub3File.build(|b| b.skip_manifest(true).skip_toc(false));
@@ -175,7 +163,7 @@ fn test_toc_skip_manifest() {
 
     for kind in [TocEntryKind::Toc, TocEntryKind::PageList] {
         for version in [EpubVersion::EPUB2, EpubVersion::EPUB3] {
-            assert!(toc.by_kind_version(&kind, version).is_none());
+            assert!(toc.by_kind_version(kind, version).is_none());
         }
         assert!(toc.by_kind(kind).is_none());
     }
@@ -190,14 +178,13 @@ fn test_toc_skip_manifest() {
 #[wasm_bindgen_test]
 fn test_spine_and_skip_manifest_entry_reference() {
     use super::spine::EXPECTED_SPINE;
-    use rbook::ebook::spine::{Spine, SpineEntry};
 
     let epub = Epub3File.build(|b| b.skip_manifest(true));
     let spine = epub.spine();
 
     assert!(!spine.is_empty());
     assert_eq!(EXPECTED_SPINE.len(), spine.len());
-    for (entry, expected) in spine.entries().zip(EXPECTED_SPINE) {
+    for (entry, expected) in spine.iter().zip(EXPECTED_SPINE) {
         assert!(entry.manifest_entry().is_none());
         assert!(entry.resource().is_none());
 
@@ -212,49 +199,36 @@ fn test_spine_and_skip_manifest_entry_reference() {
 #[wasm_bindgen_test]
 fn test_toc_and_skip_manifest_entry_reference() {
     use super::toc::EXPECTED_GUIDE;
-    use rbook::ebook::toc::{TocChildren, TocEntry};
 
     let epub = Epub3File.build(|b| b.skip_manifest(true));
     let toc = epub.toc();
     let guide = toc.landmarks().unwrap();
-    let contents = guide.children();
 
     // Only the EPUB 2 guide parsable when the manifest is skipped
     assert!(guide.is_root());
-    assert_eq!(EXPECTED_GUIDE.len(), contents.len());
+    assert_eq!(EXPECTED_GUIDE.len(), guide.len());
 
-    for (entry, expected) in contents.into_iter().zip(EXPECTED_GUIDE) {
+    for (entry, expected) in guide.into_iter().zip(EXPECTED_GUIDE) {
         assert!(entry.manifest_entry().is_none());
         assert!(entry.resource().is_none());
 
         // Check basic integrity
         assert_eq!(expected.depth, entry.depth());
-        assert_eq!(expected.order, entry.order());
         assert_eq!(expected.href, entry.href_raw().unwrap().as_str());
         assert_eq!(expected.label, entry.label());
-        assert_eq!(&expected.kind, entry.kind());
+        assert_eq!(expected.kind, entry.kind());
     }
 }
 
 #[test]
 fn test_manifest_iterators() {
-    use rbook::epub::manifest::EpubManifestEntry;
-
-    fn into_vec<'a>(
-        iterator: Box<dyn Iterator<Item = EpubManifestEntry<'a>> + 'a>,
-    ) -> Vec<EpubManifestEntry<'a>> {
-        let mut vec: Vec<_> = iterator.collect();
-        vec.sort_by_key(EpubManifestEntry::id);
-        vec
-    }
-
     /////////////////////
     // EPUB 3 test file
     /////////////////////
-    let epub = Epub3File.open();
+    let epub = Epub3File.open_strict();
     let manifest = epub.manifest();
 
-    let styles = into_vec(Box::new(manifest.styles()));
+    let styles: Vec<_> = manifest.styles().collect();
     assert_eq!("text/css", styles[0].media_type());
     assert_eq!(1, styles.len());
 
@@ -266,32 +240,32 @@ fn test_manifest_iterators() {
     /////////////////////
     // EPUB 2 test file
     /////////////////////
-    let epub = Epub2Dir.open();
+    let epub = Epub2Dir.open_strict();
     let manifest = epub.manifest();
 
-    let scripts = into_vec(Box::new(manifest.scripts()));
+    let scripts: Vec<_> = manifest.scripts().collect();
     assert_eq!("application/javascript", scripts[0].media_type());
     assert_eq!("application/ecmascript", scripts[1].media_type());
     assert_eq!("text/javascript", scripts[2].media_type());
     assert_eq!("application/javascript", scripts[3].media_type());
     assert_eq!(4, scripts.len());
 
-    let styles = into_vec(Box::new(manifest.styles()));
+    let styles: Vec<_> = manifest.styles().collect();
     assert_eq!(0, styles.len());
 
-    let fonts = into_vec(Box::new(manifest.fonts()));
+    let fonts: Vec<_> = manifest.fonts().collect();
     assert_eq!("font/woff", fonts[0].media_type());
     assert_eq!("font/ttf", fonts[1].media_type());
     assert_eq!("application/font-woff", fonts[2].media_type());
     assert_eq!(3, fonts.len());
 
-    let audio = into_vec(Box::new(manifest.audio()));
+    let audio: Vec<_> = manifest.audio().collect();
     assert_eq!("audio/aac", audio[0].media_type());
     assert_eq!("audio/mp3", audio[1].media_type());
     assert_eq!("audio/ogg", audio[2].media_type());
     assert_eq!(3, audio.len());
 
-    let video = into_vec(Box::new(manifest.video()));
+    let video: Vec<_> = manifest.video().collect();
     assert_eq!("video/mp4", video[0].media_type());
     assert_eq!("video/mpv", video[1].media_type());
     assert_eq!(2, video.len());
@@ -345,7 +319,7 @@ pub const EXPECTED_MANIFEST: &[ManifestTestData] = &[
     ManifestTestData::new("cover-image1", "/EPUB/img/cover.webm", "img/cover.webm", "image/webm", None, Some("cover-image2"), &["cover-image"]),
     ManifestTestData::new("cover-image2", "/EPUB/img/cover.avif", "img/cover.avif", "image/avif", None, Some("cover-image3"), &[]),
     ManifestTestData::new("cover-image3", "/EPUB/img/cover.png", "img/cover.png", "image/png", None, None, &[]),
-    ManifestTestData::new("style", "/file%20name%20with%20spaces.css", "../../file%20name%20with%20spaces.css", "text/css", None, None, &[]),
+    ManifestTestData::new("style", "/file%20name%20with%20spaces.css", "../file%20name%20with%20spaces.css", "text/css", None, None, &[]),
     ManifestTestData::new("toc", "/toc.xhtml", "../toc.xhtml", "application/xhtml+xml", None, None, &["scripted", "nav"]),
     ManifestTestData::new("toc-ncx", "/toc.ncx", "../toc.ncx", "application/x-dtbncx+xml", None, None, &[]),
 ];

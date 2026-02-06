@@ -1,159 +1,131 @@
 //! EPUB-specific table-of-contents content.
+//!
+//! # See Also
+//! - [`ebook::toc`](crate::ebook::toc) for the general ToC module.
 
-use crate::ebook::element::{AttributeData, Attributes, Href};
-use crate::ebook::epub::manifest::{EpubManifestEntry, EpubManifestEntryProvider};
-use crate::ebook::epub::{EpubConfig, EpubVersion};
-use crate::ebook::toc::{Toc, TocChildren, TocEntry, TocEntryKind};
-use std::borrow::Borrow;
-use std::collections::HashMap;
-use std::collections::hash_map::Iter as HashMapIter;
-use std::fmt::{Debug, Formatter};
+#[cfg(feature = "write")]
+mod write;
+
+use crate::ebook::element::{Attributes, AttributesData, Href};
+use crate::ebook::epub::EpubVersion;
+use crate::ebook::epub::manifest::{EpubManifestContext, EpubManifestEntry};
+use crate::ebook::resource::Resource;
+use crate::ebook::toc::{Toc, TocEntry, TocEntryKind};
+use crate::util::{self, Sealed};
+use indexmap::IndexMap;
+use indexmap::map::Iter as HashMapIter;
+use std::fmt::Debug;
 use std::slice::Iter as SliceIter;
+
+#[cfg(feature = "write")]
+pub use write::{
+    DetachedEpubTocEntry, EpubTocEntryIterMut, EpubTocEntryMut, EpubTocIterMut, EpubTocMut,
+};
 
 ////////////////////////////////////////////////////////////////////////////////
 // PRIVATE API
 ////////////////////////////////////////////////////////////////////////////////
 
-pub(super) type TocGroups = HashMap<TocGroupKey, EpubTocEntryData>;
-
-/// This helper allows convenient [lookup](HashMap::get) from `&mut HashMap`
-/// without requiring [`EpubTocKey`] to have a `'static` lifetime.
-#[derive(Debug, Hash, PartialEq, Eq)]
-pub(super) struct TocGroupKey(EpubTocKey<'static>);
-
-impl TocGroupKey {
-    pub(super) fn kind(&self) -> &TocEntryKind<'_> {
-        &self.0.kind
-    }
-}
-
-impl<'a> Borrow<EpubTocKey<'a>> for TocGroupKey {
-    fn borrow(&self) -> &EpubTocKey<'a> {
-        &self.0
-    }
-}
-
-impl From<EpubTocKey<'static>> for TocGroupKey {
-    fn from(value: EpubTocKey<'static>) -> Self {
-        Self(value)
-    }
-}
+pub(super) type TocGroups = IndexMap<EpubTocKey, EpubTocEntryData>;
 
 #[derive(Debug, Hash, PartialEq, Eq)]
-pub(super) struct EpubTocKey<'a> {
-    pub(super) kind: TocEntryKind<'a>,
-    version: Option<EpubVersion>,
+pub(super) struct EpubTocKey {
+    pub(super) kind: String,
+    pub(super) version: EpubVersion,
 }
 
-impl<'a> EpubTocKey<'a> {
-    pub(super) fn new(kind: TocEntryKind<'a>, version: impl Into<Option<EpubVersion>>) -> Self {
-        Self {
-            version: version.into(),
-            kind,
-        }
+impl EpubTocKey {
+    pub(super) fn new(kind: String, version: EpubVersion) -> Self {
+        Self { kind, version }
+    }
+
+    // Only used when the `write` feature is toggled currently.
+    #[cfg(feature = "write")]
+    pub(super) fn kind(&self) -> TocEntryKind<'_> {
+        TocEntryKind::from(&self.kind)
+    }
+}
+
+impl indexmap::Equivalent<EpubTocKey> for (&str, EpubVersion) {
+    fn equivalent(&self, key: &EpubTocKey) -> bool {
+        self.0 == key.kind && self.1 == key.version
     }
 }
 
 #[derive(Debug, PartialEq)]
 pub(super) struct EpubTocData {
-    /// Despite a toc being required for EPUBs, allow
-    /// leniency for those that don't if `strict` is
-    /// disabled within [`EpubOpenOptions`](super::EpubOpenOptions).
-    preferred_toc: Option<EpubVersion>,
-    preferred_landmarks: Option<EpubVersion>,
-    preferred_page_list: Option<EpubVersion>,
-    toc_map: TocGroups,
+    pub(super) preferred_version: EpubVersion,
+    pub(super) entries: TocGroups,
 }
 
 impl EpubTocData {
-    pub(super) fn new(toc_map: TocGroups) -> Self {
+    pub(super) fn new(entries: TocGroups) -> Self {
         Self {
-            toc_map,
-            preferred_toc: None,
-            preferred_page_list: None,
-            preferred_landmarks: None,
+            // the preferred version here is a placeholder
+            preferred_version: EpubVersion::EPUB3,
+            entries,
         }
     }
 
     pub(super) fn empty() -> Self {
-        Self::new(HashMap::new())
-    }
-
-    pub(super) fn from_guide(data: EpubTocEntryData) -> Self {
-        let mut map = HashMap::new();
-        map.insert(
-            TocGroupKey(EpubTocKey::new(TocEntryKind::Landmarks, EpubVersion::EPUB2)),
-            data,
-        );
-        Self::new(map)
+        Self::new(IndexMap::new())
     }
 
     pub(super) fn extend(&mut self, data: Self) {
-        self.toc_map.extend(data.toc_map);
+        self.entries.extend(data.entries);
     }
 
-    pub(super) fn set_preferences(&mut self, config: &EpubConfig) {
-        self.preferred_toc = self.get_preferred_kind(TocEntryKind::Toc, config.preferred_toc);
-        self.preferred_landmarks =
-            self.get_preferred_kind(TocEntryKind::Landmarks, config.preferred_landmarks);
-        self.preferred_page_list =
-            self.get_preferred_kind(TocEntryKind::PageList, config.preferred_page_list);
-    }
-
-    /// Gets the id of the first available preference, otherwise returns [`None`].
-    fn get_preferred_kind(
-        &self,
-        kind: TocEntryKind<'static>,
-        preferred_version: EpubVersion,
-    ) -> Option<EpubVersion> {
-        let versions: [EpubVersion; 2] = match preferred_version {
-            // Retrieve the EPUB2 variant with EPUB3 as a fallback.
-            EpubVersion::Epub2(_) => [EpubVersion::EPUB2, EpubVersion::EPUB3],
-            // Retrieve the EPUB3 variant with EPUB2 as a fallback.
-            _ => [EpubVersion::EPUB3, EpubVersion::EPUB2],
-        };
-
-        versions.into_iter().find(move |version| {
-            self.toc_map
-                .contains_key(&EpubTocKey::new(kind.clone(), *version))
-        })
-    }
-
-    pub(super) fn get_preferred_version(&self, kind: &TocEntryKind) -> Option<EpubVersion> {
+    pub(super) fn get_preferred_version(&self, kind: TocEntryKind) -> EpubVersion {
         match kind {
-            TocEntryKind::Landmarks => self.preferred_landmarks,
-            TocEntryKind::PageList => self.preferred_page_list,
-            TocEntryKind::Toc => self.preferred_toc,
-            _ => None,
+            TocEntryKind::Landmarks | TocEntryKind::PageList | TocEntryKind::Toc => {
+                self.preferred_version
+            }
+            _ => EpubVersion::EPUB3,
         }
     }
 }
 
-#[derive(Clone, Debug, Default, Hash, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub(super) struct EpubTocEntryData {
     pub(super) id: Option<String>,
-    pub(super) order: usize,
-    pub(super) depth: usize,
     pub(super) label: String,
-    pub(super) kind: TocEntryKind<'static>,
+    pub(super) kind: Option<String>,
     pub(super) href: Option<String>,
     pub(super) href_raw: Option<String>,
-    pub(super) attributes: Vec<AttributeData>,
+    pub(super) attributes: AttributesData,
     pub(super) children: Vec<EpubTocEntryData>,
 }
 
 #[derive(Copy, Clone)]
-struct EpubTocContext<'ebook> {
-    provider: EpubManifestEntryProvider<'ebook>,
+pub(super) struct EpubTocContext<'ebook> {
+    manifest_ctx: EpubManifestContext<'ebook>,
 }
 
 impl<'ebook> EpubTocContext<'ebook> {
-    fn new(provider: EpubManifestEntryProvider<'ebook>) -> Self {
-        Self { provider }
+    pub(super) fn new(manifest_ctx: EpubManifestContext<'ebook>) -> Self {
+        Self { manifest_ctx }
     }
 
-    fn create_entry(self, data: &'ebook EpubTocEntryData) -> EpubTocEntry<'ebook> {
-        EpubTocEntry { ctx: self, data }
+    pub(super) fn create_root(
+        self,
+        version: EpubVersion,
+        data: &'ebook EpubTocEntryData,
+    ) -> EpubTocEntry<'ebook> {
+        self.create_entry(version, data, 0)
+    }
+
+    pub(super) fn create_entry(
+        self,
+        version: EpubVersion,
+        data: &'ebook EpubTocEntryData,
+        depth: usize,
+    ) -> EpubTocEntry<'ebook> {
+        EpubTocEntry {
+            ctx: self,
+            version,
+            data,
+            depth,
+        }
     }
 }
 
@@ -161,143 +133,212 @@ impl<'ebook> EpubTocContext<'ebook> {
 // PUBLIC API
 ////////////////////////////////////////////////////////////////////////////////
 
-/// An EPUB table of contents, see [`Toc`] for additional details.
+/// The EPUB table of contents, accessible via [`Epub::toc`](super::Epub::toc).
+/// See [`Toc`] for additional details.
 ///
 /// For EPUB 3 ebooks backwards compatible with EPUB2,
-/// the preferred toc formats are configurable via [`EpubOpenOptions`](super::EpubOpenOptions).
+/// the preferred toc format is configurable via
+/// [`EpubOpenOptions::preferred_toc`](super::EpubOpenOptions::preferred_toc).
 /// Methods regarding preferred format:
 /// - [`EpubToc::contents`] (`toc`)
 /// - [`EpubToc::page_list`] (`page-list`)
 /// - [`EpubToc::landmarks`] (`landmarks/guide`)
 /// - [`EpubToc::by_kind_version`]
+///
+/// # See Also
+/// - [`EpubTocMut`] for a mutable view.
 #[derive(Copy, Clone)]
 pub struct EpubToc<'ebook> {
     ctx: EpubTocContext<'ebook>,
-    data: &'ebook EpubTocData,
+    toc: &'ebook EpubTocData,
 }
 
 impl<'ebook> EpubToc<'ebook> {
-    pub(super) fn new(
-        provider: EpubManifestEntryProvider<'ebook>,
-        data: &'ebook EpubTocData,
-    ) -> Self {
+    pub(super) fn new(manifest_ctx: EpubManifestContext<'ebook>, toc: &'ebook EpubTocData) -> Self {
         Self {
-            ctx: EpubTocContext::new(provider),
-            data,
+            ctx: EpubTocContext::new(manifest_ctx),
+            toc,
         }
     }
 
-    fn by_toc_key(
-        &self,
-        kind: TocEntryKind<'ebook>,
-        version: Option<EpubVersion>,
-    ) -> Option<EpubTocEntry<'ebook>> {
-        self.data
-            .toc_map
-            .get(&EpubTocKey::new(kind, version))
-            .map(|data| self.ctx.create_entry(data))
+    fn by_toc_key(&self, kind: &str, version: EpubVersion) -> Option<EpubTocEntry<'ebook>> {
+        self.toc
+            .entries
+            .get(&(kind, version))
+            .map(|data| self.ctx.create_root(version, data))
     }
 
-    /// The preferred **page list** format, mapping to the EPUB 2 or EPUB 3
-    /// [`TocEntryKind::PageList`] format, if present.
+    /// Returns the preferred **page list** root entry.
+    ///
+    /// This maps to:
+    /// - **EPUB 3:** XHTML `nav` where `epub:type` is `page-list`.
+    /// - **EPUB 2:** NCX `pageList`.
     ///
     /// The default preferred format (EPUB 3) is configurable via
-    /// [`EpubOpenOptions::preferred_page_list`](super::EpubOpenOptions::preferred_page_list).
+    /// [`EpubOpenOptions::preferred_toc`](super::EpubOpenOptions::preferred_toc).
     ///
     /// # Note
-    /// This method is identical to calling [`Toc::by_kind`]
+    /// This method is equivalent to calling [`EpubToc::by_kind`]
     /// with [`TocEntryKind::PageList`] as the argument.
+    ///
+    /// # See Also
+    /// - **[`Self::by_kind`] to see selection and fallback behavior, which this method uses.*
     pub fn page_list(&self) -> Option<EpubTocEntry<'ebook>> {
         self.by_kind(TocEntryKind::PageList)
     }
 
-    /// The preferred **guide/landmarks** format, mapping to the EPUB 2 (Guide) or EPUB 3
-    /// [`TocEntryKind::Landmarks`] format, if present.
+    /// Returns the preferred **guide/landmarks** root entry.
+    ///
+    /// This maps to:
+    /// - **EPUB 3:** XHTML `nav` where `epub:type` is `landmarks`.
+    /// - **EPUB 2:** OPF `guide`.
     ///
     /// The default preferred format (EPUB 3) is configurable via
-    /// [`EpubOpenOptions::preferred_landmarks`](super::EpubOpenOptions::preferred_landmarks).
+    /// [`EpubOpenOptions::preferred_toc`](super::EpubOpenOptions::preferred_toc).
     ///
     /// # Note
-    /// This method is identical to calling [`Toc::by_kind`]
+    /// This method is equivalent to calling [`EpubToc::by_kind`]
     /// with [`TocEntryKind::Landmarks`] as the argument.
+    ///
+    /// # See Also
+    /// - **[`Self::by_kind`] to see selection and fallback behavior, which this method uses.**
     pub fn landmarks(&self) -> Option<EpubTocEntry<'ebook>> {
         self.by_kind(TocEntryKind::Landmarks)
     }
 
-    /// Returns the **root** toc entry for a given [`TocEntryKind`],
-    /// using the specified [`EpubVersion`].
+    /// Returns the root entry associated with the given `kind` and `version`, if present.
     ///
-    /// **This method is useful when [`EpubOpenOptions::store_all`](super::EpubOpenOptions::store_all) is set to `true`.**
-    ///
-    /// An example:
+    /// Example Mappings:
     /// - [`TocEntryKind::PageList`] + [`EpubVersion::Epub2`] = Legacy EPUB 2 NCX page list.
     /// - [`TocEntryKind::PageList`] + [`EpubVersion::Epub3`] = EPUB 3 XHTML page list.
     ///
-    /// This method is **only** effective for the following kinds,
-    /// otherwise [`None`] is always returned:
-    /// - [`TocEntryKind::Toc`]
-    /// - [`TocEntryKind::Landmarks`]
-    /// - [`TocEntryKind::PageList`]
-    ///
     /// # See Also
+    /// - [`EpubOpenOptions`](super::EpubOpenOptions) to see conditional ToC-related parsing options.
     /// - [`Toc::by_kind`] to retrieve the toc root for a given [`TocEntryKind`].
     pub fn by_kind_version(
         &self,
         kind: impl Into<TocEntryKind<'ebook>>,
         version: EpubVersion,
     ) -> Option<EpubTocEntry<'ebook>> {
+        let kind = kind.into();
         // "Normalize" epub version as the contained value
         // may be different (e.g., "3.1", "3.2")
         // Version must be `2.0` or `3.0`
-        self.by_toc_key(kind.into(), Some(version.as_major()))
+        self.by_toc_key(kind.as_str(), version.as_major())
     }
-}
 
-#[allow(refining_impl_trait)]
-impl<'ebook> Toc<'ebook> for EpubToc<'ebook> {
-    fn contents(&self) -> Option<EpubTocEntry<'ebook>> {
+    /// Returns the preferred **table of contents** root entry.
+    ///
+    /// This maps to:
+    /// - **EPUB 3:** XHTML `nav` where `epub:type` is `toc`.
+    /// - **EPUB 2:** NCX `navMap`.
+    ///
+    /// The default preferred variant (EPUB 3) is configurable via
+    /// [`EpubOpenOptions::preferred_toc`](super::EpubOpenOptions::preferred_toc).
+    ///
+    /// # Note
+    /// This method is equivalent to calling [`EpubToc::by_kind`]
+    /// with [`TocEntryKind::Toc`] as the argument.
+    ///
+    #[doc = util::inherent_doc!(Toc, contents)]
+    /// # See Also
+    /// - **[`Self::by_kind`] to see selection and fallback behavior, which this method uses.**
+    /// - [`Self::by_kind_version`] to retrieve a specific variant (e.g. EPUB 2 NCX).
+    pub fn contents(&self) -> Option<EpubTocEntry<'ebook>> {
         self.by_kind(TocEntryKind::Toc)
     }
 
-    fn by_kind(&self, kind: impl Into<TocEntryKind<'ebook>>) -> Option<EpubTocEntry<'ebook>> {
+    // NOTE: This doc is nearly identical to EpubTocMut::by_kind_mut
+    /// Returns the root entry associated with the given `kind` and preferred variant.
+    ///
+    /// The specific variant returned (EPUB 3 or EPUB 2 NCX) depends on:
+    /// 1. Which variants an [`Epub`](super::Epub) contains when opened, as dictated by
+    ///    [`EpubOpenOptions`](super::EpubOpenOptions).
+    /// 2. Preferences such as
+    ///    [`EpubOpenOptions::preferred_toc`](crate::epub::EpubOpenOptions::preferred_toc).
+    ///
+    ///    If an [`Epub`](super::Epub) was created in-memory via
+    ///    [`new`](super::Epub::new) or [`builder`](super::Epub::builder),
+    ///    all preferences are set to [`EpubVersion::EPUB3`].
+    ///
+    /// If the preferred variant is not present, the other variant
+    /// (EPUB 3 or EPUB 2 NCX) is returned instead.
+    /// If neither variant exists, [`None`] is returned.
+    ///
+    #[doc = util::inherent_doc!(Toc, by_kind)]
+    /// # See Also
+    /// - [`Self::by_kind_version`]
+    ///   to retrieve a specific root entry without any fallback behavior.
+    pub fn by_kind(&self, kind: impl Into<TocEntryKind<'ebook>>) -> Option<EpubTocEntry<'ebook>> {
         let kind = kind.into();
-        let version = self.data.get_preferred_version(&kind);
-        self.by_toc_key(kind, version)
+        let preferred_version = self.toc.get_preferred_version(kind);
+        let attempts = std::iter::once(preferred_version)
+            // If preferred version isn't available, try all standard versions
+            // Note: If the preferred version is EPUB2/3, it is also included in `VERSIONS`.
+            //       Despite the redundancy, the cost is negligible.
+            .chain(EpubVersion::VERSIONS);
+
+        // Mutable key for quick lookup & modification
+        for version in attempts {
+            if let Some(root) = self.by_toc_key(kind.as_str(), version) {
+                return Some(root);
+            }
+        }
+        None
     }
 
-    fn kinds(&self) -> EpubTocIter<'ebook> {
+    /// Returns an iterator over all **root** [entries](EpubTocEntry).
+    #[doc = util::inherent_doc!(Toc, iter)]
+    pub fn iter(&self) -> EpubTocIter<'ebook> {
         self.into_iter()
     }
 }
 
+impl Sealed for EpubToc<'_> {}
+
+#[allow(refining_impl_trait)]
+impl<'ebook> Toc<'ebook> for EpubToc<'ebook> {
+    fn contents(&self) -> Option<EpubTocEntry<'ebook>> {
+        self.contents()
+    }
+
+    fn by_kind(&self, kind: impl Into<TocEntryKind<'ebook>>) -> Option<EpubTocEntry<'ebook>> {
+        self.by_kind(kind)
+    }
+
+    fn iter(&self) -> EpubTocIter<'ebook> {
+        self.iter()
+    }
+}
+
 impl Debug for EpubToc<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("EpubToc")
-            .field("data", self.data)
+            .field("data", self.toc)
             .finish_non_exhaustive()
     }
 }
 
 impl PartialEq for EpubToc<'_> {
     fn eq(&self, other: &Self) -> bool {
-        self.data == other.data
+        self.toc == other.toc
     }
 }
 
 impl<'ebook> IntoIterator for &EpubToc<'ebook> {
-    type Item = (&'ebook TocEntryKind<'ebook>, EpubTocEntry<'ebook>);
+    type Item = EpubTocEntry<'ebook>;
     type IntoIter = EpubTocIter<'ebook>;
 
     fn into_iter(self) -> Self::IntoIter {
         EpubTocIter {
             ctx: self.ctx,
-            iter: self.data.toc_map.iter(),
+            iter: self.toc.entries.iter(),
         }
     }
 }
 
 impl<'ebook> IntoIterator for EpubToc<'ebook> {
-    type Item = (&'ebook TocEntryKind<'ebook>, EpubTocEntry<'ebook>);
+    type Item = EpubTocEntry<'ebook>;
     type IntoIter = EpubTocIter<'ebook>;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -305,20 +346,21 @@ impl<'ebook> IntoIterator for EpubToc<'ebook> {
     }
 }
 
-/// An iterator over all root toc kinds within an [`EpubToc`].
+/// An iterator over all ToC roots contained within [`EpubToc`].
 ///
 /// # See Also
-/// - [`EpubToc::kinds`]
+/// - [`EpubToc::iter`] to create an instance of this struct.
 ///
 /// # Examples
 /// - Iterating over all root toc kinds:
 /// ```
-/// # use rbook::ebook::errors::EbookResult;
-/// # use rbook::{Ebook, Epub};
-/// # fn main() -> EbookResult<()> {
+/// # use rbook::Epub;
+/// # fn main() -> rbook::ebook::errors::EbookResult<()> {
 /// let epub = Epub::open("tests/ebooks/example_epub")?;
 ///
-/// for (kind, root) in epub.toc() {
+/// for root in epub.toc() {
+///     let kind = root.kind();
+///
 ///     // process toc root //
 /// }
 /// # Ok(())
@@ -326,37 +368,111 @@ impl<'ebook> IntoIterator for EpubToc<'ebook> {
 /// ```
 pub struct EpubTocIter<'ebook> {
     ctx: EpubTocContext<'ebook>,
-    iter: HashMapIter<'ebook, TocGroupKey, EpubTocEntryData>,
+    iter: HashMapIter<'ebook, EpubTocKey, EpubTocEntryData>,
 }
 
 impl<'ebook> Iterator for EpubTocIter<'ebook> {
-    type Item = (&'ebook TocEntryKind<'ebook>, EpubTocEntry<'ebook>);
+    type Item = EpubTocEntry<'ebook>;
 
     fn next(&mut self) -> Option<Self::Item> {
         self.iter
             .next()
-            .map(move |(key, data)| (key.kind(), self.ctx.create_entry(data)))
+            .map(move |(key, data)| self.ctx.create_root(key.version, data))
     }
 }
 
-/// An entry contained within an [`EpubToc`], encompassing associated metadata.
+/// A [`TocEntry`] contained within an [`EpubToc`], encompassing associated metadata.
+///
+/// # See Also
+/// - [`EpubTocEntryMut`] for a mutable view.
+/// - [`Self::attributes`] to retrieve the legacy EPUB 2 NCX `playOrder` attribute.
+///
+/// # Examples
+/// - Observing the root entry of landmarks:
+/// ```
+/// # use rbook::Epub;
+/// # use rbook::ebook::toc::TocEntryKind;
+/// # use rbook::epub::metadata::EpubVersion;
+/// # fn main() -> rbook::ebook::errors::EbookResult<()> {
+/// let epub = Epub::open("tests/ebooks/example_epub")?;
+/// // Retrieving the landmarks
+/// let landmarks_root = epub.toc().landmarks().unwrap();
+///
+/// // The version indicates whether the landmarks derive from
+/// // the EPUB 2 NCX document or EPUB 3 XHTML nav document.
+/// assert_eq!(EpubVersion::EPUB3, landmarks_root.version());
+///
+/// // The kind indicates the root contains entries specifying
+/// // landmarks (i.e., points of interest).
+/// assert_eq!(TocEntryKind::Landmarks, landmarks_root.kind());
+///
+/// // There are 3 direct entries that make up the landmarks.
+/// assert_eq!(3, landmarks_root.len());
+/// # Ok(())
+/// # }
+/// ```
 #[derive(Copy, Clone)]
 pub struct EpubTocEntry<'ebook> {
     ctx: EpubTocContext<'ebook>,
+    version: EpubVersion,
     data: &'ebook EpubTocEntryData,
+    depth: usize,
 }
 
 impl<'ebook> EpubTocEntry<'ebook> {
-    /// The unique id of a toc entry.
+    /// Version information to indicate whether an entry derives from
+    /// the EPUB 2 NCX document or the EPUB 3 XHTML nav document.
+    pub fn version(&self) -> EpubVersion {
+        self.version
+    }
+
+    /// The unique ID of a toc entry.
+    ///
+    /// # Note
+    /// For EPUB 3, this field is derived from the anchor (`a`) element.
     pub fn id(&self) -> Option<&'ebook str> {
         self.data.id.as_deref()
+    }
+
+    /// The raw `epub:type`/`type` value.
+    ///
+    /// This method is a lower-level call than [`Self::kind`],
+    /// which allows inspecting the original value before normalization by [`TocEntryKind`].
+    ///
+    /// # Examples
+    /// - Retrieving the raw and normalized value:
+    /// ```
+    /// # use rbook::Epub;
+    /// # use rbook::ebook::toc::TocEntryKind;
+    /// # use rbook::epub::metadata::EpubVersion;
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
+    /// let epub = Epub::options()
+    ///     .retain_variants(true)
+    ///     .open("tests/ebooks/example_epub")?;
+    ///
+    /// // Retrieving the EPUB 2 guide
+    /// let guide = epub.toc().by_kind_version(TocEntryKind::Landmarks, EpubVersion::EPUB2).unwrap();
+    ///
+    /// // Retrieving the 3rd entry
+    /// let entry = guide.get(2).unwrap();
+    ///
+    /// // Original:
+    /// assert_eq!(Some("text"), entry.kind_raw());
+    /// // Normalized:
+    /// assert_eq!(TocEntryKind::BodyMatter, entry.kind());
+    /// assert_eq!("bodymatter", entry.kind().as_str());
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn kind_raw(&self) -> Option<&'ebook str> {
+        self.data.kind.as_deref()
     }
 
     /// The resolved absolute percent-encoded `href`,
     /// indicating the location a toc entry points to.
     ///
-    /// Returns [`None`] if no `href` (EPUB 3) nor `src` (EPUB 2) attribute
-    /// is associated with an entry.
+    /// Returns [`None`] if the entry neither has an `href` (EPUB 3)
+    /// nor a `src` (EPUB 2) attribute.
     ///
     /// Example of a resolved href:
     /// ```text
@@ -377,14 +493,14 @@ impl<'ebook> EpubTocEntry<'ebook> {
     /// - [`Href::path`] to retrieve the href value without the query and fragment.
     /// - [`Self::resource`] as the primary means for retrieving ebook content.
     pub fn href(&self) -> Option<Href<'ebook>> {
-        self.data.href.as_deref().map(Into::into)
+        self.data.href.as_deref().map(Href::new)
     }
 
     /// The raw (relative) `href`,
     /// indicating the location a toc entry points to.
     ///
-    /// Returns [`None`] if no `href` (EPUB 3) nor `src` (EPUB 2) attribute
-    /// is associated with an entry.
+    /// Returns [`None`] if the entry neither has an `href` (EPUB 3)
+    /// nor a `src` (EPUB 2) attribute.
     ///
     /// Example of a raw (relative) href:
     /// ```text
@@ -394,18 +510,21 @@ impl<'ebook> EpubTocEntry<'ebook> {
     /// # Percent-Encoding
     /// If [`EpubOpenOptions::strict`](super::EpubOpenOptions::strict) is disabled
     /// and the EPUB is malformed (e.g., unencoded hrefs),
-    /// the returned [`Href`] will reflect that raw state.
+    /// the returned [`Href`] will reflect that unencoded state.
     ///
     /// # Note
-    /// [`Self::href`] is recommended over this method.
-    /// Providing the raw href to a method such as
-    /// [`Ebook::read_resource_bytes`](crate::Ebook::read_resource_bytes) **may fail**.
+    /// - [`Self::href`] is recommended over this method.
+    ///   Providing the raw href to a method such as
+    ///   [`Ebook::read_resource_bytes`](crate::Ebook::read_resource_bytes) **may fail**.
+    /// - In EPUB modification workflows, if the href of a manifest item is changed
+    ///   via [`EpubManifestEntryMut::set_href`](super::manifest::EpubManifestEntryMut::set_href),
+    ///   [`Self::href`] can return [`Some`] while this method returns [`None`].
     ///
     /// # See Also
-    /// - [`Epub`](super::Epub) documentation of `read_resource_bytes` for normalization details.
+    /// - [`Epub`](super::Epub) documentation of `copy_resource` for normalization details.
     /// - [`Href::path`] to retrieve the href value without the query and fragment.
     pub fn href_raw(&self) -> Option<Href<'ebook>> {
-        self.data.href_raw.as_deref().map(Into::into)
+        self.data.href_raw.as_deref().map(Href::new)
     }
 
     /// All additional XML [`Attributes`].
@@ -424,117 +543,219 @@ impl<'ebook> EpubTocEntry<'ebook> {
     /// The following attributes will **not** be found within the returned collection:
     /// - [`id`](Self::id)
     /// - [`href`](Self::href)
-    /// - [`epub:type`](Self::kind)
+    /// - [`epub:type`](Self::kind_raw)
+    /// - [`type`](Self::kind_raw) (EPUB 2; legacy)
     /// - [`src`](Self::href) (EPUB 2; legacy)
-    /// - [`playOrder`](Self::order) (EPUB 2; legacy)
-    pub fn attributes(&self) -> Attributes<'ebook> {
-        (&self.data.attributes).into()
+    ///
+    /// # Legacy `playOrder` Attribute
+    /// The legacy NCX `playOrder` attribute is accessible from this method, if present.
+    /// However, it is ***not*** guaranteed to represent accurate play order in EPUBs.
+    /// For a reliable order, it is recommended to call
+    /// [`Self::flatten`] paired with [`Iterator::enumerate`]:
+    /// ```
+    /// # use rbook::Epub;
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
+    /// let epub = Epub::open("tests/ebooks/example_epub")?;
+    /// // Retrieving the main toc contents
+    /// let main_contents_root = epub.toc().contents().unwrap();
+    ///
+    /// for (order, entry) in main_contents_root.flatten().enumerate() {
+    ///     let label = entry.label();
+    ///
+    ///     println!("{order}: {label}");
+    /// }
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn attributes(&self) -> &'ebook Attributes {
+        &self.data.attributes
     }
-}
 
-#[allow(refining_impl_trait)]
-impl<'ebook> TocEntry<'ebook> for EpubTocEntry<'ebook> {
-    fn order(&self) -> usize {
-        self.data.order
+    /// The depth of an entry relative to the root ([`0 = root`](Self::is_root)).
+    #[doc = util::inherent_doc!(TocEntry, depth)]
+    pub fn depth(&self) -> usize {
+        self.depth
     }
 
-    fn depth(&self) -> usize {
-        self.data.depth
-    }
-
-    fn label(&self) -> &'ebook str {
+    /// The human-readable label.
+    #[doc = util::inherent_doc!(TocEntry, label)]
+    pub fn label(&self) -> &'ebook str {
         &self.data.label
     }
 
-    fn kind(&self) -> &'ebook TocEntryKind<'ebook> {
-        &self.data.kind
+    /// The semantic kind of content associated with an entry.
+    #[doc = util::inherent_doc!(TocEntry, kind)]
+    pub fn kind(&self) -> TocEntryKind<'ebook> {
+        self.data
+            .kind
+            .as_deref()
+            .map(TocEntryKind::from)
+            .unwrap_or_default()
     }
 
-    fn children(&self) -> EpubTocChildren<'ebook> {
-        EpubTocChildren(*self)
-    }
-
-    fn manifest_entry(&self) -> Option<EpubManifestEntry<'ebook>> {
+    /// The [`EpubManifestEntry`] associated with an [`EpubTocEntry`].
+    #[doc = util::inherent_doc!(TocEntry, manifest_entry)]
+    pub fn manifest_entry(&self) -> Option<EpubManifestEntry<'ebook>> {
         self.href()
-            .and_then(|href| self.ctx.provider.by_href(href.path().as_str()))
+            .and_then(|href| self.ctx.manifest_ctx.by_href(href.path().as_str()))
     }
-}
 
-impl Debug for EpubTocEntry<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.debug_struct("EpubTocEntry")
-            .field("data", self.data)
-            .finish_non_exhaustive()
+    /// The [`Resource`] intended to navigate to from an entry.
+    #[doc = util::inherent_doc!(TocEntry, resource)]
+    pub fn resource(&self) -> Option<Resource<'ebook>> {
+        TocEntry::resource(self)
     }
-}
 
-impl<'a> IntoIterator for &EpubTocEntry<'a> {
-    type Item = EpubTocEntry<'a>;
-    type IntoIter = EpubTocEntryIter<'a>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        EpubTocEntryIter {
-            ctx: self.ctx,
-            iter: self.data.children.iter(),
-        }
-    }
-}
-
-impl<'a> IntoIterator for EpubTocEntry<'a> {
-    type Item = Self;
-    type IntoIter = EpubTocEntryIter<'a>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        (&self).into_iter()
-    }
-}
-
-/// The children of an [`EpubTocEntry`].
-///
-/// See [`TocChildren`] for more details.
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub struct EpubTocChildren<'ebook>(EpubTocEntry<'ebook>);
-
-#[allow(refining_impl_trait)]
-impl<'ebook> TocChildren<'ebook> for EpubTocChildren<'ebook> {
-    fn get(&self, index: usize) -> Option<EpubTocEntry<'ebook>> {
-        self.0
-            .data
+    /// Returns the associated direct child [`EpubTocEntry`] if the given `index` is less than
+    /// [`Self::len`], otherwise [`None`].
+    #[doc = util::inherent_doc!(TocEntry, get)]
+    pub fn get(&self, index: usize) -> Option<EpubTocEntry<'ebook>> {
+        self.data
             .children
             .get(index)
-            .map(|data| self.0.ctx.create_entry(data))
+            .map(|data| self.ctx.create_entry(self.version, data, self.depth + 1))
     }
 
-    fn iter(&self) -> EpubTocEntryIter<'ebook> {
-        self.into_iter()
+    /// Returns an iterator over direct child entries
+    /// (whose [`depth`](EpubTocEntry::depth) is one greater than the parent).
+    #[doc = util::inherent_doc!(TocEntry, iter)]
+    pub fn iter(&self) -> EpubTocEntryIter<'ebook> {
+        EpubTocEntryIter {
+            ctx: self.ctx,
+            version: self.version,
+            iter: self.data.children.iter(),
+            next_depth: self.depth + 1,
+        }
     }
 
-    fn flatten(&self) -> impl Iterator<Item = EpubTocEntry<'ebook>> + 'ebook {
+    /// Returns a recursive iterator over **all** children.
+    #[doc = util::inherent_doc!(TocEntry, flatten)]
+    pub fn flatten(&self) -> impl Iterator<Item = EpubTocEntry<'ebook>> + 'ebook {
         struct FlatEpubTocEntryIterator<'ebook> {
             ctx: EpubTocContext<'ebook>,
-            stack: Vec<&'ebook EpubTocEntryData>,
+            version: EpubVersion,
+            stack: Vec<(usize, &'ebook EpubTocEntryData)>, // Vec<(depth, data)>
         }
 
         impl<'ebook> Iterator for FlatEpubTocEntryIterator<'ebook> {
             type Item = EpubTocEntry<'ebook>;
 
             fn next(&mut self) -> Option<Self::Item> {
-                let data = self.stack.pop()?;
+                let (depth, data) = self.stack.pop()?;
 
                 // Push children in reverse order to maintain DFS order
-                self.stack.extend(data.children.iter().rev());
-                Some(self.ctx.create_entry(data))
+                self.stack
+                    .extend(data.children.iter().rev().map(|data| (depth + 1, data)));
+                Some(self.ctx.create_entry(self.version, data, depth))
             }
         }
 
         FlatEpubTocEntryIterator {
-            ctx: self.0.ctx,
-            stack: self.0.data.children.iter().rev().collect(),
+            ctx: self.ctx,
+            version: self.version,
+            stack: self
+                .data
+                .children
+                .iter()
+                .rev()
+                .map(|data| (self.depth + 1, data))
+                .collect(),
         }
     }
 
+    /// The total number of direct [`children`](Self::iter) a toc entry has.
+    #[doc = util::inherent_doc!(TocEntry, len)]
+    pub fn len(&self) -> usize {
+        self.data.children.len()
+    }
+
+    /// Returns `true` if there are no children.
+    #[doc = util::inherent_doc!(TocEntry, is_empty)]
+    pub fn is_empty(&self) -> bool {
+        TocEntry::is_empty(self)
+    }
+
+    /// Returns `true` if the depth of a toc entry is `0`, indicating the root.
+    #[doc = util::inherent_doc!(TocEntry, is_root)]
+    pub fn is_root(&self) -> bool {
+        TocEntry::is_root(self)
+    }
+
+    /// Calculates and returns the **maximum** depth relative to an entry.
+    /// In other words, how many levels deep is the most-nested child?
+    #[doc = util::inherent_doc!(TocEntry, max_depth)]
+    pub fn max_depth(&self) -> usize {
+        TocEntry::max_depth(self)
+    }
+
+    /// Calculates and returns the **total** number of all (direct and nested)
+    /// children relative to an entry.
+    #[doc = util::inherent_doc!(TocEntry, total_len)]
+    pub fn total_len(&self) -> usize {
+        TocEntry::total_len(self)
+    }
+}
+
+impl Sealed for EpubTocEntry<'_> {}
+
+#[allow(refining_impl_trait)]
+impl<'ebook> TocEntry<'ebook> for EpubTocEntry<'ebook> {
+    fn depth(&self) -> usize {
+        self.depth()
+    }
+
+    fn label(&self) -> &'ebook str {
+        self.label()
+    }
+
+    fn kind(&self) -> TocEntryKind<'ebook> {
+        self.kind()
+    }
+
+    fn manifest_entry(&self) -> Option<EpubManifestEntry<'ebook>> {
+        self.manifest_entry()
+    }
+
+    fn get(&self, index: usize) -> Option<EpubTocEntry<'ebook>> {
+        self.get(index)
+    }
+
+    fn iter(&self) -> EpubTocEntryIter<'ebook> {
+        self.iter()
+    }
+
+    fn flatten(&self) -> impl Iterator<Item = EpubTocEntry<'ebook>> + 'ebook {
+        self.flatten()
+    }
+
     fn len(&self) -> usize {
-        self.0.data.children.len()
+        self.len()
+    }
+}
+
+impl Debug for EpubTocEntry<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("EpubTocEntry")
+            .field("data", self.data)
+            .finish_non_exhaustive()
+    }
+}
+
+impl<'ebook> IntoIterator for &EpubTocEntry<'ebook> {
+    type Item = EpubTocEntry<'ebook>;
+    type IntoIter = EpubTocEntryIter<'ebook>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.iter()
+    }
+}
+
+impl<'ebook> IntoIterator for EpubTocEntry<'ebook> {
+    type Item = Self;
+    type IntoIter = EpubTocEntryIter<'ebook>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        (&self).into_iter()
     }
 }
 
@@ -544,55 +765,39 @@ impl PartialEq<Self> for EpubTocEntry<'_> {
     }
 }
 
-impl<'ebook> IntoIterator for &EpubTocChildren<'ebook> {
-    type Item = EpubTocEntry<'ebook>;
-    type IntoIter = EpubTocEntryIter<'ebook>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter()
-    }
-}
-
-impl<'ebook> IntoIterator for EpubTocChildren<'ebook> {
-    type Item = EpubTocEntry<'ebook>;
-    type IntoIter = EpubTocEntryIter<'ebook>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.0.into_iter()
-    }
-}
-
-/// An iterator over the immediate [`children`](EpubTocEntry) of an [`EpubTocEntry`].
+/// An iterator over the direct [`children`](EpubTocEntry) contained within [`EpubTocEntry`].
 ///
 /// # See Also
-/// - [`EpubTocChildren::iter`]
-/// - [`EpubTocChildren::flatten`]
+/// - [`EpubTocEntry::iter`] to create an [`EpubTocEntry`] instance.
+/// - [`EpubTocEntry::flatten`] to iterate over all children in flattened form.
 ///
 /// # Examples
-/// - Iterating over immediate children:
+/// - Iterating over direct children:
 /// ```
-/// # use rbook::ebook::errors::EbookResult;
-/// # use rbook::ebook::toc::{Toc, TocEntry};
-/// # use rbook::{Ebook, Epub};
-/// # fn main() -> EbookResult<()> {
+/// # use rbook::Epub;
+/// # fn main() -> rbook::ebook::errors::EbookResult<()> {
 /// let epub = Epub::open("tests/ebooks/example_epub")?;
 /// let nav_root = epub.toc().contents().unwrap();
 ///
 /// for child in nav_root {
-///     // process immediate child //
+///     // process direct child //
 /// }
 /// # Ok(())
 /// # }
 /// ```
 pub struct EpubTocEntryIter<'ebook> {
     ctx: EpubTocContext<'ebook>,
+    version: EpubVersion,
     iter: SliceIter<'ebook, EpubTocEntryData>,
+    next_depth: usize,
 }
 
 impl<'ebook> Iterator for EpubTocEntryIter<'ebook> {
     type Item = EpubTocEntry<'ebook>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.iter.next().map(|data| self.ctx.create_entry(data))
+        self.iter
+            .next()
+            .map(|data| self.ctx.create_entry(self.version, data, self.next_depth))
     }
 }

@@ -8,7 +8,7 @@
 
 > A fast, format-agnostic, ergonomic ebook library with a focus on EPUB.
 
-The primary goal of `rbook` is to provide an easy-to-use high-level API for handling ebooks.
+The primary goal of `rbook` is to provide an easy-to-use high-level API for handling and editing ebooks.
 Most importantly, this library is designed with future formats in mind
 (`CBZ`, `FB2`, `MOBI`, etc.) via core traits defined within the [ebook](https://docs.rs/rbook/latest/rbook/ebook) 
 and [reader](https://docs.rs/rbook/latest/rbook/reader) module, allowing all formats to share the same "base" API.
@@ -22,10 +22,10 @@ Here is a non-exhaustive list of the features `rbook` provides:
 
 | Feature                     | Overview                                                                                                        | Documentation                                                        |
 |-----------------------------|-----------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------|
-| **EPUB 2 and 3**            | Read-only (for now) view of EPUB `2` and `3` formats.                                                           | [epub module](https://docs.rs/rbook/latest/rbook/ebook/epub)         |
+| **EPUB 2 and 3**            | Simple and advanced read/write view of EPUB `2` and `3` formats.                                                | [epub module](https://docs.rs/rbook/latest/rbook/ebook/epub)         |
 | **Reader**                  | Random‐access or sequential iteration over readable content.                                                    | [reader module](https://docs.rs/rbook/latest/rbook/reader)           |
 | **Detailed Types**          | Abstractions built on expressive traits and types.                                                              |                                                                      |
-| **Metadata**                | Typed access to titles, creators, publishers, languages, tags, roles, attributes, and more.                     | [metadata module](https://docs.rs/rbook/latest/rbook/ebook/metadata) |
+| **Metadata**                | Typed access to dates, titles, creators, publishers, languages, tags, roles, attributes, and more.              | [metadata module](https://docs.rs/rbook/latest/rbook/ebook/metadata) |
 | **Manifest**                | Lookup and traverse contained resources such as readable content (XHTML) and images.                            | [manifest module](https://docs.rs/rbook/latest/rbook/ebook/manifest) |
 | **Spine**                   | Chronological reading order and preferred page direction.                                                       | [spine module](https://docs.rs/rbook/latest/rbook/ebook/spine)       |
 | **Table of Contents (ToC)** | Navigation points, including the EPUB 2 guide and EPUB 3 landmarks.                                             | [toc module](https://docs.rs/rbook/latest/rbook/ebook/toc)           |
@@ -37,6 +37,7 @@ enabled by default in a project's `Cargo.toml` file:
 
 | Feature        | Description                                                                                           |
 |----------------|-------------------------------------------------------------------------------------------------------|
+| **write**      | Creation and modification of EPUB `2` and `3` formats.                                                |
 | **prelude**    | Convenience [prelude](https://docs.rs/rbook/latest/rbook/prelude) ***only*** including common traits. |
 | **threadsafe** | Enables `Send` + `Sync` constraint for `Epub`.                                                        |
 
@@ -44,8 +45,8 @@ enabled by default in a project's `Cargo.toml` file:
 `rbook` can be used by adding it as a dependency in a project's `Cargo.toml` file:
 ```toml
 [dependencies]
-rbook = "0.6.12"                                           # With default features
-# rbook = { version = "0.6.12", default-features = false } # Excluding default features
+rbook = "0.7.0"                                           # With default features
+# rbook = { version = "0.7.0", default-features = false } # Excluding default features
 ```
 
 ## WebAssembly
@@ -54,38 +55,39 @@ The `wasm32-unknown-unknown` target is supported by default.
 ## Examples
 ### Opening and reading an EPUB file
 ```rust
-use rbook::{Epub, prelude::*}; // Prelude for traits
+use rbook::Epub;
 
 fn main() {
     // Open an epub from a file or directory
     // * `Read + Seek` implementations supported via `read(...)` for byte streams/buffers
-    let epub = Epub::options()
-        .strict(false) // Disable strict checks (`true` by default)
-        .skip_toc(true) // Skips ToC-related parsing, such as toc.ncx (`false` by default)
-        .open("tests/ebooks/example_epub")
-        .unwrap();
+    let epub = Epub::open("example.epub").unwrap();
 
     // Create a reader instance 
     // * Configurable via `reader_builder()`
     let mut reader = epub.reader();
-    
+
     // Print the readable content
-    while let Some(Ok(data)) = reader.read_next() {
-        let resource_kind = data.manifest_entry().resource_kind();
-        assert_eq!("application/xhtml+xml", resource_kind.as_str());
-        assert_eq!("xhtml", resource_kind.subtype());
+    for data_result in reader {
+        let data = data_result.unwrap();
+        let kind = data.manifest_entry().kind();
+        assert_eq!("application/xhtml+xml", kind.as_str());
+        assert_eq!("xhtml", kind.subtype());
         println!("{}", data.content());
     }
 }
 ```
 ### Accessing metadata: Retrieving the main title
 ```rust
-use rbook::{Epub, prelude::*};
+use rbook::Epub;
 use rbook::ebook::metadata::{LanguageKind, TitleKind};
 
 fn main() {
-    let epub = Epub::open("tests/ebooks/example_epub").unwrap();
-    
+    let epub = Epub::options()
+        .strict(true) // Enable strict checks (`false` by default)
+        .skip_toc(true) // Skips ToC-related parsing, such as toc.ncx (`false` by default)
+        .open("example.epub")
+        .unwrap();    
+
     // Retrieve the main title (all titles retrievable via `titles()`)
     let title = epub.metadata().title().unwrap();
     assert_eq!("Example EPUB", title.value());
@@ -98,9 +100,9 @@ fn main() {
     assert_eq!(LanguageKind::Bcp47, alternate_script.language().kind());
 }
 ```
-### Accessing metadata: Retrieving the first creator
+### Accessing metadata: Retrieving the year and first creator
 ```rust
-use rbook::{Epub, prelude::*};
+use rbook::Epub;
 use rbook::ebook::metadata::LanguageKind;
 
 fn main() {
@@ -110,9 +112,14 @@ fn main() {
         .skip_toc(true)
         .skip_manifest(true)
         .skip_spine(true)
-        .open("tests/ebooks/example_epub")
+        .open("example.epub")
         .unwrap();
-    
+
+    // Retrieve the published date and time
+    let published = epub.metadata().published().unwrap();
+    assert_eq!(2023, published.date().year());
+    assert!(published.time().is_local());
+
     // Retrieve the first creator
     let creator = epub.metadata().creators().next().unwrap();
     assert_eq!("John Doe", creator.value());
@@ -133,24 +140,85 @@ fn main() {
 ```
 ### Extracting images from the manifest
 ```rust
-use rbook::{Epub, prelude::*};
-use std::{fs, path::Path};
+use rbook::Epub;
+use std::fs::{self, File};
+use std::path::Path;
 
 fn main() {
-    let epub = Epub::open("tests/ebooks/example_epub").unwrap();
+    let epub = Epub::open("example.epub").unwrap();
     
     // Create an output directory for the extracted images
     let out = Path::new("extracted_images");
     fs::create_dir_all(&out).unwrap();
     
     for image in epub.manifest().images() {
-        // Read the raw image bytes
-        let bytes = image.read_bytes().unwrap();
-
         // Extract the filename from the href and write to disk
-        let filename = image.href().name().decode(); // Decode as EPUB hrefs may be URL-encoded
-        fs::write(out.join(&*filename), bytes).unwrap();
+        let filename = image.href().name().decode(); // Decode as EPUB hrefs are percent-encoded
+
+        // Copy the raw image bytes
+        let file = File::create(out.join(&*filename)).unwrap();
+        image.copy_bytes(file).unwrap();
     }
+}
+```
+### Editing an EPUB
+```rust
+use rbook::Epub;
+use rbook::ebook::errors::EbookResult;
+
+fn main() -> EbookResult<()> {
+    Epub::open("old.epub")?
+        .edit()
+        .creator("Jane Doe") // Adding a creator
+        .write()
+        .compression(9)
+        .save("new.epub")
+}
+```
+### Creating a backwards-compatible EPUB 3 file
+
+> This example uses the high-level builder API.  
+> See the [epub module](https://docs.rs/rbook/latest/rbook/ebook/epub)
+> for lower-level control over the manifest, spine, etc.
+
+```rust
+use rbook::Epub;
+use rbook::ebook::errors::EbookResult;
+use rbook::ebook::toc::TocEntryKind;
+use rbook::epub::EpubChapter;
+use std::path::Path;
+
+const XHTML: &[u8] = b"<xhtml>...</xhtml>"; // Example data
+    
+fn main() -> EbookResult<()> {
+    Epub::builder()
+        .identifier("urn:example")
+        .title("Doe Story")
+        .creator(["John Doe", "Jane Doe"])
+        .language("en")
+        // Reference a file stored on disk or provide in-memory bytes
+        .cover_image(("cover.png", Path::new("local/file/cover.png")))
+        .chapter([
+            // Standard Chapter (Auto-generates href/filename "volume_i.xhtml")
+            EpubChapter::new("Volume I").xhtml(XHTML).children(
+                // Providing an explicit href (v1c1.xhtml)
+                EpubChapter::new("I: Intro")
+                    .kind(TocEntryKind::Introduction)
+                    .href("v1c1.xhtml")
+                    .xhtml_body("<p>Basic text</p>"),
+            ),
+            EpubChapter::new("Volume II").children([
+                // Referencing an XHTML file stored on the OS file system
+                EpubChapter::new("I").href("v2/c1.xhtml").xhtml(Path::new("path/to/c1.xhtml")),
+                // Navigation-only entry linking to a fragment in another chapter
+                EpubChapter::new("Section 1").href("v2/c1.xhtml#section-1"),
+                // Resource included in spine/manifest but omitted from ToC
+                EpubChapter::unlisted("v3extras.xhtml").xhtml(XHTML),
+            ]),
+        ])
+        .write()
+        .compression(0)
+        .save("doe_story.epub") // Save to file or alternative write to memory
 }
 ```
 

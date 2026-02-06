@@ -1,39 +1,210 @@
 //! The Electronic Publication ([`Epub`]) module.
 //!
-//! Supports EPUB versions `2` and `3`.
+//! `rbook` supports EPUB versions `2` and `3`.
 //!
 //! For more information regarding the EPUB spec, see:
 //! <https://www.w3.org/TR/epub>
+//!
+//! # Reading
+//! Opening an [`Epub`] provides access to its core components:
+//! - [`EpubPackage`]: Package details (epub version, package location/directory, prefixes)
+//! - [`EpubMetadata`]: Metadata details (title, language, identifiers, version)
+//! - [`EpubManifest`]: Manifest resources (HTML, images, CSS, Media Overlays (SMIL))
+//! - [`EpubSpine`]: Canonical reading order
+//! - [`EpubToc`]: Table of Contents (e.g., guide, landmarks, page list)
+//!
+//! EPUBs can be opened using [`Epub::open`] or [`Epub::read`].
+//! For finer-grain control over parser behavior, such as strictness and skipping
+//! specific components for performance, see [`EpubOpenOptions`].
+//!
+//! ## Renditions
+//! While rare, multi-rendition EPUBs are not fully supported currently.
+//! The first `rootfile` declared in `META-INF/container.xml`
+//! will always be selected as the active rendition.
+//!
+//! ## Examples
+//! - Opening an [`Epub`] and inspecting the manifest:
+//! ```
+//! # use rbook::epub::Epub;
+//! # use rbook::epub::metadata::EpubVersion;
+//! # fn main() -> rbook::ebook::errors::EbookResult<()> {
+//! let epub = Epub::options()
+//!     .strict(true)
+//!     .open("tests/ebooks/example_epub")?;
+//!
+//! assert!(epub.metadata().version().is_epub3());
+//!
+//! let manifest = epub.manifest();
+//! assert_eq!(5, manifest.readable_content().count());
+//! assert_eq!(3, manifest.images().count());
+//! assert_eq!(0, manifest.audio().count());
+//! assert_eq!(12, manifest.len());
+//!
+//! let cover = manifest.cover_image().unwrap();
+//! assert_eq!("cover-image1", cover.id());
+//! assert_eq!("/EPUB/img/cover.webm", cover.href());
+//!
+//! // Or `copy_bytes` to copy directly into any `Write` implementation
+//! let cover_bytes = cover.read_bytes().unwrap();
+//! # Ok(())
+//! # }
+//! ```
+//!
+//! # Writing
+//! Modifying or creating an [`Epub`] is done through the write API,
+//! available via the `write` crate feature (enabled by default).
+//!
+//! The API provides two levels of access:
+//! - [`EpubEditor`]: A high-level abstraction for common tasks
+//!   such as updating metadata, adding [creators](EpubEditor::creator),
+//!   and inserting [resources](EpubEditor::resource) or [chapters](EpubEditor::chapter).
+//! ```
+//! # #[cfg(feature = "write")]
+//! # {
+//! # use rbook::Epub;
+//! Epub::builder()
+//!     .creator("John Doe")
+//!     .resource(("stylesheet.css", "ol { list-style: none; }"));
+//! # }
+//! ```
+//!
+//! Lower-level write API:
+//! - [`EpubPackageMut`](package::EpubPackageMut): Modify package details and prefixes.
+//! - [`EpubMetadataMut`](metadata::EpubMetadataMut): Modify metadata entries and refinements.
+//! - [`EpubManifestMut`](manifest::EpubManifestMut): Add, remove, or relocate resources.
+//! - [`EpubSpineMut`](spine::EpubSpineMut): Reorder the reading sequence.
+//! - [`EpubTocMut`](toc::EpubTocMut): Modify navigation hierarchy.
+//! ```
+//! # #[cfg(feature = "write")]
+//! # {
+//! # use rbook::Epub;
+//! # use rbook::epub::manifest::DetachedEpubManifestEntry;
+//! # use rbook::epub::metadata::DetachedEpubMetaEntry;
+//! # fn main() {
+//! # let mut epub = Epub::new();
+//! epub.metadata_mut().push(
+//!     // Create entries detached from the EPUB, then insert them.
+//!     DetachedEpubMetaEntry::creator("Jane Doe")
+//!         .file_as("Doe, Jane")
+//!         .role("edt"),
+//! );
+//! epub.manifest_mut().push(
+//!     DetachedEpubManifestEntry::new("stylesheet_1_id")
+//!         .href("stylesheet.css")
+//!         .content("ol { list-style: none; }"),
+//! );
+//! # }
+//! # }
+//! ```
+//!
+//! Output configuration, such as [compression](EpubWriteOptions::compression)
+//! and [target compatibility](EpubWriteOptions::target) is available via [`EpubWriteOptions`].
+//!
+//! ## Cascading Updates
+//! Modifying a manifest entry's `id` or `href` triggers a cascading update across an [`Epub`]:
+//!
+//! - Renaming a resource `id` updates all referencing `idref` values in the
+//!   [spine](EpubSpine).
+//! - Updating the `href` updates all associated navigation links in the
+//!   [Table of Contents](EpubToc).
+//!
+//! See [`EpubManifestEntryMut::set_id`](manifest::EpubManifestEntryMut::set_id)
+//! and [`EpubManifestEntryMut::set_href`](manifest::EpubManifestEntryMut::set_href)
+//! for more details.
+//!
+//! ## Auto-Generation
+//! Several structural requirements are handled automatically to produce a well-formed EPUB:
+//!
+//! ### Timestamps
+//! If not set, the publication and modification dates
+//! are generated automatically using the system clock in
+//! [**ISO 8601-1**](https://www.iso.org/iso-8601-date-and-time-format.html) format.
+//!
+//! - For EPUB 2, the modification date is not generated.
+//! - **WebAssembly**: On `wasm32-unknown-unknown`, the system clock is unavailable.
+//!   Timestamps can be provided manually via [`EpubEditor::published_date`]
+//!   and [`EpubEditor::modified_date`].
+//!
+//! ### IDs
+//! To uphold structural integrity, unique IDs are generated automatically for:
+//! - **Refined Entries**: Entries in the [spine](spine::EpubSpineEntry) or
+//!   [metadata](metadata::EpubMetaEntry) that contain nested refinements but
+//!   lack an explicit ID.
+//! - **NCX Entries**: `navPoint` entries that lack an explicit ID.
+//!
+//! ### See Also
+//! - [`EpubWriteOptions::target`] for additional EPUB 2 auto-generation details.
+//! - [`EpubWriteOptions::generate_toc`] for ToC generation details.
+//!
+//! ## Cleaning
+//! When performing heavy modifications (such as removing manifest resources),
+//! it is recommended to call [`Epub::cleanup`],
+//! which removes orphaned references in the spine and table of contents.
+//!
+//! ## XML Escaping
+//! All metadata values, chapter titles, labels, and attribute values are stored as
+//! unescaped plain text (e.g., `"1 < 2 & 3"`).
+//!
+//! The following characters are automatically XML-escaped
+//! when [writing](Epub::write) to a destination:
+//!
+//! | Character | Entity Mapping |
+//! |-----------|----------------|
+//! | `<`       | `&lt;`         |
+//! | `>`       | `&gt;`         |
+//! | `&`       | `&amp;`        |
+//! | `"`       | `&quot;`       |
+//! | `'`       | `&apos;`       |
+//!
+//! To preserve author intent across reading systems,
+//! certain whitespace characters are encoded as numeric character references:
+//!
+//! | Character  | Numeric Character Reference Mapping     |
+//! |------------|-----------------------------------------|
+//! | `\t`       | `&#9;`                                  |
+//! | `\n`       | `&#10;`                                 |
+//! | `\r`       | `&#13;`                                 |
+//! | `\u{00A0}` | `&#160;` (Non-breaking space: `&nbsp;`) |
 
+mod archive;
 mod consts;
 pub mod errors;
 pub mod manifest;
 pub mod metadata;
+pub mod package;
 mod parser;
 pub mod reader;
 pub mod spine;
 pub mod toc;
+#[cfg(feature = "write")]
+mod write;
 
 use crate::ebook::Ebook;
 use crate::ebook::archive::zip::ZipArchive;
-use crate::ebook::archive::{self, Archive, ResourceArchive};
-use crate::ebook::element::Href;
+use crate::ebook::archive::{Archive, ResourceProvider, get_archive};
+use crate::ebook::epub::archive::EpubArchive;
 use crate::ebook::epub::manifest::{EpubManifest, EpubManifestData};
 use crate::ebook::epub::metadata::{EpubMetadata, EpubMetadataData, EpubVersion};
-use crate::ebook::epub::parser::EpubParser;
-use crate::ebook::epub::reader::{EpubReader, EpubReaderBuilder, EpubReaderOptions};
+use crate::ebook::epub::package::{EpubPackage, EpubPackageData};
+use crate::ebook::epub::parser::{EpubParseConfig, EpubParser};
+use crate::ebook::epub::reader::{EpubReader, EpubReaderOptions};
 use crate::ebook::epub::spine::{EpubSpine, EpubSpineData};
 use crate::ebook::epub::toc::{EpubToc, EpubTocData};
-use crate::ebook::errors::{EbookError, EbookResult};
+use crate::ebook::errors::{ArchiveResult, EbookError, EbookResult};
 use crate::ebook::resource::{Resource, ResourceKey};
-use crate::util::uri;
-use std::io::{Read, Seek};
+use crate::util::{self, Sealed, uri};
+use std::borrow::Cow;
+use std::io::{Read, Seek, Write};
 use std::path::Path;
+
+#[cfg(feature = "write")]
+pub use write::{EpubChapter, EpubEditor, EpubWriteOptions, OrphanFilter};
 
 /// [`Ebook`]: Electronic Publication (EPUB)
 ///
 /// Provides access to the following contents of an epub:
-/// - [`EpubMetadata`]: Metadata details (epub version, title, language, identifiers)
+/// - [`EpubPackage`]: Package details (epub version, package location/directory, prefixes)
+/// - [`EpubMetadata`]: Metadata details (title, language, identifiers, version)
 /// - [`EpubManifest`]: Manifest resources (HTML, images, CSS, Media Overlays (SMIL))
 /// - [`EpubSpine`]: Canonical reading order
 /// - [`EpubToc`]: Table of contents, Guide and Landmarks
@@ -45,21 +216,21 @@ use std::path::Path;
 /// makes [`Epub`] implement `Send + Sync`:
 /// ```toml
 /// [dependencies]
-/// rbook = { version = "...", features = ["threadsafe"] }
+/// rbook = { version = "…", features = ["threadsafe"] }
 /// ```
 /// # Renditions
 /// Multi-rendition EPUBs are not fully supported,
 /// and the first OPF `rootfile` will always be selected.  
 ///
+/// # See Also
+/// - [`EpubEditor`] to conveniently [create](Epub::builder) or [modify](Epub::edit) an [`Epub`].
+/// - [`epub`](self) trait-level documentation for more information.
+///
 /// # Examples
 /// - Reading the contents of an epub:
 /// ```
-/// # use rbook::ebook::errors::EbookResult;
-/// # use rbook::ebook::manifest::{Manifest, ManifestEntry};
-/// # use rbook::ebook::metadata::{MetaEntry, Metadata};
-/// # use rbook::reader::ReaderContent;
-/// # use rbook::{Ebook, Epub};
-/// # fn main() -> EbookResult<()> {
+/// # use rbook::Epub;
+/// # fn main() -> rbook::ebook::errors::EbookResult<()> {
 /// let epub = Epub::open("tests/ebooks/example_epub")?;
 ///
 /// // Retrieving the main title
@@ -78,8 +249,8 @@ use std::path::Path;
 /// ```
 #[derive(Debug)]
 pub struct Epub {
-    archive: ResourceArchive,
-    package_file: String,
+    archive: EpubArchive,
+    package: EpubPackageData,
     metadata: EpubMetadataData,
     manifest: EpubManifestData,
     spine: EpubSpineData,
@@ -92,17 +263,15 @@ impl Epub {
     /// # Examples
     /// - Opening an EPUB with specific options:
     /// ```
-    /// # use rbook::ebook::errors::EbookResult;
     /// # use rbook::epub::Epub;
     /// # use rbook::epub::metadata::EpubVersion;
-    /// # fn main() -> EbookResult<()> {
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
     /// let epub = Epub::options()
-    ///     .strict(false)
-    ///     .store_all(true)
+    ///     .strict(true)
+    ///     .retain_variants(true)
     ///     .skip_metadata(true)
     ///     .skip_spine(true)
-    ///     .preferred_page_list(EpubVersion::EPUB2)
-    ///     .preferred_landmarks(EpubVersion::EPUB2)
+    ///     .preferred_toc(EpubVersion::EPUB2)
     ///     .open("tests/ebooks/example_epub")?;
     /// # Ok(())
     /// # }
@@ -117,7 +286,7 @@ impl Epub {
     /// contents of an unzipped EPUB.
     ///
     /// # Note
-    /// [`EpubOpenOptions::strict`] is set to `true` by default.
+    /// [`EpubOpenOptions::strict`] is set to `false` by default.
     ///
     /// # Errors
     /// - [`ArchiveError`](EbookError::Archive): Missing or invalid EPUB files.
@@ -125,7 +294,8 @@ impl Epub {
     ///
     /// # See Also
     /// - [`Self::options`] to specify options.
-    /// - [`EpubOpenOptions::read`] to read from a byte buffer.
+    /// - [`Self::read`] to read from a byte buffer.
+    /// - [`EpubOpenOptions::read`] to read from a byte buffer with specific options.
     ///
     /// # Examples
     /// - Opening from an EPUB file:
@@ -142,16 +312,42 @@ impl Epub {
         Self::options().open(path)
     }
 
+    /// Opens an EPUB from any implementation of [`Read`] + [`Seek`]
+    /// with default [`EpubOpenOptions`].
+    ///
+    /// # Thread-safety
+    /// [`Send`] + [`Sync`] are required constraints if the
+    /// `threadsafe` feature is enabled (**enabled by default**).
+    ///
+    /// Thread-safety can be disabled in a project's `Cargo.toml` file.
+    /// See the [base documentation](crate)
+    /// for a list of the default crate features and an example.
+    ///
+    /// # Errors
+    /// - [`ArchiveError`](EbookError::Archive): Missing or invalid EPUB files.
+    /// - [`FormatError`](EbookError::Format): Malformed EPUB content.
+    ///
+    /// # See Also
+    /// - [`Self::options`] to specify options.
+    /// - [`Self::open`] to open from a path (file or directory).
+    /// - [`EpubOpenOptions::read`] to open an [`Epub`] with specific options applied.
+    pub fn read<
+        #[cfg(feature = "threadsafe")] R: 'static + Read + Seek + Send + Sync,
+        #[cfg(not(feature = "threadsafe"))] R: 'static + Read + Seek,
+    >(
+        source: R,
+    ) -> EbookResult<Self> {
+        Self::options().read(source)
+    }
+
     /// Returns a builder to create an [`EpubReader`] with specific options.
     ///
     /// # Examples
     /// - Retrieving a new EPUB reader instance with configuration:
     /// ```
-    /// # use rbook::{Ebook, Epub};
-    /// # use rbook::ebook::errors::EbookResult;
+    /// # use rbook::Epub;
     /// # use rbook::epub::reader::LinearBehavior;
-    /// # use rbook::reader::{Reader, ReaderContent};
-    /// # fn main() -> EbookResult<()> {
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
     /// let epub = Epub::open("tests/ebooks/epub2")?;
     /// let mut epub_reader = epub.reader_builder()
     ///     // Omit linear readable entries
@@ -164,195 +360,81 @@ impl Epub {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn reader_builder(&self) -> EpubReaderBuilder<'_> {
-        EpubReaderBuilder::new(self)
+    pub fn reader_builder(&self) -> EpubReaderOptions<&Self> {
+        EpubReaderOptions::<&Self>::new(self)
     }
 
-    /// The absolute percent-encoded location of the package `.opf` file.
-    ///
-    /// This is ***not*** a filesystem path.
-    /// It always starts with `/` to indicate the EPUB container root,
-    /// and ***is*** percent encoded (e.g., `/my%20dir/my%20pkg.opf`).
-    ///
-    /// # See Also
-    /// - [`Href::decode`] to retrieve the percent-decoded form.
-    /// - [`Href::name`] to retrieve the filename.
-    ///
-    /// # Examples
-    /// - Retrieving the package file:
-    /// ```
-    /// # use rbook::{Ebook, Epub};
-    /// # use rbook::ebook::errors::EbookResult;
-    /// # fn main() -> EbookResult<()> {
-    /// let epub = Epub::open("tests/ebooks/example_epub")?;
-    ///
-    /// assert_eq!("/EPUB/example.opf", epub.package_file().as_str());
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn package_file(&self) -> Href<'_> {
-        self.package_file.as_str().into()
-    }
-
-    /// The absolute percent-encoded directory [`Self::package_file`] resides in.
-    ///
-    /// This is ***not*** a filesystem path.
-    /// It always starts with `/` to indicate the EPUB container root,
-    /// and ***is*** percent encoded (e.g., `/my%20dir`).
-    ///
-    /// [`Resources`](Resource) referenced in the package file are resolved relative to the
-    /// package directory.
-    ///
-    /// # See Also
-    /// - [`Href::decode`] to retrieve the percent-decoded form.
-    ///
-    /// # Examples
-    /// - Retrieving the package file and directory:
-    /// ```
-    /// # use rbook::{Ebook, Epub};
-    /// # use rbook::ebook::errors::EbookResult;
-    /// # fn main() -> EbookResult<()> {
-    /// let epub = Epub::open("tests/ebooks/example_epub")?;
-    /// let package_dir = epub.package_directory().as_str();
-    /// let package_file = epub.package_file().as_str();
-    ///
-    /// assert_eq!("/EPUB", package_dir);
-    /// assert_eq!(format!("{package_dir}/example.opf"), package_file);
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn package_directory(&self) -> Href<'_> {
-        uri::parent(&self.package_file).into()
-    }
-
-    /// Deprecated in favor of [`EpubOpenOptions::read`], accessible via [`Epub::open`].
-    #[deprecated(
-        since = "0.6.8",
-        note = "Use `Epub::options`, then call `EpubOpenOptions::open` instead."
-    )]
-    pub fn open_with(
-        path: impl AsRef<Path>,
-        options: impl Into<EpubOpenOptions>,
-    ) -> EbookResult<Self> {
-        options.into().open(path)
-    }
-
-    /// Deprecated in favor of [`EpubOpenOptions::read`], accessible via [`Epub::options`].
-    #[deprecated(
-        since = "0.6.8",
-        note = "Use `Epub::options`, then call `EpubOpenOptions::read` instead."
-    )]
-    pub fn read<
-        #[cfg(feature = "threadsafe")] R: 'static + Read + Seek + Send + Sync,
-        #[cfg(not(feature = "threadsafe"))] R: 'static + Read + Seek,
-    >(
-        reader: R,
-        options: impl Into<EpubOpenOptions>,
-    ) -> EbookResult<Self> {
-        options.into().read(reader)
-    }
-
-    /// Deprecated in favor of [`Epub::reader_builder`] / [`EpubReaderOptions::create`].
-    #[deprecated(
-        since = "0.6.8",
-        note = "Use `Epub::reader_builder` or `EpubReaderOptions::create` instead."
-    )]
-    pub fn reader_with(&self, options: impl Into<EpubReaderOptions>) -> EpubReader<'_> {
-        options.into().create(self)
-    }
-
-    //////////////////////////////////
-    // PRIVATE API
-    //////////////////////////////////
-
-    fn transform_resource<'b>(&self, resource: Resource<'b>) -> Resource<'b> {
-        let href = match resource.key() {
-            ResourceKey::Value(value) => uri::decode(value.as_ref()),
-            ResourceKey::Position(_) => return resource,
-        };
-        let package_dir = self.package_directory().decode();
-
-        let modified_href = if href.starts_with('/') {
-            uri::normalize(href.as_ref())
-        } else {
-            uri::resolve(package_dir.as_ref(), href.as_ref()).into_owned()
-        };
-
-        resource.swap_value(modified_href)
-    }
-
-    // For now, the preferences from `config` are not stored within the `Epub` struct.
-    fn parse(config: EpubConfig, archive: Box<dyn Archive>) -> EbookResult<Self> {
-        let mut parser = EpubParser::new(&config, archive.as_ref());
-        let data = parser.parse()?;
-
-        Ok(Self {
-            archive: ResourceArchive::new(archive),
-            package_file: data.package_file,
-            metadata: data.metadata,
-            manifest: data.manifest,
-            spine: data.spine,
-            toc: data.toc,
-        })
-    }
-}
-
-#[allow(refining_impl_trait)]
-impl Ebook for Epub {
     /// Returns a new [`EpubReader`] to sequentially read over the [`EpubSpine`]
     /// contents of an ebook.
-    ///
+    #[doc = util::inherent_doc!(Ebook, metadata)]
     /// # See Also
     /// - [`Self::reader_builder`] to alter the behavior of an [`EpubReader`].
-    fn reader(&self) -> EpubReader<'_> {
+    pub fn reader(&self) -> EpubReader<'_> {
         self.reader_builder().create()
     }
 
-    fn metadata(&self) -> EpubMetadata<'_> {
-        EpubMetadata::new(&self.metadata)
+    /// The package, encompassing `<package>` element data.
+    pub fn package(&self) -> EpubPackage<'_> {
+        EpubPackage::new(&self.package)
     }
 
-    fn manifest(&self) -> EpubManifest<'_> {
-        EpubManifest::new(EpubResourceProvider(&self.archive), &self.manifest)
+    /// Data associated with an [`Epub`], such as
+    /// [title](EpubMetadata::title) and [author](EpubMetadata::creators) information.
+    #[doc = util::inherent_doc!(Ebook, metadata)]
+    pub fn metadata(&self) -> EpubMetadata<'_> {
+        EpubMetadata::new(&self.package, &self.metadata)
     }
 
-    fn spine(&self) -> EpubSpine<'_> {
-        EpubSpine::new(self.manifest().into(), &self.spine)
+    /// The [`EpubManifest`], encompassing the publication [`resources`](Resource)
+    /// contained within an [`Epub`].
+    #[doc = util::inherent_doc!(Ebook, manifest)]
+    pub fn manifest(&self) -> EpubManifest<'_> {
+        EpubManifest::new(
+            ResourceProvider::Archive(&self.archive),
+            (&self.package).into(),
+            &self.manifest,
+            &self.metadata,
+        )
     }
 
-    fn toc(&self) -> EpubToc<'_> {
+    /// The [`EpubSpine`], encompassing the canonical reading-order sequence.
+    #[doc = util::inherent_doc!(Ebook, spine)]
+    pub fn spine(&self) -> EpubSpine<'_> {
+        EpubSpine::new(self.manifest().into(), (&self.package).into(), &self.spine)
+    }
+
+    /// The table of contents ([`EpubToc`]), encompassing navigation points
+    /// (e.g., landmarks, guide, page list).
+    #[doc = util::inherent_doc!(Ebook, toc)]
+    pub fn toc(&self) -> EpubToc<'_> {
         EpubToc::new(self.manifest().into(), &self.toc)
     }
 
-    /// See [`Self::read_resource_bytes`] for EPUB-specific information regarding
-    /// normalization.
-    fn read_resource_str<'a>(&self, resource: impl Into<Resource<'a>>) -> EbookResult<String> {
-        self.archive
-            .read_resource_str(&self.transform_resource(resource.into()))
-            .map_err(Into::into)
-    }
-
-    /// Returns the specified [`Resource`] in the form of bytes.
+    /// Copies the content of a [`Resource`] into the given `writer`,
+    /// returning the total number of bytes written on success.
     ///
+    /// # Normalization
     /// If the given [`Resource::key`] is a relative path,
-    /// it is appended to [`Self::package_directory`].
+    /// it is appended to [`EpubPackage::directory`].
     /// Such behavior may be circumvented by making the path absolute by adding a forward
     /// slash (`/`) before ***any*** components.
     ///
     /// Paths are percent-decoded ***then*** normalized before resource retrieval.
-    ///
+    #[doc = util::inherent_doc!(Ebook, copy_resource)]
     /// # See Also
-    /// - [`Ebook::read_resource_bytes`]
+    /// - [`EpubManifestEntry::copy_bytes`](manifest::EpubManifestEntry::copy_bytes)
+    ///   to copy the content directly from a manifest entry.
+    /// - [`Self::read_resource_str`] to retrieve the content as a [`String`].
+    /// - [`Self::read_resource_bytes`] to retrieve the content as bytes.
     ///
     /// # Examples:
     /// - Retrieving file content:
     /// ```
-    /// # use rbook::{Ebook, Epub};
-    /// # use rbook::ebook::errors::EbookResult;
-    /// # fn main() -> EbookResult<()> {
+    /// # use rbook::Epub;
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
     /// let epub = Epub::open("tests/ebooks/example_epub")?;
     ///
-    /// assert_eq!("/EPUB", epub.package_directory().as_str());
+    /// assert_eq!("/EPUB", epub.package().directory().as_str());
     ///
     /// // Absolute chapter path:
     /// let c1 = epub.read_resource_bytes("/EPUB/c1.xhtml")?;
@@ -376,16 +458,121 @@ impl Ebook for Epub {
     /// # Ok(())
     /// # }
     /// ```
-    fn read_resource_bytes<'a>(&self, resource: impl Into<Resource<'a>>) -> EbookResult<Vec<u8>> {
+    pub fn copy_resource<'a>(
+        &self,
+        resource: impl Into<Resource<'a>>,
+        mut writer: &mut impl Write,
+    ) -> ArchiveResult<u64> {
         self.archive
-            .read_resource_bytes(&self.transform_resource(resource.into()))
-            .map_err(Into::into)
+            .copy_resource_decoded(&self.transform_resource(resource.into()), &mut writer)
+    }
+
+    /// Returns the content of a [`Resource`] as a string.
+    #[doc = util::inherent_doc!(Ebook, read_resource_str)]
+    /// # See Also
+    /// - [`Self::copy_resource`] for path normalization details.
+    /// - [`EpubManifestEntry::read_str`](manifest::EpubManifestEntry::read_str)
+    ///   to retrieve the content directly from a manifest entry.
+    pub fn read_resource_str<'a>(
+        &self,
+        resource: impl Into<Resource<'a>>,
+    ) -> ArchiveResult<String> {
+        Ebook::read_resource_str(self, resource)
+    }
+
+    /// Returns the content of a [`Resource`] as bytes.
+    #[doc = util::inherent_doc!(Ebook, read_resource_bytes)]
+    /// # See Also
+    /// - [`Self::copy_resource`] for path normalization details.
+    /// - [`EpubManifestEntry::read_bytes`](manifest::EpubManifestEntry::read_bytes)
+    ///   to retrieve the content directly from a manifest entry.
+    pub fn read_resource_bytes<'a>(
+        &self,
+        resource: impl Into<Resource<'a>>,
+    ) -> ArchiveResult<Vec<u8>> {
+        Ebook::read_resource_bytes(self, resource)
+    }
+
+    //////////////////////////////////
+    // PRIVATE API
+    //////////////////////////////////
+
+    fn transform_resource<'a>(&self, resource: Resource<'a>) -> Resource<'a> {
+        // Decoding must happen first before path normalization
+        let decoded_href = match resource.key() {
+            ResourceKey::Value(value) => uri::decode(value),
+            ResourceKey::Position(_) => return resource,
+        };
+
+        let normalized = if decoded_href.starts_with(uri::SEPARATOR) {
+            uri::normalize(&decoded_href)
+        } else {
+            uri::resolve(&self.package().directory().decode(), &decoded_href)
+        };
+
+        if let Cow::Owned(normalized) = normalized {
+            // Input is not normalized
+            resource.swap_value(normalized)
+        } else if let Cow::Owned(decoded) = decoded_href {
+            // Input is normalized, not decoded
+            resource.swap_value(decoded)
+        } else {
+            // Input is already decoded and normalized
+            resource
+        }
+    }
+
+    fn parse(config: &EpubParseConfig, archive: Box<dyn Archive>) -> EbookResult<Self> {
+        let archive = EpubArchive::new(archive);
+        let data = EpubParser::new(config, &archive).parse()?;
+
+        Ok(Self {
+            archive,
+            package: data.package,
+            metadata: data.metadata,
+            manifest: data.manifest,
+            spine: data.spine,
+            toc: data.toc,
+        })
+    }
+}
+
+impl Sealed for Epub {}
+
+#[allow(refining_impl_trait)]
+impl Ebook for Epub {
+    fn reader(&self) -> EpubReader<'_> {
+        self.reader()
+    }
+
+    fn metadata(&self) -> EpubMetadata<'_> {
+        self.metadata()
+    }
+
+    fn manifest(&self) -> EpubManifest<'_> {
+        self.manifest()
+    }
+
+    fn spine(&self) -> EpubSpine<'_> {
+        self.spine()
+    }
+
+    fn toc(&self) -> EpubToc<'_> {
+        self.toc()
+    }
+
+    fn copy_resource<'a>(
+        &self,
+        resource: impl Into<Resource<'a>>,
+        mut writer: &mut impl Write,
+    ) -> ArchiveResult<u64> {
+        self.copy_resource(resource, &mut writer)
     }
 }
 
 impl PartialEq for Epub {
     fn eq(&self, other: &Self) -> bool {
-        self.package_file() == other.package_file()
+        self.package == other.package
             && self.metadata() == other.metadata()
             && self.manifest() == other.manifest()
             && self.spine() == other.spine()
@@ -393,128 +580,49 @@ impl PartialEq for Epub {
     }
 }
 
-#[derive(Clone, Debug)]
-pub(crate) struct EpubConfig {
-    /// See [`EpubOpenOptions::preferred_toc`].
-    pub(crate) preferred_toc: EpubVersion,
-    /// See [`EpubOpenOptions::preferred_landmarks`].
-    pub(crate) preferred_landmarks: EpubVersion,
-    /// See [`EpubOpenOptions::preferred_page_list`].
-    pub(crate) preferred_page_list: EpubVersion,
-    /// See [`EpubOpenOptions::store_all`].
-    pub(crate) store_all: bool,
-    /// See [`EpubOpenOptions::strict`].
-    pub(crate) strict: bool,
-    /// See [`EpubOpenOptions::skip_metadata`]; inverted.
-    pub(crate) parse_metadata: bool,
-    /// See [`EpubOpenOptions::skip_manifest`]; inverted.
-    pub(crate) parse_manifest: bool,
-    /// See [`EpubOpenOptions::skip_spine`]; inverted.
-    pub(crate) parse_spine: bool,
-    /// See [`EpubOpenOptions::skip_toc`]; inverted.
-    pub(crate) parse_toc: bool,
-}
-
-// Temporary placeholder for now until 0.7.0
-#[allow(deprecated)]
-impl From<EpubOpenOptions> for EpubConfig {
-    fn from(options: EpubOpenOptions) -> Self {
-        Self {
-            preferred_toc: options.preferred_toc,
-            preferred_landmarks: options.preferred_landmarks,
-            preferred_page_list: options.preferred_page_list,
-            store_all: options.store_all,
-            strict: options.strict,
-            parse_metadata: !options.skip_metadata,
-            parse_manifest: !options.skip_manifest,
-            parse_spine: !options.skip_spine,
-            parse_toc: !options.skip_toc,
-        }
-    }
-}
-
-// BACKWARD COMPATIBILITY (Renamed)
-/// Deprecated; prefer [`EpubOpenOptions`] instead.
-#[deprecated(since = "0.6.8", note = "Use `EpubOpenOptions` instead.")]
-pub type EpubSettingsBuilder = EpubOpenOptions;
-/// Deprecated; prefer [`EpubOpenOptions`] instead.
-#[deprecated(since = "0.6.8", note = "Use `EpubOpenOptions` instead.")]
-pub type EpubSettings = EpubOpenOptions;
-
-/// Builder to open an [`Epub`].
+/// Configuration to open an [`Epub`] from a source.
 ///
 /// # Options
 /// ## Parsing Behavior
-/// - [`strict`](EpubOpenOptions::strict)
-/// - [`skip_metadata`](EpubOpenOptions::skip_metadata)
-/// - [`skip_manifest`](EpubOpenOptions::skip_manifest)
-/// - [`skip_spine`](EpubOpenOptions::skip_spine)
-/// - [`skip_toc`](EpubOpenOptions::skip_toc)
+/// - [`strict`](EpubOpenOptions::strict) (Default: `false`)
+/// - [`skip_metadata`](EpubOpenOptions::skip_metadata) (Default: `false`)
+/// - [`skip_manifest`](EpubOpenOptions::skip_manifest) (Default: `false`)
+/// - [`skip_spine`](EpubOpenOptions::skip_spine) (Default: `false`)
+/// - [`skip_toc`](EpubOpenOptions::skip_toc) (Default: `false`)
 /// ## Table of Contents
-/// - [`preferred_toc`](EpubOpenOptions::preferred_toc)
-/// - [`preferred_landmarks`](EpubOpenOptions::preferred_landmarks)
-/// - [`preferred_page_list`](EpubOpenOptions::preferred_page_list)
-/// - [`store_all`](EpubOpenOptions::store_all)
+/// - [`preferred_toc`](EpubOpenOptions::preferred_toc) (Default: [`EpubVersion::Epub3`])
+/// - [`retain_variants`](EpubOpenOptions::retain_variants) (Default: `false`)
 ///
 /// # Examples
 /// - Supplying specific options to open an [`Epub`] with:
-/// ```
-/// # use rbook::ebook::errors::EbookResult;
+/// ```no_run
+/// # use rbook::Epub;
 /// # use rbook::epub::metadata::EpubVersion;
-/// # use rbook::{Ebook, Epub};
-/// # fn main() -> EbookResult<()> {
-/// let epub = Epub::options() // returns `EpubOpenOptions`
-///     .store_all(true)
-///     .strict(false)
-///     .skip_toc(true)
-///     .preferred_landmarks(EpubVersion::EPUB2)
-///     .open("tests/ebooks/example_epub")?;
+/// # fn main() -> rbook::ebook::errors::EbookResult<()> {
+/// let mut options = Epub::options(); // returns `EpubOpenOptions`
+///
+/// options.retain_variants(true)
+///        .strict(true)
+///        .skip_toc(true)
+///        .preferred_toc(EpubVersion::EPUB2);
+///
+/// // Opening multiple EPUBs with the same options
+/// let epub1 = options.open("example.epub")?;
+/// let epub2 = options.open("lotr.epub")?;
+/// let epub3 = options.open("sao.epub")?;
 /// # Ok(())
 /// # }
 /// ```
-#[non_exhaustive]
-#[derive(Clone, Debug)]
-pub struct EpubOpenOptions /*(EpubConfig)*/ {
-    // In 0.7.0, all these fields will be replaced with `EpubConfig`.
-    /// See [`EpubOpenOptions::preferred_toc`].
-    #[deprecated(since = "0.6.8", note = "Use `preferred_toc` method instead.")]
-    pub preferred_toc: EpubVersion,
-    /// See [`EpubOpenOptions::preferred_landmarks`].
-    #[deprecated(since = "0.6.8", note = "Use `preferred_landmarks` method instead.")]
-    pub preferred_landmarks: EpubVersion,
-    /// See [`EpubOpenOptions::preferred_page_list`].
-    #[deprecated(since = "0.6.8", note = "Use `preferred_page_list` method instead.")]
-    pub preferred_page_list: EpubVersion,
-    /// See [`EpubOpenOptions::store_all`].
-    #[deprecated(since = "0.6.8", note = "Use `store_all` method instead.")]
-    pub store_all: bool,
-    /// See [`EpubOpenOptions::strict`].
-    #[deprecated(since = "0.6.8", note = "Use `strict` method instead.")]
-    pub strict: bool,
-    skip_metadata: bool,
-    skip_manifest: bool,
-    skip_spine: bool,
-    skip_toc: bool,
-}
+#[derive(Clone, Debug, Default)]
+pub struct EpubOpenOptions(EpubParseConfig);
 
-#[allow(deprecated)]
 impl EpubOpenOptions {
     /// Creates a new builder with default values.
     ///
     /// # See Also
     /// - [`Epub::options`]
     pub fn new() -> Self {
-        Self {
-            preferred_toc: EpubVersion::EPUB3,
-            preferred_landmarks: EpubVersion::EPUB3,
-            preferred_page_list: EpubVersion::EPUB3,
-            store_all: false,
-            strict: true,
-            skip_metadata: false,
-            skip_manifest: false,
-            skip_spine: false,
-            skip_toc: false,
-        }
+        Self(EpubParseConfig::default())
     }
 
     /// Opens an [`Epub`] from the given [`Path`] with the specified [options](EpubOpenOptions).
@@ -529,10 +637,10 @@ impl EpubOpenOptions {
     /// # See Also
     /// - [`Self::read`] to open from a byte buffer.
     /// - [`Epub::open`] to open an [`Epub`] with default options applied.
-    pub fn open(self, path: impl AsRef<Path>) -> EbookResult<Epub> {
+    pub fn open(&self, path: impl AsRef<Path>) -> EbookResult<Epub> {
         Epub::parse(
-            self.into(),
-            archive::get_archive(path.as_ref()).map_err(EbookError::Archive)?,
+            &self.0,
+            get_archive(path.as_ref()).map_err(EbookError::Archive)?,
         )
     }
 
@@ -553,13 +661,13 @@ impl EpubOpenOptions {
     ///
     /// # See Also
     /// - [`Self::open`] to open from a path (file or directory).
+    /// - [`Epub::read`] to open an [`Epub`] with default options applied.
     ///
     /// # Examples
     /// - Opening from a [`Cursor`](std::io::Cursor) with an underlying [`Vec`] containing bytes:
     /// ```no_run
-    /// # use rbook::ebook::errors::EbookResult;
     /// # use rbook::epub::Epub;
-    /// # fn main() -> EbookResult<()> {
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
     /// # let epub_bytes = b"";
     /// let bytes_vec: Vec<u8> = Vec::from(epub_bytes);
     /// let cursor = std::io::Cursor::new(bytes_vec);
@@ -581,84 +689,58 @@ impl EpubOpenOptions {
         #[cfg(feature = "threadsafe")] R: 'static + Read + Seek + Send + Sync,
         #[cfg(not(feature = "threadsafe"))] R: 'static + Read + Seek,
     >(
-        self,
-        reader: R,
+        &self,
+        source: R,
     ) -> EbookResult<Epub> {
-        Epub::parse(self.into(), Box::new(ZipArchive::new(reader, None)?))
+        Epub::parse(&self.0, Box::new(ZipArchive::new(source, None)?))
     }
 
     //////////////////////////////////
     // BUILDING
     //////////////////////////////////
 
-    /// Prefer a table of contents (toc) format over another as the default
-    /// from [`Toc::contents`](super::Toc::contents).
+    /// Prefer a specific Table of Contents variant (e.g., EPUB 2 NCX).
     ///
-    /// **Formats**:
-    /// - Epub2: `navMap (ncx)`
-    /// - Epub3: `toc (xhtml)`
+    /// **This affects EPUB 3 ebooks that are backwards-compatible with EPUB 2.**
     ///
-    /// If the preferred format is not available,
-    /// the other format is used instead.
+    /// This option dictates which variant is parsed if [`Self::retain_variants`]
+    /// is set to `false`.
     ///
-    /// **This primarily affects EPUB3 ebooks that
-    /// are backwards-compatible with EPUB2.**
+    /// **Variants**:
+    /// - EPUB 2: `navMap (ncx)`
+    /// - EPUB 3: `toc (xhtml)`
+    ///
+    /// If the preferred variant is not available,
+    /// the other variant is used instead.
     ///
     /// Default: [`EpubVersion::Epub3`]
-    pub fn preferred_toc(mut self, version: EpubVersion) -> Self {
-        self.preferred_toc = version;
+    pub fn preferred_toc(&mut self, version: EpubVersion) -> &mut Self {
+        self.0.preferred_toc = version.as_major();
         self
     }
 
-    /// Prefer a landmark format over another as the default
-    /// from [`EpubToc::landmarks`].
-    ///
-    /// **Formats**:
-    /// - Epub2: `guide (opf)`
-    /// - Epub3: `landmarks (xhtml)`
-    ///
-    /// If the preferred format is not available,
-    /// the other format is used instead.
-    ///
-    /// **This primarily affects EPUB3 ebooks that
-    /// are backwards-compatible with EPUB2.**
-    ///
-    /// Default: [`EpubVersion::Epub3`]
-    pub fn preferred_landmarks(mut self, version: EpubVersion) -> Self {
-        self.preferred_landmarks = version;
-        self
-    }
-
-    /// Prefer a page list format over another as the default
-    /// from [`EpubToc::page_list`].
-    ///
-    /// **Formats**:
-    /// - Epub2: `pageList (ncx)`
-    /// - Epub3: `page-list (xhtml)`
-    ///
-    /// If the preferred format is not available,
-    /// the other format is used instead.
-    ///
-    /// **This primarily affects EPUB3 ebooks that
-    /// are backwards-compatible with EPUB2.**
-    ///
-    /// Default: [`EpubVersion::Epub3`]
-    pub fn preferred_page_list(mut self, version: EpubVersion) -> Self {
-        self.preferred_page_list = version;
-        self
-    }
-
-    /// Store **both** EPUB 2 and 3-specific information.
+    /// Retain **both** EPUB 2 and 3-specific information.
     ///
     /// **Currently, this only pertains to the table of contents.**
     ///
-    /// If the epub contains both an EPUB2 `ncx` toc
-    /// and EPUB3 `xhtml` toc, they will both be parsed and
+    /// When set to `true`, if the EPUB contains both an EPUB 2 **NCX** ToC
+    /// and EPUB 3 **XHTML** ToC, they will both be parsed and
     /// added to [`EpubToc`].
+    /// **Otherwise, only the format specified by
+    /// [`Self::preferred_toc`] will be retained.**
+    ///
+    /// # Modification Behavior
+    /// When enabled, all variants are treated independently.
+    /// Modifications made to one (e.g., inserting a ToC entry pointing to a chapter)
+    /// will **not** automatically sync to the other.
+    /// Changes must be applied to both variants manually.
+    ///
+    /// Only one variant is required when writing.
+    /// See [`EpubWriteOptions::generate_toc`] for more details.
     ///
     /// Default: `false`
-    pub fn store_all(mut self, store_all: bool) -> Self {
-        self.store_all = store_all;
+    pub fn retain_variants(&mut self, retain: bool) -> &mut Self {
+        self.0.retain_variants = retain;
         self
     }
 
@@ -669,7 +751,6 @@ impl EpubOpenOptions {
     /// - Has a [**version**](EpubMetadata::version) where `2.0 <= version < 4.0`.
     /// - Has a [**table of contents**](super::Toc::contents).
     /// - Elements (e.g., `item`, `itemref`) have their required attributes present.
-    /// - [Hrefs](Href) are **percent-encoded**.
     ///
     /// If any of the conditions are not met,
     /// an error will be returned.
@@ -678,12 +759,12 @@ impl EpubOpenOptions {
     /// However, it will refuse further processing if malformations are found.**
     ///
     /// # See Also
-    /// - [`EpubFormatError`](errors::EpubFormatError) to see which
+    /// - [`EpubError`](errors::EpubError) to see which
     ///   format errors are ignored when strict mode disabled.
     ///
-    /// Default: `true`
-    pub fn strict(mut self, strict: bool) -> Self {
-        self.strict = strict;
+    /// Default: `false`
+    pub fn strict(&mut self, strict: bool) -> &mut Self {
+        self.0.strict = strict;
         self
     }
 
@@ -702,8 +783,8 @@ impl EpubOpenOptions {
     ///   [`EpubSpineEntry::refinements`](spine::EpubSpineEntry::refinements)).
     ///
     /// Default: `false`
-    pub fn skip_metadata(mut self, skip: bool) -> Self {
-        self.skip_metadata = skip;
+    pub fn skip_metadata(&mut self, skip: bool) -> &mut Self {
+        self.0.parse_metadata = !skip;
         self
     }
 
@@ -734,8 +815,8 @@ impl EpubOpenOptions {
     ///   as it requires a lookup to the manifest.
     ///
     /// Default: `false`
-    pub fn skip_manifest(mut self, skip: bool) -> Self {
-        self.skip_manifest = skip;
+    pub fn skip_manifest(&mut self, skip: bool) -> &mut Self {
+        self.0.parse_manifest = !skip;
         self
     }
 
@@ -751,8 +832,8 @@ impl EpubOpenOptions {
     ///   as readers requires a lookup to the spine.
     ///
     /// Default: `false`
-    pub fn skip_spine(mut self, skip: bool) -> Self {
-        self.skip_spine = skip;
+    pub fn skip_spine(&mut self, skip: bool) -> &mut Self {
+        self.0.parse_spine = !skip;
         self
     }
 
@@ -764,47 +845,8 @@ impl EpubOpenOptions {
     /// If `true`, [`Epub::toc`] will return an empty [`EpubToc`] instance.
     ///
     /// Default: `false`
-    pub fn skip_toc(mut self, skip: bool) -> Self {
-        self.skip_toc = skip;
+    pub fn skip_toc(&mut self, skip: bool) -> &mut Self {
+        self.0.parse_toc = !skip;
         self
-    }
-
-    /// Turn this instance into an [`EpubOpenOptions`] instance.
-    #[deprecated(
-        since = "0.6.8",
-        note = "Use `EpubOpenOptions::open` or `EpubOpenOptions::read` instead."
-    )]
-    pub fn build(self) -> EpubOpenOptions {
-        self
-    }
-
-    /// Deprecated; prefer [`Epub::options`] instead.
-    #[deprecated(
-        since = "0.6.8",
-        note = "Use `Epub::options` or `EpubOpenOptions::new` instead."
-    )]
-    pub fn builder() -> Self {
-        Self::new()
-    }
-}
-
-impl Default for EpubOpenOptions {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-#[derive(Copy, Clone)]
-pub(super) struct EpubResourceProvider<'ebook>(&'ebook ResourceArchive);
-
-/// These methods don't delegate to [`Epub::transform_resource`]
-/// as the input (`resource`) is **trusted**.
-impl EpubResourceProvider<'_> {
-    pub(super) fn read_str(&self, resource: Resource) -> EbookResult<String> {
-        self.0.read_resource_str(&resource).map_err(Into::into)
-    }
-
-    pub(super) fn read_bytes(&self, resource: Resource) -> EbookResult<Vec<u8>> {
-        self.0.read_resource_bytes(&resource).map_err(Into::into)
     }
 }

@@ -3,7 +3,10 @@
 //! # See Also
 //! - [`epub::metadata`][crate::epub::metadata] for the epub-specific metadata module.
 
-use std::fmt::{Display, Formatter};
+pub mod datetime;
+
+use crate::util::Sealed;
+use std::fmt::Display;
 use std::hash::Hash;
 
 /// The metadata of an [`Ebook`](super::Ebook), encompassing detailed information,
@@ -15,10 +18,9 @@ use std::hash::Hash;
 /// # Examples
 /// - Retrieving the [`author`](Metadata::creators) and [`subtitle`](Metadata::title):
 /// ```
-/// # use rbook::{Ebook, Epub};
-/// # use rbook::ebook::metadata::{Metadata, MetaEntry, Title, TitleKind};
-/// # use rbook::ebook::errors::EbookResult;
-/// # fn main() -> EbookResult<()> {
+/// # use rbook::Epub;
+/// # use rbook::ebook::metadata::TitleKind;
+/// # fn main() -> rbook::ebook::errors::EbookResult<()> {
 /// let epub = Epub::open("tests/ebooks/example_epub")?;
 /// let metadata = epub.metadata();
 ///
@@ -36,12 +38,15 @@ use std::hash::Hash;
 /// assert_eq!(1, title.order());
 ///
 /// // Retrieving the last modified date:
-/// let modified = epub.metadata().modified_date().unwrap();
-/// assert_eq!(modified.as_str(), "2023-01-25T10:11:35Z");
+/// let modified = epub.metadata().modified().unwrap();
+/// let date = modified.date();
+/// let time = modified.time();
+/// assert_eq!((2023, 1, 25), (date.year(), date.month(), date.day()));
+/// assert_eq!((10, 11, 35), (time.hour(), time.minute(), time.second()));
 /// # Ok(())
 /// # }
 /// ```
-pub trait Metadata<'ebook> {
+pub trait Metadata<'ebook>: Sealed {
     /// The version of an [`ebook's`](super::Ebook) format in the form of a string.
     ///
     /// # See Also
@@ -50,14 +55,16 @@ pub trait Metadata<'ebook> {
     /// # Examples
     /// - Retrieving the version of an ebook in EPUB format:
     /// ```
-    /// # use rbook::ebook::errors::EbookResult;
+    /// # use rbook::Epub;
     /// # use rbook::ebook::metadata::Metadata;
-    /// # use rbook::{Ebook, Epub};
-    /// # fn main() -> EbookResult<()> {
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
     /// let epub = Epub::open("tests/ebooks/example_epub")?;
     /// let metadata = epub.metadata();
     ///
+    /// // Calling the trait method directly returns `Option<&str>`
     /// assert_eq!(Some("3.3"), Metadata::version_str(&metadata));
+    /// // The inherent method `EpubMetadata::version_str` returns `&str` instead:
+    /// assert_eq!("3.3", metadata.version_str());
     /// # Ok(())
     /// # }
     /// ```
@@ -71,14 +78,18 @@ pub trait Metadata<'ebook> {
     /// # Examples
     /// - Retrieving the version of an ebook in EPUB format:
     /// ```
-    /// # use rbook::ebook::errors::EbookResult;
-    /// # use rbook::ebook::metadata::{Metadata, Version};
-    /// # use rbook::{Ebook, Epub};
-    /// # fn main() -> EbookResult<()> {
+    /// # use rbook::Epub;
+    /// # use rbook::ebook::metadata::Metadata;
+    /// # use rbook::ebook::metadata::Version;
+    /// # use rbook::epub::metadata::EpubVersion;
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
     /// let epub = Epub::open("tests/ebooks/example_epub")?;
     /// let metadata = epub.metadata();
     ///
+    /// // Calling the trait method directly returns `Option<Version>`
     /// assert_eq!(Some(Version(3, 3)), Metadata::version(&metadata));
+    /// // The inherent method `EpubMetadata::version` returns `EpubVersion` instead:
+    /// assert_eq!(EpubVersion::from(Version(3, 3)), metadata.version());
     /// # Ok(())
     /// # }
     /// ```
@@ -89,44 +100,49 @@ pub trait Metadata<'ebook> {
     /// # Examples
     /// - Retrieving the publication date:
     /// ```
-    /// # use rbook::ebook::errors::EbookResult;
-    /// # use rbook::ebook::metadata::{Metadata};
-    /// # use rbook::{Ebook, Epub};
-    /// # fn main() -> EbookResult<()> {
+    /// # use rbook::Epub;
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
     /// let epub = Epub::open("tests/ebooks/epub2")?;
-    /// let publication_date = epub.metadata().publication_date().unwrap();
+    /// let published = epub.metadata().published().unwrap();
+    /// let entry = epub.metadata().published_entry().unwrap();
+    /// let date = published.date();
     ///
-    /// assert_eq!(publication_date.as_str(), "2023-01-25");
+    /// assert_eq!("2023-01-25", entry.value());
+    /// assert_eq!(2023, date.year());
+    /// assert_eq!(1, date.month());
+    /// assert_eq!(25, date.day());
     /// # Ok(())
     /// # }
     /// ```
-    fn publication_date(&self) -> Option<DateTime<'ebook>>;
+    fn published(&self) -> Option<datetime::DateTime>;
 
     /// The last modified date; when an [`Ebook`](super::Ebook) was last modified.
     ///
     /// # See Also
-    /// - [`Self::publication_date`] to retrieve the data en ebook was published.
+    /// - [`Self::published`] to retrieve the data en ebook was published.
     ///
     /// # Examples
     /// - Retrieving the modification date:
     /// ```
-    /// # use rbook::ebook::errors::EbookResult;
-    /// # use rbook::ebook::metadata::{Metadata};
-    /// # use rbook::{Ebook, Epub};
-    /// # fn main() -> EbookResult<()> {
+    /// # use rbook::Epub;
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
     /// let epub = Epub::open("tests/ebooks/epub2")?;
-    /// let modified_date = epub.metadata().modified_date().unwrap();
+    /// let modified = epub.metadata().modified().unwrap();
+    /// let entry = epub.metadata().modified_entry().unwrap();
     ///
-    /// assert_eq!(modified_date.as_str(), "2025-11-27");
+    /// assert_eq!("2025-11-27", entry.value());
+    /// assert_eq!(2025, modified.date().year());
+    /// assert_eq!(0, modified.time().hour());
+    /// assert_eq!(false, modified.time().is_utc());
     /// # Ok(())
     /// # }
     /// ```
-    fn modified_date(&self) -> Option<DateTime<'ebook>>;
+    fn modified(&self) -> Option<datetime::DateTime>;
 
     /// The main unique [`Identifier`] of an [`Ebook`](super::Ebook).
     fn identifier(&self) -> Option<impl Identifier<'ebook> + 'ebook>;
 
-    /// Returns an iterator over **all** [`Identifiers`](Identifier)
+    /// Returns an iterator over **all** [identifiers](Identifier)
     /// by [`order`](MetaEntry::order).
     ///
     /// Note that the first entry may not be the main [`Identifier`],
@@ -153,22 +169,21 @@ pub trait Metadata<'ebook> {
     /// # Examples
     /// - Retrieving the main title:
     /// ```
-    /// # use rbook::{Ebook, Epub};
-    /// # use rbook::ebook::metadata::{Metadata, MetaEntry, Title, TitleKind};
-    /// # use rbook::ebook::errors::EbookResult;
-    /// # fn main() -> EbookResult<()> {
+    /// # use rbook::Epub;
+    /// # use rbook::ebook::metadata::TitleKind;
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
     /// let epub = Epub::open("tests/ebooks/example_epub")?;
     /// let title = epub.metadata().title().unwrap();
     ///
     /// assert_eq!("Example EPUB", title.value());
     /// assert_eq!(TitleKind::Main, title.kind());
-    /// assert_eq!(0, title.order());
+    /// assert_eq!(2, title.order());
     /// # Ok(())
     /// # }
     /// ```
     fn title(&self) -> Option<impl Title<'ebook> + 'ebook>;
 
-    /// Returns an iterator over **all** [`Titles`](Title)
+    /// Returns an iterator over **all** [titles](Title)
     /// by [`order`](MetaEntry::order).
     ///
     /// Note that the first entry may not be the main [`Title`],
@@ -182,22 +197,26 @@ pub trait Metadata<'ebook> {
     /// # Examples
     /// - Retrieving the titles of an ebook:
     /// ```
-    /// # use rbook::{Ebook, Epub};
-    /// # use rbook::ebook::metadata::{Metadata, MetaEntry, Title, TitleKind};
-    /// # use rbook::ebook::errors::EbookResult;
-    /// # fn main() -> EbookResult<()> {
+    /// # use rbook::Epub;
+    /// # use rbook::ebook::metadata::TitleKind;
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
     /// let epub = Epub::open("tests/ebooks/example_epub")?;
     /// let mut titles = epub.metadata().titles();
     ///
-    /// let first = titles.next().unwrap();
-    /// assert_eq!("Example EPUB", first.value());
-    /// assert_eq!(TitleKind::Main, first.kind());
-    /// assert_eq!(0, first.order());
+    /// let title_a = titles.next().unwrap();
+    /// assert_eq!("This is not the main title", title_a.value());
+    /// assert_eq!(TitleKind::Unknown, title_a.kind());
+    /// assert_eq!(0, title_a.order());
     ///
-    /// let second = titles.next().unwrap();
-    /// assert_eq!("A subtitle", second.value());
-    /// assert_eq!(TitleKind::Subtitle, second.kind());
-    /// assert_eq!(1, second.order());
+    /// let title_b = titles.next().unwrap();
+    /// assert_eq!("A subtitle", title_b.value());
+    /// assert_eq!(TitleKind::Subtitle, title_b.kind());
+    /// assert_eq!(1, title_b.order());
+    ///
+    /// let title_c = titles.next().unwrap();
+    /// assert_eq!("Example EPUB", title_c.value());
+    /// assert_eq!(TitleKind::Main, title_c.kind());
+    /// assert_eq!(2, title_c.order());
     /// # Ok(())
     /// # }
     /// ```
@@ -209,24 +228,29 @@ pub trait Metadata<'ebook> {
     /// Returns an iterator over **all** descriptions by [`order`](MetaEntry::order).
     fn descriptions(&self) -> impl Iterator<Item = impl MetaEntry<'ebook> + 'ebook> + 'ebook;
 
-    /// Returns an iterator over **all** [`Creators`](Contributor)
+    /// Returns an iterator over **all** [creators](Contributor)
     /// by [`order`](MetaEntry::order).
     fn creators(&self) -> impl Iterator<Item = impl Contributor<'ebook> + 'ebook> + 'ebook;
 
-    /// Returns an iterator over **all** [`Contributors`](Contributor)
+    /// Returns an iterator over **all** [contributors](Contributor)
     /// by [`order`](MetaEntry::order).
     fn contributors(&self) -> impl Iterator<Item = impl Contributor<'ebook> + 'ebook> + 'ebook;
 
-    /// Returns an iterator over **all** [`Publishers`](Contributor)
+    /// Returns an iterator over **all** [publishers](Contributor)
     /// by [`order`](MetaEntry::order).
     fn publishers(&self) -> impl Iterator<Item = impl Contributor<'ebook> + 'ebook> + 'ebook;
 
-    /// Returns an iterator over **all** [`Tags`](Tag)
+    /// Returns an iterator over **all** generators.
+    ///
+    /// A generator indicates the software used to create an [`Ebook`](super::Ebook).
+    fn generators(&self) -> impl Iterator<Item = impl MetaEntry<'ebook> + 'ebook> + 'ebook;
+
+    /// Returns an iterator over **all** [tags](Tag)
     /// by [`order`](MetaEntry::order).
     fn tags(&self) -> impl Iterator<Item = impl Tag<'ebook> + 'ebook> + 'ebook;
 
     /// Returns an iterator over **all** metadata entries.
-    fn entries(&self) -> impl Iterator<Item = impl MetaEntry<'ebook> + 'ebook> + 'ebook;
+    fn iter(&self) -> impl Iterator<Item = impl MetaEntry<'ebook> + 'ebook> + 'ebook;
 }
 
 /// The scheme of metadata entries, specifying a registry [`source`](Scheme::source)
@@ -245,10 +269,8 @@ pub trait Metadata<'ebook> {
 /// # Examples
 /// - Retrieving the source and code:
 /// ```
-/// # use rbook::ebook::errors::EbookResult;
-/// # use rbook::ebook::metadata::{Metadata, Language};
-/// # use rbook::{Ebook, Epub};
-/// # fn main() -> EbookResult<()> {
+/// # use rbook::Epub;
+/// # fn main() -> rbook::ebook::errors::EbookResult<()> {
 /// let epub = Epub::open("tests/ebooks/example_epub")?;
 /// let primary_language = epub.metadata().language().unwrap();
 /// let scheme = primary_language.scheme();
@@ -320,10 +342,9 @@ impl<'ebook> LanguageTag<'ebook> {
 ///
 /// # Examples
 /// ```
-/// # use rbook::ebook::errors::EbookResult;
-/// # use rbook::ebook::metadata::{Metadata, MetaEntry, LanguageKind};
-/// # use rbook::{Ebook, Epub};
-/// # fn main() -> EbookResult<()> {
+/// # use rbook::Epub;
+/// # use rbook::ebook::metadata::LanguageKind;
+/// # fn main() -> rbook::ebook::errors::EbookResult<()> {
 /// let epub = Epub::open("tests/ebooks/example_epub")?;
 /// let title = epub.metadata().title().unwrap();
 ///
@@ -366,16 +387,14 @@ impl<'ebook> AlternateScript<'ebook> {
 ///
 /// # See Also
 /// - [`EpubMetaEntry`](crate::epub::metadata::EpubMetaEntry) for epub-specific entry information.
-pub trait MetaEntry<'ebook> {
-    /// The text value of an entry.
+pub trait MetaEntry<'ebook>: Sealed {
+    /// The plain text value of an entry.
     ///
     /// # Example
     /// - Retrieving the value of a description:
     /// ```
-    /// # use rbook::ebook::errors::EbookResult;
-    /// # use rbook::ebook::metadata::{Metadata, MetaEntry};
-    /// # use rbook::{Ebook, Epub};
-    /// # fn main() -> EbookResult<()> {
+    /// # use rbook::Epub;
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
     /// let epub = Epub::open("tests/ebooks/example_epub")?;
     /// let description = epub.metadata().description().unwrap();
     ///
@@ -398,10 +417,8 @@ pub trait MetaEntry<'ebook> {
     /// # Example
     /// - Retrieving the order of tags:
     /// ```
-    /// # use rbook::ebook::errors::EbookResult;
-    /// # use rbook::ebook::metadata::{Metadata, MetaEntry};
-    /// # use rbook::{Ebook, Epub};
-    /// # fn main() -> EbookResult<()> {
+    /// # use rbook::Epub;
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
     /// let epub = Epub::open("tests/ebooks/example_epub")?;
     /// let mut tags = epub.metadata().tags();
     ///
@@ -426,10 +443,8 @@ pub trait MetaEntry<'ebook> {
     /// # Example
     /// - Retrieving the sort key:
     /// ```
-    /// # use rbook::ebook::errors::EbookResult;
-    /// # use rbook::ebook::metadata::{Metadata, MetaEntry};
-    /// # use rbook::{Ebook, Epub};
-    /// # fn main() -> EbookResult<()> {
+    /// # use rbook::Epub;
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
     /// let epub = Epub::open("tests/ebooks/example_epub")?;
     ///
     /// let creator = epub.metadata().creators().next().unwrap();
@@ -457,11 +472,9 @@ pub trait MetaEntry<'ebook> {
 /// # Examples
 /// - Retrieving a language's kind and scheme:
 /// ```
-/// # use rbook::ebook::errors::EbookResult;
-/// # use rbook::ebook::metadata::{Metadata, Language, LanguageKind};
-/// # use rbook::{Ebook, Epub};
-/// # fn main() -> EbookResult<()> {
-/// use rbook::ebook::metadata::MetaEntry;
+/// # use rbook::Epub;
+/// # use rbook::ebook::metadata::LanguageKind;
+/// # fn main() -> rbook::ebook::errors::EbookResult<()> {
 /// let epub = Epub::open("tests/ebooks/example_epub")?;
 /// let language = epub.metadata().language().unwrap();
 ///
@@ -496,10 +509,8 @@ pub trait Language<'ebook>: MetaEntry<'ebook> {
 /// # Examples
 /// - Retrieving the main identifier:
 /// ```
-/// # use rbook::ebook::errors::EbookResult;
-/// # use rbook::ebook::metadata::{Metadata, MetaEntry, Identifier};
-/// # use rbook::{Ebook, Epub};
-/// # fn main() -> EbookResult<()> {
+/// # use rbook::Epub;
+/// # fn main() -> rbook::ebook::errors::EbookResult<()> {
 /// let epub = Epub::open("tests/ebooks/example_epub")?;
 /// let identifier = epub.metadata().identifier().unwrap();
 /// let scheme = identifier.scheme().unwrap();
@@ -525,10 +536,9 @@ pub trait Identifier<'ebook>: MetaEntry<'ebook> + Eq + Hash {
 /// # Examples
 /// - Retrieving a title's kind:
 /// ```
-/// # use rbook::ebook::errors::EbookResult;
-/// # use rbook::ebook::metadata::{Metadata, Title, TitleKind};
-/// # use rbook::{Ebook, Epub};
-/// # fn main() -> EbookResult<()> {
+/// # use rbook::Epub;
+/// # use rbook::ebook::metadata::TitleKind;
+/// # fn main() -> rbook::ebook::errors::EbookResult<()> {
 /// let epub = Epub::open("tests/ebooks/example_epub")?;
 /// let subtitle = epub.metadata().titles().nth(1).unwrap();
 ///
@@ -547,7 +557,7 @@ pub trait Title<'ebook>: MetaEntry<'ebook> {
     /// This is a lower-level call than [`Self::kind`] to retrieve the raw string value, if any.
     fn scheme(&self) -> Option<Scheme<'ebook>>;
 
-    /// The title kind enum.
+    /// The kind of title.
     ///
     /// If [`TitleKind::Unknown`] is returned, [`Self::scheme`]
     /// can be used to retrieve the string value of the unknown title kind, if present.
@@ -562,10 +572,8 @@ pub trait Title<'ebook>: MetaEntry<'ebook> {
 /// # Examples
 /// - Retrieving all tags:
 /// ```
-/// # use rbook::ebook::errors::EbookResult;
-/// # use rbook::ebook::metadata::{Metadata, MetaEntry, Tag};
-/// # use rbook::{Ebook, Epub};
-/// # fn main() -> EbookResult<()> {
+/// # use rbook::Epub;
+/// # fn main() -> rbook::ebook::errors::EbookResult<()> {
 /// let epub = Epub::open("tests/ebooks/example_epub")?;
 /// let tags = epub.metadata().tags().collect::<Vec<_>>();
 ///
@@ -601,10 +609,8 @@ pub trait Tag<'ebook>: MetaEntry<'ebook> {
 /// # Examples
 /// - Retrieving an author:
 /// ```
-/// # use rbook::ebook::errors::EbookResult;
-/// # use rbook::ebook::metadata::{Metadata, MetaEntry, Contributor};
-/// # use rbook::{Ebook, Epub};
-/// # fn main() -> EbookResult<()> {
+/// # use rbook::Epub;
+/// # fn main() -> rbook::ebook::errors::EbookResult<()> {
 /// let epub = Epub::open("tests/ebooks/example_epub")?;
 /// let author = epub.metadata().creators().next().unwrap();
 /// let role = author.main_role().unwrap();
@@ -656,7 +662,7 @@ impl LanguageKind {
 }
 
 impl Display for LanguageKind {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.as_str())
     }
 }
@@ -682,19 +688,74 @@ pub enum TitleKind {
 }
 
 impl TitleKind {
-    // **For now**, there is no public From<&str> method for TitleKind because
+    const MAIN: &'static str = "main";
+    const SUBTITLE: &'static str = "subtitle";
+    const SHORT: &'static str = "short";
+    const EXPANDED: &'static str = "expanded";
+    const COLLECTION: &'static str = "collection";
+    const EDITION: &'static str = "edition";
+
+    // **For now**, there is no public From<&str>/as_str method for TitleKind because
     // other ebook formats may have different (and potentially conflicting)
     // mappings (e.g., main-title, primary, etc.)
     pub(super) fn from(kind: &str) -> Self {
         match kind {
-            "main" => Self::Main,
-            "subtitle" => Self::Subtitle,
-            "short" => Self::Short,
-            "collection" => Self::Collection,
-            "edition" => Self::Edition,
-            "expanded" => Self::Expanded,
+            Self::MAIN => Self::Main,
+            Self::SUBTITLE => Self::Subtitle,
+            Self::SHORT => Self::Short,
+            Self::COLLECTION => Self::Collection,
+            Self::EDITION => Self::Edition,
+            Self::EXPANDED => Self::Expanded,
             _ => Self::Unknown,
         }
+    }
+
+    #[cfg(feature = "write")]
+    pub(super) fn as_str(&self) -> Option<&'static str> {
+        match self {
+            Self::Main => Some(Self::MAIN),
+            Self::Subtitle => Some(Self::SUBTITLE),
+            Self::Short => Some(Self::SHORT),
+            Self::Collection => Some(Self::COLLECTION),
+            Self::Edition => Some(Self::EDITION),
+            Self::Expanded => Some(Self::EXPANDED),
+            _ => None,
+        }
+    }
+
+    /// Returns `true` if the title kind is [`TitleKind::Main`]
+    pub fn is_main(&self) -> bool {
+        matches!(self, Self::Main)
+    }
+
+    /// Returns `true` if the title kind is [`TitleKind::Subtitle`]
+    pub fn is_subtitle(&self) -> bool {
+        matches!(self, Self::Subtitle)
+    }
+
+    /// Returns `true` if the title kind is [`TitleKind::Short`]
+    pub fn is_short(&self) -> bool {
+        matches!(self, Self::Short)
+    }
+
+    /// Returns `true` if the title kind is [`TitleKind::Collection`]
+    pub fn is_collection(&self) -> bool {
+        matches!(self, Self::Collection)
+    }
+
+    /// Returns `true` if the title kind is [`TitleKind::Edition`]
+    pub fn is_edition(&self) -> bool {
+        matches!(self, Self::Edition)
+    }
+
+    /// Returns `true` if the title kind is [`TitleKind::Expanded`]
+    pub fn is_expanded(&self) -> bool {
+        matches!(self, Self::Expanded)
+    }
+
+    /// Returns `true` if the title kind is [`TitleKind::Unknown`]
+    pub fn is_unknown(&self) -> bool {
+        matches!(self, Self::Unknown)
     }
 }
 
@@ -744,65 +805,15 @@ impl Version {
     }
 }
 
+impl From<u16> for Version {
+    fn from(version: u16) -> Self {
+        Self(version, 0)
+    }
+}
+
 impl Display for Version {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}.{}", self.0, self.1)
-    }
-}
-
-/// A (non-parsed) datetime from an [`Ebook`](super::Ebook),
-/// typically in `ISO-8601-1` format.
-///
-/// [`DateTime::as_str`] may provide dates in different formats:
-/// - `2025-12-01` (ISO-8601-1)
-/// - `2025-12-01T00:00:00Z` (ISO-8601-1)
-///
-/// Rare and generally not recommended, although possible:
-/// - `December 2025`
-/// - `1.12.2025`
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub struct DateTime<'ebook>(
-    /// Wraps a &str because the format of a date from an ebook is unreliable
-    &'ebook str,
-);
-
-impl<'ebook> DateTime<'ebook> {
-    pub(crate) fn new(datetime: &'ebook str) -> Self {
-        Self(datetime)
-    }
-
-    /// The raw date string.
-    ///
-    /// See the [`DateTime`] struct-level doc for more details.
-    ///
-    /// # Examples
-    /// - Retrieving the publication date of an ebook:
-    /// ```
-    /// # use rbook::ebook::errors::EbookResult;
-    /// # use rbook::ebook::metadata::{Metadata, Version};
-    /// # use rbook::{Ebook, Epub};
-    /// # fn main() -> EbookResult<()> {
-    /// let epub = Epub::open("tests/ebooks/example_epub")?;
-    /// let date = epub.metadata().publication_date().unwrap();
-    ///
-    /// assert_eq!("2023-01-25", date.as_str());
-    /// # Ok(())
-    /// # }
-    /// ```
-    pub fn as_str(&self) -> &'ebook str {
-        self.0
-    }
-}
-
-impl<'ebook> AsRef<str> for DateTime<'ebook> {
-    fn as_ref(&self) -> &'ebook str {
-        self.0
-    }
-}
-
-impl Display for DateTime<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.as_str())
     }
 }
 

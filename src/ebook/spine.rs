@@ -5,7 +5,8 @@
 
 use crate::ebook::manifest::ManifestEntry;
 use crate::ebook::resource::Resource;
-use std::fmt::{Display, Formatter};
+use crate::util::Sealed;
+use std::fmt::Display;
 
 /// The "spine" of an [`Ebook`](super::Ebook) encompassing the canonical
 /// reading order of textual resources intended for end-user reading.
@@ -18,12 +19,10 @@ use std::fmt::{Display, Formatter};
 /// # Examples
 /// - Traversing the contents in canonical order:
 /// ```
-/// # use rbook::ebook::errors::EbookResult;
-/// # use rbook::ebook::spine::Spine;
-/// # use rbook::{Ebook, Epub};
-/// # fn main() -> EbookResult<()> {
+/// # use rbook::Epub;
+/// # fn main() -> rbook::ebook::errors::EbookResult<()> {
 /// let epub = Epub::open("tests/ebooks/example_epub")?;
-/// let mut entries = epub.spine().entries();
+/// let mut entries = epub.spine().iter();
 ///
 /// // Traversing to the cover page (START)
 /// assert_eq!("cover", entries.next().unwrap().idref());
@@ -40,71 +39,67 @@ use std::fmt::{Display, Formatter};
 /// # Ok(())
 /// # }
 /// ```
-pub trait Spine<'ebook> {
+pub trait Spine<'ebook>: Sealed {
     /// The [`PageDirection`] hint, indicating how readable content flows.
     fn page_direction(&self) -> PageDirection;
 
-    /// The total number of [`entries`](SpineEntry) that makes up the spine.
+    /// The total number of [entries](SpineEntry) that makes up the spine.
     ///
     /// # Examples
     /// - Retrieving the count:
     /// ```
-    /// # use rbook::ebook::errors::EbookResult;
-    /// # use rbook::ebook::spine::Spine;
-    /// # use rbook::{Ebook, Epub};
-    /// # fn main() -> EbookResult<()> {
+    /// # use rbook::Epub;
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
     /// let epub = Epub::open("tests/ebooks/example_epub")?;
     ///
     /// // This ebook has 4 readable entries.
     /// assert_eq!(5, epub.spine().len());
-    /// // Invoking `len` is preferred as it
+    /// // Calling `len` is preferred as it
     /// // does not need to consume an iterator.
-    /// assert_eq!(5, epub.spine().entries().count());
+    /// assert_eq!(5, epub.spine().iter().count());
     /// # Ok(())
     /// # }
     /// ```
     fn len(&self) -> usize;
 
-    /// Returns the associated [`SpineEntry`] if the given `order` is less than
+    /// Returns the associated [`SpineEntry`] if the given `index` is less than
     /// [`Self::len`], otherwise [`None`].
     ///
     /// # Examples
     /// - Retrieving a spine entry by its order:
     /// ```
-    /// # use rbook::ebook::errors::EbookResult;
-    /// # use rbook::ebook::spine::{Spine, SpineEntry};
-    /// # use rbook::{Ebook, Epub};
-    /// # fn main() -> EbookResult<()> {
+    /// # use rbook::Epub;
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
     /// let epub = Epub::open("tests/ebooks/example_epub")?;
     /// let spine = epub.spine();
     ///
-    /// let spine_entry = spine.by_order(2).unwrap();
+    /// let spine_entry = spine.get(2).unwrap();
     /// assert_eq!(2, spine_entry.order());
     /// assert_eq!("c1", spine_entry.idref());
     ///
-    /// let spine_entry = spine.by_order(4).unwrap();
+    /// let spine_entry = spine.get(4).unwrap();
     /// assert_eq!(4, spine_entry.order());
     /// assert_eq!("c2", spine_entry.idref());
     ///
     /// // Attempting to retrieve a non-existent out-of-bounds entry.
     /// // Since `len` is 5, the retrievable range is `[0, 4]`.
     /// assert_eq!(5, spine.len());
-    /// assert_eq!(None, spine.by_order(5));
-    /// assert_eq!(None, spine.by_order(100));
+    /// assert_eq!(None, spine.get(5));
+    /// assert_eq!(None, spine.get(100));
     ///
     /// # Ok(())
     /// # }
     /// ```
-    fn by_order(&self, order: usize) -> Option<impl SpineEntry<'ebook> + 'ebook>;
+    fn get(&self, index: usize) -> Option<impl SpineEntry<'ebook> + 'ebook>;
 
-    /// Returns an iterator over all [`entries`](SpineEntry) within
+    /// Returns an iterator over all [entries](SpineEntry) within
     /// the spine in canonical order.
     ///
     /// # See Also
     /// - [`Spine::len`] to retrieve the total number of entries.
-    fn entries(&self) -> impl Iterator<Item = impl SpineEntry<'ebook> + 'ebook> + 'ebook;
+    fn iter(&self) -> impl Iterator<Item = impl SpineEntry<'ebook> + 'ebook> + 'ebook;
 
-    /// Returns `true` if there are no [`entries`](SpineEntry).
+    /// Returns `true` if there are no [entries](SpineEntry).
     ///
     /// Although possible, spines are generally not empty as ebooks *should* have readable content.
     fn is_empty(&self) -> bool {
@@ -116,7 +111,7 @@ pub trait Spine<'ebook> {
 ///
 /// # See Also
 /// - [`EpubSpineEntry`](crate::epub::spine::EpubSpineEntry) for epub-specific entry information.
-pub trait SpineEntry<'ebook>: Ord {
+pub trait SpineEntry<'ebook>: Sealed {
     /// The canonical order of an entry (`0 = first entry`).
     fn order(&self) -> usize;
 
@@ -143,7 +138,7 @@ pub trait SpineEntry<'ebook>: Ord {
 /// the default direction via **style configuration**, **user preferences**, etc.
 ///
 /// The page direction does **not** affect the canonical
-/// order of [`spine`](Spine) [`entries`](SpineEntry).
+/// order of [`Spine`] [entries](SpineEntry).
 /// Instead, it is a hint indicating how the content flows, such as
 /// [`left-to-right (ltr)`](PageDirection::LeftToRight),
 /// [`right-to-left (rtl)`](PageDirection::RightToLeft),
@@ -157,9 +152,11 @@ pub trait SpineEntry<'ebook>: Ord {
 pub enum PageDirection {
     /// Pages flow from left-to-right (`ltr`).
     LeftToRight,
-    /// Pages flow from right-to-left (`rtl`).
+    /// Pages flow from right-to-left (`rtl`) (e.g., Manga).
     RightToLeft,
     /// No specified page direction preference (`default`).
+    ///
+    /// Reader systems commonly treat this as `ltr`.
     #[default]
     Default,
 }
@@ -177,6 +174,21 @@ impl PageDirection {
             Self::RIGHT_TO_LEFT_BYTES => Self::RightToLeft,
             _ => Self::Default,
         }
+    }
+
+    /// Returns `true` if the page direction is [`PageDirection::LeftToRight`].
+    pub fn is_ltr(&self) -> bool {
+        matches!(self, Self::LeftToRight)
+    }
+
+    /// Returns `true` if the page direction is [`PageDirection::RightToLeft`].
+    pub fn is_rtl(&self) -> bool {
+        matches!(self, Self::RightToLeft)
+    }
+
+    /// Returns `true` if the page direction is [`PageDirection::Default`].
+    pub fn is_default(&self) -> bool {
+        matches!(self, Self::Default)
     }
 
     /// Returns the string representation of a [`PageDirection`] preference.
@@ -199,7 +211,7 @@ impl PageDirection {
 }
 
 impl Display for PageDirection {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.as_str())
     }
 }

@@ -1,12 +1,22 @@
 //! EPUB-specific spine content.
+//!
+//! # See Also
+//! - [`ebook::spine`](crate::ebook::spine) for the general spine module.
 
-use crate::ebook::element::{AttributeData, Attributes, Properties, PropertiesData};
-use crate::ebook::epub::manifest::{EpubManifestEntry, EpubManifestEntryProvider};
+#[cfg(feature = "write")]
+mod write;
+
+use crate::ebook::element::{Attributes, AttributesData, Properties, PropertiesData};
+use crate::ebook::epub::manifest::{EpubManifestContext, EpubManifestEntry};
 use crate::ebook::epub::metadata::{EpubRefinements, EpubRefinementsData};
+use crate::ebook::epub::package::EpubPackageMetaContext;
+use crate::ebook::resource::Resource;
 use crate::ebook::spine::{PageDirection, Spine, SpineEntry};
-use std::cmp::Ordering;
-use std::fmt::{Debug, Formatter};
-use std::slice::Iter as SliceIter;
+use crate::util::{self, Sealed};
+use std::fmt::Debug;
+
+#[cfg(feature = "write")]
+pub use write::{DetachedEpubSpineEntry, EpubSpineEntryMut, EpubSpineIterMut, EpubSpineMut};
 
 ////////////////////////////////////////////////////////////////////////////////
 // PRIVATE API
@@ -14,8 +24,8 @@ use std::slice::Iter as SliceIter;
 
 #[derive(Debug, PartialEq)]
 pub(super) struct EpubSpineData {
-    page_direction: PageDirection,
-    entries: Vec<EpubSpineEntryData>,
+    pub(super) page_direction: PageDirection,
+    pub(super) entries: Vec<EpubSpineEntryData>,
 }
 
 impl EpubSpineData {
@@ -34,30 +44,43 @@ impl EpubSpineData {
     }
 }
 
-#[derive(Clone, Debug, Default, Hash, PartialEq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub(super) struct EpubSpineEntryData {
     pub(super) id: Option<String>,
-    pub(super) order: usize,
     pub(super) idref: String,
     pub(super) linear: bool,
     pub(super) properties: PropertiesData,
-    pub(super) attributes: Vec<AttributeData>,
+    pub(super) attributes: AttributesData,
     pub(super) refinements: EpubRefinementsData,
 }
 
 #[derive(Copy, Clone)]
-struct EpubSpineContext<'ebook> {
-    /// Provider for resource lookup within spine entries
-    provider: EpubManifestEntryProvider<'ebook>,
+pub(super) struct EpubSpineContext<'ebook> {
+    manifest_ctx: EpubManifestContext<'ebook>,
+    meta_ctx: EpubPackageMetaContext<'ebook>,
 }
 
 impl<'ebook> EpubSpineContext<'ebook> {
-    fn new(provider: EpubManifestEntryProvider<'ebook>) -> Self {
-        Self { provider }
+    pub(super) fn new(
+        manifest_ctx: EpubManifestContext<'ebook>,
+        meta_ctx: EpubPackageMetaContext<'ebook>,
+    ) -> Self {
+        Self {
+            manifest_ctx,
+            meta_ctx,
+        }
     }
 
-    fn create_entry(self, data: &'ebook EpubSpineEntryData) -> EpubSpineEntry<'ebook> {
-        EpubSpineEntry { ctx: self, data }
+    pub(super) fn create_entry(
+        self,
+        data: &'ebook EpubSpineEntryData,
+        index: usize,
+    ) -> EpubSpineEntry<'ebook> {
+        EpubSpineEntry {
+            ctx: self,
+            data,
+            index,
+        }
     }
 }
 
@@ -65,49 +88,40 @@ impl<'ebook> EpubSpineContext<'ebook> {
 // PUBLIC API
 ////////////////////////////////////////////////////////////////////////////////
 
-/// An EPUB spine, see [`Spine`] for more details.
+/// The EPUB spine, accessible via [`Epub::spine`](super::Epub::spine).
+/// See [`Spine`] for more details.
+///
+/// # See Also
+/// - [`EpubSpineMut`] for a mutable view.
 #[derive(Copy, Clone)]
 pub struct EpubSpine<'ebook> {
     ctx: EpubSpineContext<'ebook>,
-    data: &'ebook EpubSpineData,
+    spine: &'ebook EpubSpineData,
 }
 
 impl<'ebook> EpubSpine<'ebook> {
     pub(super) fn new(
-        provider: EpubManifestEntryProvider<'ebook>,
-        data: &'ebook EpubSpineData,
+        manifest_ctx: EpubManifestContext<'ebook>,
+        meta_ctx: EpubPackageMetaContext<'ebook>,
+        spine: &'ebook EpubSpineData,
     ) -> Self {
         Self {
-            ctx: EpubSpineContext::new(provider),
-            data,
+            ctx: EpubSpineContext::new(manifest_ctx, meta_ctx),
+            spine,
         }
     }
 
-    fn by_predicate(
-        &self,
-        predicate: impl Fn(&EpubSpineEntryData) -> bool,
-    ) -> Option<EpubSpineEntry<'ebook>> {
-        self.data
-            .entries
-            .iter()
-            .find(|&data| predicate(data))
-            .map(|data| self.ctx.create_entry(data))
-    }
-
-    /// Returns the [`EpubSpineEntry`] that matches the given `id` if present,
-    /// otherwise [`None`].
+    /// Returns the [`EpubSpineEntry`] matching the given `id`, or [`None`] if not found.
     ///
     /// # See Also
-    /// - [`Self::by_idref`] to retrieve a spine entry by the [`id`](EpubManifestEntry::id)
+    /// - [`Self::by_idref`] to retrieve spine entries by the [`id`](EpubManifestEntry::id)
     ///   of an [`EpubManifestEntry`].
     ///
     /// # Examples
-    /// - Retrieving a spine entry by its id:
+    /// - Retrieving a spine entry by its ID:
     /// ```
-    /// # use rbook::ebook::errors::EbookResult;
-    /// # use rbook::ebook::spine::SpineEntry;
-    /// # use rbook::{Ebook, Epub};
-    /// # fn main() -> EbookResult<()> {
+    /// # use rbook::Epub;
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
     /// let epub = Epub::open("tests/ebooks/example_epub")?;
     ///
     /// let spine_entry = epub.spine().by_id("supplementary").unwrap();
@@ -120,78 +134,122 @@ impl<'ebook> EpubSpine<'ebook> {
     /// # }
     /// ```
     pub fn by_id(&self, id: &str) -> Option<EpubSpineEntry<'ebook>> {
-        self.by_predicate(|data| data.id.as_deref() == Some(id))
+        self.spine
+            .entries
+            .iter()
+            .enumerate()
+            .find(|(_, data)| data.id.as_deref() == Some(id))
+            .map(|(i, data)| self.ctx.create_entry(data, i))
     }
 
-    /// Returns the [`EpubSpineEntry`] that matches the given `idref` if present,
-    /// otherwise [`None`].
+    /// Returns an iterator over all entries matching the given `idref`.
     ///
     /// An [`idref`](EpubSpineEntry::idref) is the [`id`](EpubManifestEntry::id) of a
     /// [`EpubManifestEntry`] referenced by a spine entry.
     ///
+    /// Albeit uncommon, more than one spine entry can reference the same manifest entry.
+    ///
     /// # Examples
     /// - Retrieving a spine entry by its idref:
     /// ```
-    /// # use rbook::ebook::errors::EbookResult;
-    /// # use rbook::ebook::spine::SpineEntry;
-    /// # use rbook::{Ebook, Epub};
-    /// # fn main() -> EbookResult<()> {
+    /// # use rbook::Epub;
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
     /// let epub = Epub::open("tests/ebooks/example_epub")?;
     ///
-    /// let spine_entry = epub.spine().by_idref("c1").unwrap();
+    /// let spine_entry = epub.spine().by_idref("c1").next().unwrap();
     /// assert_eq!("c1", spine_entry.idref());
     /// assert_eq!(2, spine_entry.order());
     ///
-    /// let spine_entry = epub.spine().by_idref("c2").unwrap();
-    /// assert_eq!("c2", spine_entry.idref());
-    /// assert_eq!(4, spine_entry.order());
-    ///
     /// // Attempt to retrieve a non-existent entry
-    /// assert_eq!(None, epub.spine().by_idref("c999"));
+    /// assert_eq!(None, epub.spine().by_idref("c999").next());
     /// # Ok(())
     /// # }
     /// ```
-    pub fn by_idref(&self, idref: &str) -> Option<EpubSpineEntry<'ebook>> {
-        self.by_predicate(|data| data.idref == idref)
-    }
-}
+    pub fn by_idref(
+        &self,
+        idref: &'ebook str,
+    ) -> impl Iterator<Item = EpubSpineEntry<'ebook>> + 'ebook {
+        let ctx = self.ctx;
 
-#[allow(refining_impl_trait)]
-impl<'ebook> Spine<'ebook> for EpubSpine<'ebook> {
-    fn page_direction(&self) -> PageDirection {
-        self.data.page_direction
-    }
-
-    fn len(&self) -> usize {
-        self.data.entries.len()
-    }
-
-    fn by_order(&self, order: usize) -> Option<EpubSpineEntry<'ebook>> {
-        self.data
+        self.spine
             .entries
-            .get(order)
-            .map(|data| self.ctx.create_entry(data))
+            .iter()
+            .enumerate()
+            .filter(move |(_, data)| data.idref == idref)
+            .map(move |(i, data)| ctx.create_entry(data, i))
     }
 
-    fn entries(&self) -> EpubSpineIter<'ebook> {
+    /// The [`PageDirection`] hint, indicating how readable content flows.
+    #[doc = util::inherent_doc!(Spine, page_direction)]
+    pub fn page_direction(&self) -> PageDirection {
+        self.spine.page_direction
+    }
+
+    /// The total number of [entries](EpubSpineEntry) that makes up the spine.
+    #[doc = util::inherent_doc!(Spine, len)]
+    pub fn len(&self) -> usize {
+        self.spine.entries.len()
+    }
+
+    /// Returns `true` if there are no [entries](EpubSpineEntry).
+    #[doc = util::inherent_doc!(Spine, is_empty)]
+    pub fn is_empty(&self) -> bool {
+        Spine::is_empty(self)
+    }
+
+    /// Returns the associated [`EpubSpineEntry`] if the given `index` is less than
+    /// [`Self::len`], otherwise [`None`].
+    #[doc = util::inherent_doc!(Spine, get)]
+    pub fn get(&self, index: usize) -> Option<EpubSpineEntry<'ebook>> {
+        self.spine
+            .entries
+            .get(index)
+            .map(|data| self.ctx.create_entry(data, index))
+    }
+
+    /// Returns an iterator over all [entries](EpubSpineEntry) within
+    /// the spine in canonical order.
+    #[doc = util::inherent_doc!(Spine, iter)]
+    pub fn iter(&self) -> EpubSpineIter<'ebook> {
         EpubSpineIter {
             ctx: self.ctx,
-            iter: self.data.entries.iter(),
+            iter: self.spine.entries.iter().enumerate(),
         }
     }
 }
 
+impl Sealed for EpubSpine<'_> {}
+
+#[allow(refining_impl_trait)]
+impl<'ebook> Spine<'ebook> for EpubSpine<'ebook> {
+    fn page_direction(&self) -> PageDirection {
+        self.page_direction()
+    }
+
+    fn len(&self) -> usize {
+        self.len()
+    }
+
+    fn get(&self, order: usize) -> Option<EpubSpineEntry<'ebook>> {
+        self.get(order)
+    }
+
+    fn iter(&self) -> EpubSpineIter<'ebook> {
+        self.iter()
+    }
+}
+
 impl Debug for EpubSpine<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("EpubSpine")
-            .field("data", self.data)
+            .field("data", self.spine)
             .finish_non_exhaustive()
     }
 }
 
 impl PartialEq for EpubSpine<'_> {
     fn eq(&self, other: &Self) -> bool {
-        self.data == other.data
+        self.spine == other.spine
     }
 }
 
@@ -200,7 +258,7 @@ impl<'ebook> IntoIterator for &EpubSpine<'ebook> {
     type IntoIter = EpubSpineIter<'ebook>;
 
     fn into_iter(self) -> EpubSpineIter<'ebook> {
-        self.entries()
+        self.iter()
     }
 }
 
@@ -209,21 +267,20 @@ impl<'ebook> IntoIterator for EpubSpine<'ebook> {
     type IntoIter = EpubSpineIter<'ebook>;
 
     fn into_iter(self) -> EpubSpineIter<'ebook> {
-        self.entries()
+        self.iter()
     }
 }
 
-/// An iterator over all the [`entries`](EpubSpineEntry) of an [`EpubSpine`].
+/// An iterator over all the [entries](EpubSpineEntry) contained within [`EpubSpine`].
 ///
 /// # See Also
-/// - [`EpubSpine::entries`]
+/// - [`EpubSpine::iter`] to create an instance of this struct.
 ///
 /// # Examples
 /// - Iterating over all manifest entries:
 /// ```
-/// # use rbook::ebook::errors::EbookResult;
-/// # use rbook::{Ebook, Epub};
-/// # fn main() -> EbookResult<()> {
+/// # use rbook::Epub;
+/// # fn main() -> rbook::ebook::errors::EbookResult<()> {
 /// let epub = Epub::open("tests/ebooks/example_epub")?;
 ///
 /// for entry in epub.spine() {
@@ -234,31 +291,37 @@ impl<'ebook> IntoIterator for EpubSpine<'ebook> {
 /// ```
 pub struct EpubSpineIter<'ebook> {
     ctx: EpubSpineContext<'ebook>,
-    iter: SliceIter<'ebook, EpubSpineEntryData>,
+    iter: std::iter::Enumerate<std::slice::Iter<'ebook, EpubSpineEntryData>>,
 }
 
 impl<'ebook> Iterator for EpubSpineIter<'ebook> {
     type Item = EpubSpineEntry<'ebook>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.iter.next().map(|data| self.ctx.create_entry(data))
+        self.iter
+            .next()
+            .map(|(i, data)| self.ctx.create_entry(data, i))
     }
 }
 
 /// An entry contained within an [`EpubSpine`], encompassing associated metadata.
+///
+/// # See Also
+/// - [`EpubSpineEntryMut`] for a mutable view.
 #[derive(Copy, Clone)]
 pub struct EpubSpineEntry<'ebook> {
     ctx: EpubSpineContext<'ebook>,
     data: &'ebook EpubSpineEntryData,
+    index: usize,
 }
 
 impl<'ebook> EpubSpineEntry<'ebook> {
-    /// The unique id of a spine entry.
+    /// The unique ID of a spine entry.
     pub fn id(&self) -> Option<&'ebook str> {
         self.data.id.as_deref()
     }
 
-    /// The unique id reference to an [`EpubManifestEntry`] in the
+    /// The unique ID reference to an [`EpubManifestEntry`] in the
     /// [`EpubManifest`](super::EpubManifest).
     ///
     /// For direct access to the resource, [`Self::resource`] or
@@ -293,63 +356,71 @@ impl<'ebook> EpubSpineEntry<'ebook> {
     ///
     /// See the specification for more details regarding properties:
     /// <https://www.w3.org/TR/epub/#app-itemref-properties-vocab>
-    pub fn properties(&self) -> Properties<'ebook> {
-        (&self.data.properties).into()
+    pub fn properties(&self) -> &'ebook Properties {
+        &self.data.properties
     }
 
     /// All additional XML [`Attributes`].
     ///
     /// # Omitted Attributes
-    /// The following attributes will **not** be found within the returned collection:
+    /// The following attributes will not be found within the returned collection:
     /// - [`id`](Self::id)
     /// - [`idref`](Self::idref)
     /// - [`linear`](Self::is_linear)
     /// - [`properties`](Self::properties)
-    pub fn attributes(&self) -> Attributes<'ebook> {
-        (&self.data.attributes).into()
+    pub fn attributes(&self) -> &'ebook Attributes {
+        &self.data.attributes
     }
 
     /// Complementary refinement metadata entries.
     pub fn refinements(&self) -> EpubRefinements<'ebook> {
-        (&self.data.refinements).into()
+        self.ctx
+            .meta_ctx
+            .create_refinements(self.id(), &self.data.refinements)
+    }
+
+    /// The canonical order of an entry (`0 = first entry`).
+    #[doc = util::inherent_doc!(SpineEntry, order)]
+    pub fn order(&self) -> usize {
+        self.index
+    }
+
+    /// The [`EpubManifestEntry`] associated with a [`EpubSpineEntry`].
+    #[doc = util::inherent_doc!(SpineEntry, manifest_entry)]
+    pub fn manifest_entry(&self) -> Option<EpubManifestEntry<'ebook>> {
+        self.ctx.manifest_ctx.by_id(self.idref())
+    }
+
+    /// The textual [`Resource`] intended for end-user reading an entry points to.
+    #[doc = util::inherent_doc!(SpineEntry, resource)]
+    pub fn resource(&self) -> Option<Resource<'ebook>> {
+        SpineEntry::resource(self)
     }
 }
+
+impl Sealed for EpubSpineEntry<'_> {}
 
 #[allow(refining_impl_trait)]
 impl<'ebook> SpineEntry<'ebook> for EpubSpineEntry<'ebook> {
     fn order(&self) -> usize {
-        self.data.order
+        self.order()
     }
 
     fn manifest_entry(&self) -> Option<EpubManifestEntry<'ebook>> {
-        self.ctx.provider.by_id(self.idref())
+        self.manifest_entry()
     }
 }
 
 impl Debug for EpubSpineEntry<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("EpubSpineEntry")
             .field("data", self.data)
             .finish_non_exhaustive()
     }
 }
 
-impl Ord for EpubSpineEntry<'_> {
-    fn cmp(&self, other: &Self) -> Ordering {
-        self.order().cmp(&other.order())
-    }
-}
-
-impl Eq for EpubSpineEntry<'_> {}
-
 impl PartialEq for EpubSpineEntry<'_> {
     fn eq(&self, other: &Self) -> bool {
         self.data == other.data
-    }
-}
-
-impl PartialOrd<Self> for EpubSpineEntry<'_> {
-    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
-        Some(self.cmp(other))
     }
 }

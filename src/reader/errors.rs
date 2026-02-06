@@ -1,6 +1,6 @@
 //! Error-related types for a [`Reader`](super::Reader).
 
-use crate::ebook::errors::{EbookError, FormatError};
+use crate::ebook::errors::{ArchiveError, FormatError};
 use thiserror::Error;
 
 /// Alias for `Result<T, ReaderError>`.
@@ -14,9 +14,9 @@ pub type ReaderResult<T> = Result<T, ReaderError>;
 /// - [`OutOfBounds`](ReaderError::OutOfBounds)
 /// - [`NoMapping`](ReaderError::NoMapping)
 /// ## Output Errors
-/// Not directly caused by input; indicates a deeper problem in an ebook’s contents.
-/// - [`MalformedEbook`](ReaderError::MalformedEbook)
-/// - [`InvalidEbookContent`](ReaderError::InvalidEbookContent)
+/// Not directly caused by input, indicating a malformed ebook.
+/// - [`Archive`](ReaderError::Archive)
+/// - [`Format`](ReaderError::Format)
 #[non_exhaustive]
 #[derive(Error, Debug)]
 pub enum ReaderError {
@@ -38,13 +38,23 @@ pub enum ReaderError {
         String,
     ),
 
-    /// Content retrieval failed due to a malformed ebook
-    /// (e.g., malformed or missing required data).
+    /// Retrieval of reader content within an ebook archive has failed.
+    ///
+    /// When converting a [`ReaderError`] into [`EbookError`](crate::ebook::errors::EbookError),
+    /// implicitly using the try-operator (`?`) or explicitly using
+    /// [`EbookError::from`](crate::ebook::errors::EbookError::from),
+    /// this variant is retrievable from
+    /// [`EbookError::Archive`](crate::ebook::errors::EbookError::Archive) ***instead***.
     #[error(transparent)]
-    MalformedEbook(#[from] FormatError),
+    Archive(#[from] ArchiveError),
 
-    /// An unexpected error propagated from the underlying [`Ebook`](crate::Ebook)
-    /// of a [`Reader`](super::Reader).
+    /// Malformed file contents, such as essential fields missing.
+    ///
+    /// When converting a [`ReaderError`] into [`EbookError`](crate::ebook::errors::EbookError),
+    /// implicitly using the try-operator (`?`) or explicitly using
+    /// [`EbookError::from`](crate::ebook::errors::EbookError::from),
+    /// this variant is retrievable from
+    /// [`EbookError::Format`](crate::ebook::errors::EbookError::Format) ***instead***.
     #[error(transparent)]
-    InvalidEbookContent(#[from] EbookError),
+    Format(#[from] FormatError),
 }

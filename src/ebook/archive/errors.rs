@@ -1,8 +1,10 @@
+use crate::ebook::errors::UtfError;
 use crate::ebook::resource::Resource;
 use std::io;
 use std::path::PathBuf;
 
-pub(super) type ArchiveResult<T> = Result<T, ArchiveError>;
+/// Alias for `Result<T, ArchiveError>`.
+pub type ArchiveResult<T> = Result<T, ArchiveError>;
 
 /// Possible errors from an archive contained within an [`Ebook`](crate::Ebook).
 #[non_exhaustive]
@@ -11,9 +13,14 @@ pub enum ArchiveError {
     /// The content exists (such as a resource contained within an archive),
     /// although is unable to be read due to invalid utf8.
     ///
-    /// This may occur when requesting to read a resource by string.
-    #[error("[InvalidUtf8Resource - `{0}`]: Resource value cannot be read as UTF-8")]
-    InvalidUtf8Resource(Resource<'static>),
+    /// This can occur when requesting to read a resource by string.
+    #[error("[InvalidUtf8Resource - `{resource}`]: Resource value cannot be read as UTF-8")]
+    InvalidUtf8Resource {
+        /// The root cause of the error.
+        source: UtfError,
+        /// The [`Resource`] responsible for triggering the error.
+        resource: Resource<'static>,
+    },
 
     /// A given resource does not point to a valid location.
     #[error("[InvalidResource - `{resource}`]: {source}")]
@@ -37,7 +44,7 @@ pub enum ArchiveError {
     /// The archive itself is unreadable due to not existing,
     /// unsupported format, or malformed state.
     ///
-    /// This error is generally thrown **before** an archive is instantiated.
+    /// This error is *generally* thrown **before** an archive is instantiated.
     ///
     /// Path *is* [`None`] when an improper reader `R: Read + Seek`,
     /// is supplied during ebook instantiation from a method such as

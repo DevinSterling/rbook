@@ -8,6 +8,7 @@ pub mod errors;
 use crate::ebook::manifest::ManifestEntry;
 use crate::ebook::spine::SpineEntry;
 use crate::reader::errors::ReaderResult;
+use crate::util::Sealed;
 
 /// A sequential + random-access [`Ebook`](super::reader) reader.
 ///
@@ -21,10 +22,8 @@ use crate::reader::errors::ReaderResult;
 /// # Examples
 /// - Streaming over a reader's contents:
 /// ```
-/// # use rbook::{Ebook, Epub};
-/// # use rbook::reader::{Reader, ReaderContent};
-/// # use std::error::Error;
-/// # fn main() -> Result<(), Box<dyn Error>> {
+/// # use rbook::Epub;
+/// # fn main() -> rbook::ebook::errors::EbookResult<()> {
 /// let epub = Epub::open("tests/ebooks/example_epub")?;
 /// let mut reader = epub.reader();
 /// # let mut count = 0;
@@ -41,10 +40,8 @@ use crate::reader::errors::ReaderResult;
 /// ```
 /// - Random access:
 /// ```
-/// # use rbook::{Ebook, Epub};
-/// # use rbook::reader::{Reader, ReaderContent};
-/// # use std::error::Error;
-/// # fn main() -> Result<(), Box<dyn Error>> {
+/// # use rbook::Epub;
+/// # fn main() -> rbook::ebook::errors::EbookResult<()> {
 /// let epub = Epub::open("tests/ebooks/example_epub")?;
 /// let mut reader = epub.reader();
 ///
@@ -57,7 +54,7 @@ use crate::reader::errors::ReaderResult;
 /// # Ok(())
 /// # }
 /// ```
-pub trait Reader<'ebook> {
+pub trait Reader<'ebook>: Sealed {
     /// Resets the reader's cursor to its initial state; **before** the first entry.
     ///
     /// After calling this method:
@@ -69,10 +66,8 @@ pub trait Reader<'ebook> {
     /// # Examples
     /// - Assessing the current cursor position state:
     /// ```
-    /// # use rbook::{Ebook, Epub};
-    /// # use rbook::reader::{Reader, ReaderContent};
-    /// # use std::error::Error;
-    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// # use rbook::Epub;
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
     /// let epub = Epub::open("tests/ebooks/example_epub")?;
     /// let mut reader = epub.reader();
     ///
@@ -87,7 +82,7 @@ pub trait Reader<'ebook> {
     ///
     /// assert_eq!(0, reader.remaining());
     ///
-    /// // Resetting the cursor, so it's **before** the first element
+    /// // Resetting the cursor, so it is **before** the first element
     /// reader.reset();
     /// assert_eq!(None, reader.current_position());
     /// assert_eq!(5, reader.remaining());
@@ -112,10 +107,8 @@ pub trait Reader<'ebook> {
     /// # Examples
     /// - Observing how `read_next` affects the cursor position:
     /// ```
-    /// # use rbook::{Ebook, Epub};
-    /// # use rbook::reader::Reader;
-    /// # use std::error::Error;
-    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// # use rbook::Epub;
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
     /// let epub = Epub::open("tests/ebooks/example_epub")?;
     /// let mut reader = epub.reader();
     ///
@@ -149,10 +142,8 @@ pub trait Reader<'ebook> {
     /// # Examples
     /// - Observing how `read_prev` affects the cursor position:
     /// ```
-    /// # use rbook::{Ebook, Epub};
-    /// # use rbook::reader::Reader;
-    /// # use std::error::Error;
-    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// # use rbook::Epub;
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
     /// let epub = Epub::open("tests/ebooks/example_epub")?;
     /// let mut reader = epub.reader();
     ///
@@ -239,10 +230,8 @@ pub trait Reader<'ebook> {
     /// # Examples
     /// - Retrieving the position upon navigating:
     /// ```
-    /// # use rbook::{Ebook, Epub};
-    /// # use rbook::reader::{Reader, ReaderContent};
-    /// # use std::error::Error;
-    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// # use rbook::Epub;
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
     /// let epub = Epub::open("tests/ebooks/example_epub")?;
     /// let mut reader = epub.reader();
     ///
@@ -276,10 +265,8 @@ pub trait Reader<'ebook> {
     /// # Examples
     /// - Observing the number of contents remaining:
     /// ```
-    /// # use rbook::{Ebook, Epub};
-    /// # use rbook::reader::{Reader, ReaderContent};
-    /// # use std::error::Error;
-    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// # use rbook::Epub;
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
     /// let epub = Epub::open("tests/ebooks/example_epub")?;
     /// let mut reader = epub.reader();
     ///
@@ -302,15 +289,14 @@ pub trait Reader<'ebook> {
         }
     }
 
-    /// Returns `true` if the reader has no [`ReaderContent`] to provide; a [`Reader::len`] of `0`.
+    /// Returns `true` if the reader has no [`ReaderContent`] to provide;
+    /// a [length](`Self::len`) of `0`.
     ///
     /// # Examples
     /// - Assessing if a reader has content:
     /// ```
-    /// # use rbook::{Ebook, Epub};
-    /// # use rbook::reader::{Reader, ReaderContent};
-    /// # use std::error::Error;
-    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// # use rbook::Epub;
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
     /// let epub = Epub::open("tests/ebooks/example_epub")?;
     /// let mut reader = epub.reader();
     ///
@@ -330,17 +316,14 @@ pub trait Reader<'ebook> {
 /// # Examples
 /// - Retrieving the content of the same entry by different [`keys`](ReaderKey):
 /// ```
-/// # use rbook::{Ebook, Epub};
-/// # use rbook::reader::{Reader, ReaderContent};
-/// # use rbook::ebook::manifest::ManifestEntry;
-/// # use std::error::Error;
-/// # fn main() -> Result<(), Box<dyn Error>> {
+/// # use rbook::Epub;
+/// # fn main() -> rbook::ebook::errors::EbookResult<()> {
 /// let epub = Epub::open("tests/ebooks/example_epub")?;
 /// let mut reader = epub.reader();
 ///
 /// let entry_by_idref = reader.get("cover")?;
 /// let entry_by_position = reader.get(0)?;
-/// let kind =  entry_by_idref.manifest_entry().resource_kind();
+/// let kind =  entry_by_idref.manifest_entry().kind();
 ///
 /// assert_eq!(0, entry_by_idref.position());
 /// assert_eq!(0, entry_by_position.position());
@@ -358,7 +341,7 @@ pub trait Reader<'ebook> {
 /// # Ok(())
 /// # }
 /// ```
-pub trait ReaderContent<'ebook>: PartialEq + Into<String> + Into<Vec<u8>> {
+pub trait ReaderContent<'ebook>: Into<String> + Into<Vec<u8>> + Sealed {
     /// The position of reader content within a [`Reader`] (0-index-based).
     ///
     /// This value may not equal [`SpineEntry::order`] depending
@@ -367,12 +350,9 @@ pub trait ReaderContent<'ebook>: PartialEq + Into<String> + Into<Vec<u8>> {
     /// # Examples
     /// - Showcasing different positioning regarding EPUB:
     /// ```
-    /// # use rbook::{Ebook, Epub};
-    /// # use rbook::ebook::spine::SpineEntry;
+    /// # use rbook::Epub;
     /// # use rbook::epub::reader::LinearBehavior;
-    /// # use rbook::reader::{Reader, ReaderContent};
-    /// # use std::error::Error;
-    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
     /// let epub = Epub::open("tests/ebooks/example_epub")?;
     ///
     /// // Reader with non-linear spine entries prepended at the start of its internal buffer.
@@ -417,10 +397,8 @@ pub trait ReaderContent<'ebook>: PartialEq + Into<String> + Into<Vec<u8>> {
     /// # Examples:
     /// - Extracting the contained content in the form of a [`String`]:
     /// ```
-    /// # use rbook::{Ebook, Epub};
-    /// # use rbook::reader::{Reader, ReaderContent};
-    /// # use std::error::Error;
-    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// # use rbook::Epub;
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
     /// let epub = Epub::open("tests/ebooks/example_epub")?;
     /// let mut reader = epub.reader();
     ///
@@ -442,10 +420,8 @@ pub trait ReaderContent<'ebook>: PartialEq + Into<String> + Into<Vec<u8>> {
     /// # Examples:
     /// - Extracting the contained content in the form of bytes:
     /// ```
-    /// # use rbook::{Ebook, Epub};
-    /// # use rbook::reader::{Reader, ReaderContent};
-    /// # use std::error::Error;
-    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// # use rbook::Epub;
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
     /// let epub = Epub::open("tests/ebooks/example_epub")?;
     /// let mut reader = epub.reader();
     ///

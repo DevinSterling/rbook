@@ -1,18 +1,4 @@
-use std::string::{FromUtf8Error, FromUtf16Error};
-use thiserror::Error;
-
-/// Specific error details regarding `UTF`.
-///
-/// **Candidate to become part of the public API in v0.7.0.**
-#[derive(Error, Debug)]
-pub(crate) enum UtfError {
-    #[error("UTF-16 data needs to contain an even amount of bytes")]
-    UnevenByteCount,
-    #[error(transparent)]
-    InvalidUtf8(FromUtf8Error),
-    #[error(transparent)]
-    InvalidUtf16(FromUtf16Error),
-}
+use crate::ebook::errors::UtfError;
 
 // Support for UTF-16 by converting it to UTF-8
 pub(crate) fn into_utf8(data: Vec<u8>) -> Result<Vec<u8>, UtfError> {
@@ -37,20 +23,21 @@ fn is_utf16(data: &[u8]) -> bool {
 }
 
 fn from_utf16(data: &[u8]) -> Result<String, UtfError> {
-    // Determine byte order for little endian (le) and big endian (be)
-    let endian = if data.starts_with(b"\xFF") {
-        u16::from_le_bytes
-    } else {
-        u16::from_be_bytes
+    let (chunks, []) = data.as_chunks::<2>() else {
+        return Err(UtfError::UnevenByteCount(data.len()));
     };
+    let (endian, start): (fn([u8; 2]) -> u16, _) = match chunks.first() {
+        // Determine byte order for little endian (le) and big endian (be)
+        Some(b"\xFF\xFE") => (u16::from_le_bytes, 1),
+        Some(b"\xFE\xFF") => (u16::from_be_bytes, 1),
+        // No BOM
+        _ => (u16::from_be_bytes, 0),
+    };
+    let utf16 = chunks[start..].iter().copied().map(endian);
 
-    let utf16 = data[2..]
-        .chunks(2)
-        .map(|chunk| chunk.try_into().map(endian))
-        .collect::<Result<Vec<_>, _>>()
-        .map_err(|_| UtfError::UnevenByteCount)?;
-
-    String::from_utf16(utf16.as_ref()).map_err(UtfError::InvalidUtf16)
+    char::decode_utf16(utf16)
+        .collect::<Result<String, _>>()
+        .map_err(UtfError::UndecodableUtf16)
 }
 
 #[cfg(test)]
@@ -61,16 +48,17 @@ mod tests {
     const UTF_16_BE: &[u8] = b"\xFE\xFF\x00\x55\x00\x54\x00\x46\x00\x2D\x00\x38";
     // Unsupported UTF-16; no BOM available for conversion
     const UTF_16_NO_BOM: &[u8] = b"\x55\x00\x54\x00\x46\x00\x2D\x00\x38\x00";
-    // Malformed; has a BOM although, does not have an even number of bytes
-    const UTF_16_MALFORMED: &[u8] = b"\xFF\xFE\x55";
+    // Malformed UTF-16
+    const UTF_16_UNEVEN_BYTES: &[u8] = b"\xFF\xFE\x55";
+    const UTF_16_UNPAIRED_SURROGATE: &[u8] = b"\xFF\xFE\x00\xD8\x41\x00";
 
     #[test]
     fn test_is_utf16() {
         assert!(super::is_utf16(UTF_16_LE));
         assert!(super::is_utf16(UTF_16_BE));
-        assert!(super::is_utf16(UTF_16_MALFORMED));
+        assert!(super::is_utf16(UTF_16_UNEVEN_BYTES));
         assert!(!super::is_utf16(UTF_16_NO_BOM));
-        assert!(!super::is_utf16(UTF_8.as_ref()));
+        assert!(!super::is_utf16(UTF_8.as_bytes()));
         assert!(!super::is_utf16(b""));
         assert!(!super::is_utf16(b"\xFF"));
         assert!(!super::is_utf16(b"\xFE"));
@@ -88,7 +76,8 @@ mod tests {
             UTF_16_NO_BOM,
             super::into_utf8(UTF_16_NO_BOM.to_vec()).unwrap()
         );
-        assert!(super::into_utf8(UTF_16_MALFORMED.to_vec()).is_err());
+        assert!(super::into_utf8(UTF_16_UNEVEN_BYTES.to_vec()).is_err());
+        assert!(super::into_utf8(UTF_16_UNPAIRED_SURROGATE.to_vec()).is_err());
     }
 
     #[test]
@@ -102,7 +91,7 @@ mod tests {
             "U\x00T\x00F\x00-\x008\x00",
             super::into_utf8_str(UTF_16_NO_BOM.to_vec()).unwrap(),
         );
-        assert!(super::into_utf8_str(UTF_16_MALFORMED.to_vec()).is_err());
+        assert!(super::into_utf8_str(UTF_16_UNEVEN_BYTES.to_vec()).is_err());
     }
 
     #[test]
@@ -110,9 +99,8 @@ mod tests {
         assert_eq!(UTF_8, super::from_utf16(UTF_16_LE).unwrap());
         assert_eq!(UTF_8, super::from_utf16(UTF_16_BE).unwrap());
 
-        assert!(super::from_utf16(UTF_16_MALFORMED).is_err());
+        assert!(super::from_utf16(UTF_16_UNEVEN_BYTES).is_err());
 
-        // Despite passing, the behavior is undefined.
         // Lack of a BOM means improper handling of endian byte order.
         // This scenario will never occur in the public API as conversion
         // from UTF-16 to UTF-8 is guarded by `is_utf16()` which checks

@@ -4,21 +4,96 @@ mod toc;
 
 use crate::ebook::EbookResult;
 use crate::ebook::archive::Archive;
-use crate::ebook::epub::EpubConfig;
-use crate::ebook::epub::consts;
-use crate::ebook::epub::errors::EpubFormatError;
+use crate::ebook::archive::errors::ArchiveResult;
+use crate::ebook::epub::consts::ocf;
+use crate::ebook::epub::errors::EpubError;
 use crate::ebook::epub::manifest::EpubManifestData;
 use crate::ebook::epub::metadata::{EpubMetadataData, EpubVersion};
-use crate::ebook::epub::parser::package::TocLocation;
+use crate::ebook::epub::package::EpubPackageData;
 use crate::ebook::epub::spine::EpubSpineData;
 use crate::ebook::epub::toc::EpubTocData;
-use crate::ebook::errors::ArchiveError;
 use crate::parser::ParserResult;
-use crate::util::uri::{self, UriResolver};
+use crate::util::borrow::CowExt;
+use crate::util::uri;
 use std::borrow::Cow;
 
-pub(super) struct ParsedContent {
-    pub(super) package_file: String,
+#[derive(Clone, Debug)]
+pub(crate) struct EpubParseConfig {
+    /// See [`super::EpubOpenOptions::preferred_toc`].
+    pub(crate) preferred_toc: EpubVersion,
+    /// See [`super::EpubOpenOptions::retain_variants`].
+    pub(crate) retain_variants: bool,
+    /// See [`super::EpubOpenOptions::strict`].
+    pub(crate) strict: bool,
+    /// See [`super::EpubOpenOptions::skip_metadata`]; inverted.
+    pub(crate) parse_metadata: bool,
+    /// See [`super::EpubOpenOptions::skip_manifest`]; inverted.
+    pub(crate) parse_manifest: bool,
+    /// See [`super::EpubOpenOptions::skip_spine`]; inverted.
+    pub(crate) parse_spine: bool,
+    /// See [`super::EpubOpenOptions::skip_toc`]; inverted.
+    pub(crate) parse_toc: bool,
+}
+
+impl Default for EpubParseConfig {
+    fn default() -> Self {
+        Self {
+            preferred_toc: EpubVersion::EPUB3,
+            retain_variants: false,
+            strict: false,
+            parse_metadata: true,
+            parse_manifest: true,
+            parse_spine: true,
+            parse_toc: true,
+        }
+    }
+}
+
+/// Utility trait to perform validation on sub-parsers.
+trait EpubParserValidator {
+    fn config(&self) -> &EpubParseConfig;
+
+    fn is_strict(&self) -> bool {
+        self.config().strict
+    }
+
+    fn mandatory<T>(
+        &self,
+        parent: Option<T>,
+        if_missing: impl FnOnce() -> EpubError,
+    ) -> ParserResult<T> {
+        parent.ok_or_else(|| if_missing().into())
+    }
+
+    /// Required attribute value.
+    ///
+    /// If `value` is [`None`],
+    /// its [`Default`] is returned if `strict` mode is disabled.
+    /// Otherwise, an error is returned.
+    fn require_attribute<T: Default>(
+        &self,
+        value: Option<T>,
+        error_message: &'static str,
+    ) -> ParserResult<T> {
+        if self.is_strict() && value.is_none() {
+            Err(EpubError::MissingAttribute(error_message.to_owned()).into())
+        } else {
+            Ok(value.unwrap_or_default())
+        }
+    }
+
+    fn require_href(&self, href: String) -> ParserResult<String> {
+        let encoded = uri::encode(&href);
+        if self.is_strict() && matches!(encoded, Cow::Owned(_)) {
+            Err(EpubError::UnencodedHref(href).into())
+        } else {
+            Ok(encoded.take_owned().unwrap_or(href))
+        }
+    }
+}
+
+pub(super) struct ParsedComponents {
+    pub(super) package: EpubPackageData,
     pub(super) metadata: EpubMetadataData,
     pub(super) manifest: EpubManifestData,
     pub(super) spine: EpubSpineData,
@@ -26,94 +101,67 @@ pub(super) struct ParsedContent {
     pub(super) toc: EpubTocData,
 }
 
+/// The context shared among all EPUB-related parsers.
+///
+/// Currently consists of a single [`EpubParseConfig`] field.
+#[derive(Copy, Clone)]
+pub(super) struct EpubParserContext<'a> {
+    config: &'a EpubParseConfig,
+    version: EpubVersion,
+}
+
+impl EpubParserValidator for EpubParserContext<'_> {
+    fn config(&self) -> &EpubParseConfig {
+        self.config
+    }
+}
+
 pub(super) struct EpubParser<'a> {
-    config: &'a EpubConfig,
+    ctx: EpubParserContext<'a>,
     archive: &'a dyn Archive,
-    version_hint: EpubVersion,
 }
 
 impl<'a> EpubParser<'a> {
-    pub(super) fn new(settings: &'a EpubConfig, archive: &'a dyn Archive) -> Self {
+    pub(super) fn new(config: &'a EpubParseConfig, archive: &'a dyn Archive) -> Self {
         Self {
-            config: settings,
+            ctx: EpubParserContext {
+                config,
+                // Default: Overridden as soon as the package start element is parsed.
+                version: EpubVersion::EPUB3,
+            },
             archive,
-            // Irrelevant default: Overridden as soon as the package start element is parsed.
-            version_hint: EpubVersion::EPUB3,
         }
     }
 
-    pub(super) fn parse(&mut self) -> EbookResult<ParsedContent> {
+    pub(super) fn parse(mut self) -> EbookResult<ParsedComponents> {
         // Parse "META-INF/container.xml"
-        let content_meta_inf = self.read_resource(consts::CONTAINER)?;
-
+        let content_meta_inf = self.read_resource(ocf::CONTAINER_PATH)?;
         let package_file = self.parse_container(&content_meta_inf)?;
-        // A resolver to turn uris within the <package> from relative to absolute
-        let package_resolver = UriResolver::new(uri::parent(&package_file));
 
         // Parse "package.opf"
         let package_content = self.read_resource(&package_file)?;
-        let (toc_hrefs, metadata, manifest, spine, mut toc) =
-            self.parse_opf(package_resolver, &package_content)?;
+        let opf = self.parse_package(&package_content, package_file)?;
+        let mut toc = opf.guide;
 
         // Parse "toc.xhtml/ncx"
-        for TocLocation { href, version } in toc_hrefs {
-            self.version_hint = version;
-            // A resolver to turn uris within the toc file from relative to absolute
-            let toc_resolver = UriResolver::new(uri::parent(&href));
-            let content_toc = self.read_resource(href.as_str())?;
-            toc.extend(self.parse_toc(&toc_resolver, &content_toc)?);
-        }
+        self.parse_tocs(opf.toc_locations, &mut toc)?;
 
-        toc.set_preferences(self.config);
-
-        Ok(ParsedContent {
-            package_file,
-            metadata,
-            manifest,
-            spine,
+        Ok(ParsedComponents {
+            package: opf.package,
+            metadata: opf.metadata,
+            manifest: opf.manifest,
+            spine: opf.spine,
             toc,
         })
     }
 
-    fn read_resource(&self, file: &str) -> Result<Vec<u8>, ArchiveError> {
-        self.archive.read_resource_bytes_utf8(&file.into())
+    fn read_resource(&self, file: &str) -> ArchiveResult<Vec<u8>> {
+        self.archive.read_resource_as_utf8_bytes(&file.into())
     }
+}
 
-    // Helper methods
-    fn require_encoded(&self, href: String) -> ParserResult<String> {
-        let encoded = uri::encode(&href);
-
-        if self.config.strict && matches!(encoded, Cow::Owned(_)) {
-            Err(EpubFormatError::InvalidHref(format!("`{href}` <-- Not percent-encoded")).into())
-        } else {
-            Ok(match encoded {
-                Cow::Owned(encoded) => encoded,
-                Cow::Borrowed(_) => href,
-            })
-        }
-    }
-
-    fn mandatory<T>(
-        parent: Option<T>,
-        if_missing: impl FnOnce() -> EpubFormatError,
-    ) -> ParserResult<T> {
-        parent.ok_or_else(|| if_missing().into())
-    }
-
-    /// Required attribute value.
-    ///
-    /// If `attribute_value` is [`None`],
-    /// it's [`Default`] is returned if `strict` mode is disabled.
-    /// Otherwise, an error is returned.
-    fn require_attribute<T: Default>(
-        &self,
-        attribute_value: Option<T>,
-        error_message: &'static str,
-    ) -> ParserResult<T> {
-        if self.config.strict && attribute_value.is_none() {
-            Err(EpubFormatError::MissingAttribute(String::from(error_message)).into())
-        } else {
-            Ok(attribute_value.unwrap_or_default())
-        }
+impl EpubParserValidator for EpubParser<'_> {
+    fn config(&self) -> &EpubParseConfig {
+        self.ctx.config
     }
 }

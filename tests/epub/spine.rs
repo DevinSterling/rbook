@@ -1,15 +1,13 @@
 use crate::epub::util::TestEpub::Epub3File;
-use rbook::Ebook;
-use rbook::ebook::manifest::ManifestEntry;
-use rbook::ebook::spine::{PageDirection, Spine, SpineEntry};
+use rbook::ebook::spine::PageDirection;
 use wasm_bindgen_test::wasm_bindgen_test;
 
 #[test]
 #[wasm_bindgen_test]
 fn test_spine() {
-    let epub = Epub3File.open();
+    let epub = Epub3File.open_strict();
     let spine = epub.spine();
-    let entries = spine.entries().collect::<Vec<_>>();
+    let entries = spine.iter().collect::<Vec<_>>();
 
     assert_eq!(PageDirection::LeftToRight, spine.page_direction());
     assert_eq!(spine.len(), entries.len());
@@ -44,17 +42,15 @@ fn test_skip_spine() {
     assert_eq!(PageDirection::Default, spine.page_direction());
     assert_eq!(0, spine.len());
     assert!(spine.is_empty());
-    assert!(spine.entries().next().is_none());
-    assert!(spine.by_order(0).is_none());
+    assert!(spine.iter().next().is_none());
+    assert!(spine.get(0).is_none());
     assert!(spine.by_id("spine-toc").is_none());
-    assert!(spine.by_idref("c1a").is_none());
+    assert!(spine.by_idref("c1a").next().is_none());
 }
 
 #[test]
 #[wasm_bindgen_test]
 fn test_reader_skip_spine() {
-    use rbook::reader::Reader;
-
     let epub = Epub3File.build(|b| b.skip_spine(true));
     let mut reader = epub.reader();
 

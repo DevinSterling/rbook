@@ -1,31 +1,33 @@
 [package]
 authors = ["Devin Sterling"]
 name = "rbook"
-version = "0.6.12"
+version = "0.7.0"
 rust-version = "1.88.0"
 edition = "2024"
 description = """
-A fast, format-agnostic, ergonomic ebook library with a focus on EPUB 2 and 3.
+A fast, format-agnostic, ergonomic ebook library for reading, building, and editing EPUB 2 and 3.
 """
 license = "Apache-2.0"
 repository = "https://github.com/DevinSterling/rbook"
 documentation = "https://docs.rs/rbook"
-categories = ["parser-implementations"]
+categories = ["parser-implementations", "wasm"]
 keywords = ["ebook", "e-book", "epub", "epub2", "epub3"]
 
 [features]
-default = ["threadsafe", "prelude"]
+default = ["threadsafe", "prelude", "write"]
 threadsafe = []
 prelude = []
+write = []
 
 [dependencies]
 thiserror = "2.0.18"
-quick-xml = "0.39.0"
 percent-encoding = "2.3.2"
-zip = { version = "7.4.0", default-features = false, features = ["deflate"] }
+indexmap = "2.13.0"
+quick-xml = { version = "0.39.2", features = ["escape-html"] }
+zip = { version = "8.1.0", default-features = false, features = ["deflate"] }
 
 [dev-dependencies]
-wasm-bindgen-test = "0.3.58"
+wasm-bindgen-test = "0.3.62"
 
 [lints.rust]
 unsafe_code = "forbid"

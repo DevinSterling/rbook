@@ -1,2 +1,3 @@
 [default.extend-words]
 opf = "opf" # EPUB `opf` is falsely flagged
+lov = "lov" # "List of Videos" abbreviation is falsely flagged

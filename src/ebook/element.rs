@@ -1,11 +1,19 @@
 //! General XML element-related types.
 
-use crate::util::{StringExt, uri};
+#[cfg(feature = "write")]
+mod write;
+
+use crate::util::collection::{Keyed, KeyedVec};
+use crate::util::str::StringExt;
+use crate::util::uri;
 use std::borrow::Cow;
-use std::fmt::{Debug, Display, Formatter};
+use std::fmt::{Debug, Display};
 use std::hash::Hash;
-use std::slice::Iter as SliceIter;
+use std::ops::{Deref, DerefMut};
 use std::str::SplitWhitespace;
+
+#[cfg(feature = "write")]
+pub use write::AttributesIterMut;
 
 /// The percent-encoded `href` of an element, pointing to a location.
 ///
@@ -15,14 +23,17 @@ pub struct Href<'a>(&'a str);
 
 // Methods most relevant for EPUBs
 impl<'a> Href<'a> {
+    pub(crate) fn new(href: &'a str) -> Self {
+        Self(href)
+    }
+
     /// Returns the percent-decoded form.
     ///
     /// # Examples
     /// - Decoding an href:
     /// ```
-    /// # use rbook::{Ebook, Epub};
-    /// # use rbook::ebook::errors::EbookResult;
-    /// # fn main() -> EbookResult<()> {
+    /// # use rbook::Epub;
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
     /// let epub = Epub::open("tests/ebooks/example_epub")?;
     /// let href = epub.manifest().by_id("style").unwrap().href();
     ///
@@ -41,11 +52,10 @@ impl<'a> Href<'a> {
     /// - Retrieving the parent of an href:
     /// ```
     /// # use rbook::Epub;
-    /// # use rbook::ebook::errors::EbookResult;
-    /// # fn main() -> EbookResult<()> {
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
     /// let epub = Epub::open("tests/ebooks/example_epub")?;
     ///
-    /// let mut href = epub.package_file();
+    /// let mut href = epub.package().location();
     /// assert_eq!("/EPUB/example.opf", href.as_str());
     ///
     /// href = href.parent().unwrap();
@@ -60,35 +70,34 @@ impl<'a> Href<'a> {
     /// ```
     pub fn parent(&self) -> Option<Self> {
         let parent = uri::parent(self.0);
-        (!parent.is_empty() && self.0 != parent).then(|| parent.into())
+        (!parent.is_empty() && self.0 != parent).then_some(Self(parent))
     }
 
     /// The file extension, if present (e.g., `.css`, `.xhtml`).
     ///
     /// # See Also
-    /// [`ManifestEntry::resource_kind`](super::manifest::ManifestEntry::resource_kind) to
+    /// [`ManifestEntry::kind`](super::manifest::ManifestEntry::kind) to
     /// inspect the kind of resource in greater detail.
     ///
     /// # Examples
     /// - Retrieving the extension from an href:
     /// ```
     /// # use rbook::Epub;
-    /// # use rbook::ebook::errors::EbookResult;
-    /// # fn main() -> EbookResult<()> {
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
     /// let epub = Epub::open("tests/ebooks/example_epub")?;
     ///
-    /// let file = epub.package_file();
+    /// let file = epub.package().location();
     /// assert_eq!("/EPUB/example.opf", file.as_str());
     /// assert_eq!(Some("opf"), file.extension());
     ///
-    /// let dir = epub.package_directory();
+    /// let dir = epub.package().directory();
     /// assert_eq!("/EPUB", dir.as_str());
     /// assert_eq!(None, dir.extension());
     /// # Ok(())
     /// # }
     /// ```
     pub fn extension(&self) -> Option<&'a str> {
-        self.name().0.rsplit_once('.').map(|(_, ext)| ext)
+        uri::file_extension(self.0)
     }
 
     /// The href with **only** the query (`?`) and fragment (`#`) omitted.
@@ -107,13 +116,11 @@ impl<'a> Href<'a> {
     /// # Examples
     /// - Omitting the query and fragment:
     /// ```
-    /// # use rbook::{Ebook, Epub};
-    /// # use rbook::ebook::errors::EbookResult;
-    /// # use rbook::ebook::toc::{Toc, TocChildren, TocEntry};
-    /// # fn main() -> EbookResult<()> {
+    /// # use rbook::Epub;
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
     /// let epub = Epub::open("tests/ebooks/example_epub")?;
     /// let contents = epub.toc().contents().unwrap();
-    /// let toc_entry = contents.children().get(1).unwrap();
+    /// let toc_entry = contents.get(1).unwrap();
     /// let href = toc_entry.href().unwrap();
     ///
     /// assert_eq!("/EPUB/c1.xhtml?q=1#start", href.as_str());
@@ -122,10 +129,7 @@ impl<'a> Href<'a> {
     /// # }
     /// ```
     pub fn path(&self) -> Self {
-        self.0
-            .find(['#', '?'])
-            .map_or(self.0, |index| &self.0[..index])
-            .into()
+        Self(uri::path(self.0))
     }
 
     /// The filename of an href.
@@ -138,13 +142,11 @@ impl<'a> Href<'a> {
     /// # Examples
     /// - Retrieving the filename:
     /// ```
-    /// # use rbook::{Ebook, Epub};
-    /// # use rbook::ebook::errors::EbookResult;
-    /// # use rbook::ebook::toc::{Toc, TocChildren, TocEntry};
-    /// # fn main() -> EbookResult<()> {
+    /// # use rbook::Epub;
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
     /// let epub = Epub::open("tests/ebooks/example_epub")?;
     /// let contents = epub.toc().contents().unwrap();
-    /// let toc_entry = contents.children().get(1).unwrap();
+    /// let toc_entry = contents.get(1).unwrap();
     /// let href = toc_entry.href().unwrap();
     ///
     /// assert_eq!("/EPUB/c1.xhtml?q=1#start", href.as_str());
@@ -153,12 +155,7 @@ impl<'a> Href<'a> {
     /// # }
     /// ```
     pub fn name(&self) -> Self {
-        self.path()
-            .0
-            .rsplit('/')
-            .next()
-            .expect("`rsplit` guarantees at least one entry")
-            .into()
+        Self(uri::filename(self.0))
     }
 
     /// The content of a fragment (`#`) within an href.
@@ -166,13 +163,11 @@ impl<'a> Href<'a> {
     /// # Examples
     /// - Retrieving the fragment content:
     /// ```
-    /// # use rbook::{Ebook, Epub};
-    /// # use rbook::ebook::errors::EbookResult;
-    /// # use rbook::ebook::toc::{Toc, TocChildren, TocEntry};
-    /// # fn main() -> EbookResult<()> {
+    /// # use rbook::Epub;
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
     /// # let epub = Epub::open("tests/ebooks/example_epub")?;
     /// # let contents = epub.toc().contents().unwrap();
-    /// # let toc_entry = contents.children().get(1).unwrap();
+    /// # let toc_entry = contents.get(1).unwrap();
     /// let href = toc_entry.href().unwrap();
     ///
     /// assert_eq!("/EPUB/c1.xhtml?q=1#start", href.as_str());
@@ -189,13 +184,11 @@ impl<'a> Href<'a> {
     /// # Examples
     /// - Retrieving the query content:
     /// ```
-    /// # use rbook::{Ebook, Epub};
-    /// # use rbook::ebook::errors::EbookResult;
-    /// # use rbook::ebook::toc::{Toc, TocChildren, TocEntry};
-    /// # fn main() -> EbookResult<()> {
+    /// # use rbook::Epub;
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
     /// # let epub = Epub::open("tests/ebooks/example_epub")?;
     /// # let contents = epub.toc().contents().unwrap();
-    /// # let toc_entry = contents.children().get(1).unwrap();
+    /// # let toc_entry = contents.get(1).unwrap();
     /// let href = toc_entry.href().unwrap();
     ///
     /// assert_eq!("/EPUB/c1.xhtml?q=1#start", href.as_str());
@@ -215,64 +208,65 @@ impl<'a> Href<'a> {
     }
 }
 
+impl PartialEq<&str> for Href<'_> {
+    fn eq(&self, other: &&str) -> bool {
+        self.0 == *other
+    }
+}
+
+impl PartialEq<Href<'_>> for &str {
+    fn eq(&self, other: &Href<'_>) -> bool {
+        *self == other.0
+    }
+}
+
 impl<'a> AsRef<str> for Href<'a> {
     fn as_ref(&self) -> &'a str {
         self.0
     }
 }
 
-impl<'a> From<&'a str> for Href<'a> {
-    fn from(value: &'a str) -> Self {
-        Self(value)
-    }
-}
-
 impl Display for Href<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.0)
     }
 }
 
 /// A collection of properties associated with an element,
-/// where each property is separated by whitespace.
+/// where each property is separated by a single ASCII whitespace.
 ///
 /// # Examples
 /// - Retrieving the properties from a navigation resource:
 /// ```
-/// # use rbook::{Ebook, Epub};
-/// # use rbook::ebook::errors::EbookResult;
-/// # use rbook::ebook::manifest::Manifest;
-/// # fn main() -> EbookResult<()> {
+/// # use rbook::Epub;
+/// # fn main() -> rbook::ebook::errors::EbookResult<()> {
 /// let epub = Epub::open("tests/ebooks/example_epub")?;
 /// let nav_xhtml = epub.manifest().by_property("nav").next().unwrap();
 /// let properties = nav_xhtml.properties();
 ///
 /// assert_eq!("scripted nav", properties.as_str());
-/// assert_eq!(true, properties.has_property("nav"));
-/// assert_eq!(true, properties.has_property("scripted"));
-/// assert_eq!(false, properties.has_property("ncx"));
+/// assert!(properties.has_property("nav"));
+/// assert!(properties.has_property("scripted"));
+/// assert!(!properties.has_property("ncx"));
 /// # Ok(())
 /// # }
 /// ```
-#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
-pub struct Properties<'a>(&'a str);
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+pub struct Properties(String);
 
-impl<'a> Properties<'a> {
-    pub(crate) const EMPTY: Properties<'static> = Properties("");
-
-    pub(crate) fn new(properties: &'a str) -> Self {
-        Self(properties)
-    }
+impl Properties {
+    pub(crate) const EMPTY_REFERENCE: &'static Properties = &Properties(String::new());
 
     /// The number of property entries contained within.
+    ///
+    /// # Note
+    /// This method calculates the length in `O(N)` time.
     ///
     /// # Examples
     /// - Retrieving the number of properties:
     /// ```
-    /// # use rbook::{Ebook, Epub};
-    /// # use rbook::ebook::errors::EbookResult;
-    /// # use rbook::ebook::manifest::Manifest;
-    /// # fn main() -> EbookResult<()> {
+    /// # use rbook::Epub;
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
     /// let epub = Epub::open("tests/ebooks/example_epub")?;
     /// let nav_xhtml = epub.manifest().by_property("nav").next().unwrap();
     /// let properties = nav_xhtml.properties();
@@ -289,25 +283,23 @@ impl<'a> Properties<'a> {
     /// Returns `true` if there are no properties.
     ///
     /// # Examples
-    /// - Retrieving the number of properties:
+    /// - Checking if there are properties present:
     /// ```
-    /// # use rbook::{Ebook, Epub};
-    /// # use rbook::ebook::errors::EbookResult;
-    /// # use rbook::ebook::manifest::Manifest;
-    /// # fn main() -> EbookResult<()> {
+    /// # use rbook::Epub;
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
     /// let epub = Epub::open("tests/ebooks/example_epub")?;
     ///
     /// let nav_xhtml = epub.manifest().by_property("nav").next().unwrap();
     /// let nav_xhtml_properties = nav_xhtml.properties();
     ///
     /// assert_eq!("scripted nav", nav_xhtml_properties.as_str());
-    /// assert_eq!(false, nav_xhtml_properties.is_empty());
+    /// assert!(!nav_xhtml_properties.is_empty());
     ///
     /// let chapter_1 = epub.manifest().by_id("c1").unwrap();
     /// let chapter_1_properties = chapter_1.properties();
     ///
     /// assert_eq!("", chapter_1_properties.as_str());
-    /// assert_eq!(true, chapter_1_properties.is_empty());
+    /// assert!(chapter_1_properties.is_empty());
     /// # Ok(())
     /// # }
     /// ```
@@ -317,7 +309,7 @@ impl<'a> Properties<'a> {
 
     /// Returns the associated property if the given `index` is less than
     /// [`Self::len`], otherwise [`None`].
-    pub fn get(&self, index: usize) -> Option<&'a str> {
+    pub fn get(&self, index: usize) -> Option<&str> {
         self.iter().nth(index)
     }
 
@@ -326,10 +318,8 @@ impl<'a> Properties<'a> {
     /// # Examples
     /// - Iterating over each property:
     /// ```
-    /// # use rbook::{Ebook, Epub};
-    /// # use rbook::ebook::errors::EbookResult;
-    /// # use rbook::ebook::manifest::Manifest;
-    /// # fn main() -> EbookResult<()> {
+    /// # use rbook::Epub;
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
     /// let epub = Epub::open("tests/ebooks/example_epub")?;
     /// let nav_xhtml = epub.manifest().by_property("nav").next().unwrap();
     /// let properties = nav_xhtml.properties();
@@ -342,7 +332,7 @@ impl<'a> Properties<'a> {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn iter(&self) -> PropertiesIter<'a> {
+    pub fn iter(&self) -> PropertiesIter<'_> {
         PropertiesIter(self.0.split_whitespace())
     }
 
@@ -351,10 +341,8 @@ impl<'a> Properties<'a> {
     /// # Examples
     /// - Assessing if the provided properties are present:
     /// ```
-    /// # use rbook::{Ebook, Epub};
-    /// # use rbook::ebook::errors::EbookResult;
-    /// # use rbook::ebook::manifest::Manifest;
-    /// # fn main() -> EbookResult<()> {
+    /// # use rbook::Epub;
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
     /// let epub = Epub::open("tests/ebooks/example_epub")?;
     /// let nav_xhtml = epub.manifest().by_property("nav").next().unwrap();
     /// let properties = nav_xhtml.properties();
@@ -373,12 +361,10 @@ impl<'a> Properties<'a> {
 
     /// The underlying raw properties.
     ///
-    /// - Retrieving the number of properties:
+    /// - Retrieving the properties as a string:
     /// ```
-    /// # use rbook::{Ebook, Epub};
-    /// # use rbook::ebook::errors::EbookResult;
-    /// # use rbook::ebook::manifest::Manifest;
-    /// # fn main() -> EbookResult<()> {
+    /// # use rbook::Epub;
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
     /// let epub = Epub::open("tests/ebooks/example_epub")?;
     /// let nav_xhtml = epub.manifest().by_property("nav").next().unwrap();
     /// let properties = nav_xhtml.properties();
@@ -387,39 +373,24 @@ impl<'a> Properties<'a> {
     /// # Ok(())
     /// # }
     /// ```
-    pub fn as_str(&self) -> &'a str {
-        self.0
+    pub fn as_str(&self) -> &str {
+        self.0.trim()
     }
 }
 
-impl<'a> AsRef<str> for Properties<'a> {
-    fn as_ref(&self) -> &'a str {
-        self.0
+impl Display for Properties {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str(self.as_str())
     }
 }
 
-impl<'a> From<&'a PropertiesData> for Properties<'a> {
-    fn from(properties: &'a PropertiesData) -> Self {
-        Self(&properties.0)
+impl AsRef<str> for Properties {
+    fn as_ref(&self) -> &str {
+        &self.0
     }
 }
 
-impl<'a> From<Attribute<'a>> for Properties<'a> {
-    fn from(attribute: Attribute<'a>) -> Self {
-        attribute.properties()
-    }
-}
-
-impl<'a> IntoIterator for &Properties<'a> {
-    type Item = &'a str;
-    type IntoIter = PropertiesIter<'a>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.iter()
-    }
-}
-
-impl<'a> IntoIterator for Properties<'a> {
+impl<'a> IntoIterator for &'a Properties {
     type Item = &'a str;
     type IntoIter = PropertiesIter<'a>;
 
@@ -431,14 +402,13 @@ impl<'a> IntoIterator for Properties<'a> {
 /// An iterator over each property within [`Properties`].
 ///
 /// # See Also
-/// - [`Properties::iter`]
+/// - [`Properties::iter`] to create an instance of this struct.
 ///
 /// # Examples
 /// - Iterating over each property:
 /// ```
-/// # use rbook::ebook::errors::EbookResult;
-/// # use rbook::{Ebook, Epub};
-/// # fn main() -> EbookResult<()> {
+/// # use rbook::Epub;
+/// # fn main() -> rbook::ebook::errors::EbookResult<()> {
 /// let epub = Epub::open("tests/ebooks/example_epub")?;
 /// let nav_xhtml = epub.manifest().by_property("nav").next().unwrap();
 ///
@@ -459,11 +429,11 @@ impl<'a> Iterator for PropertiesIter<'a> {
 }
 
 /// A collection of [`Attribute`] entries associated with an element.
-#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
-pub struct Attributes<'a>(&'a [AttributeData]);
+#[derive(Clone, Debug, PartialEq)]
+pub struct Attributes(KeyedVec<Attribute>);
 
-impl<'a> Attributes<'a> {
-    /// The number of attribute entries contained within.
+impl Attributes {
+    /// The number of [`Attribute`] entries contained within.
     pub fn len(&self) -> usize {
         self.0.len()
     }
@@ -475,67 +445,51 @@ impl<'a> Attributes<'a> {
 
     /// Returns the associated [`Attribute`] if the given `index` is less than
     /// [`Self::len`], otherwise [`None`].
-    pub fn get(&self, index: usize) -> Option<Attribute<'a>> {
-        self.0.get(index).map(Attribute)
+    pub fn get(&self, index: usize) -> Option<&Attribute> {
+        self.0.get(index)
     }
 
     /// Returns an iterator over **all** [`Attribute`] entries.
-    pub fn iter(&self) -> AttributesIter<'a> {
-        self.into_iter()
+    pub fn iter(&self) -> AttributesIter<'_> {
+        AttributesIter(self.0.0.iter())
     }
 
-    /// Returns the [`Attribute`] with the given `name` if present,
-    /// otherwise [`None`].
-    pub fn by_name(&self, name: &str) -> Option<Attribute<'a>> {
-        self.0
-            .iter()
-            .find(|data| data.name.as_str().eq_ignore_ascii_case(name))
-            .map(Attribute)
+    /// Returns the [`Attribute`] with the given `name` if present, otherwise [`None`].
+    pub fn by_name(&self, name: &str) -> Option<&Attribute> {
+        self.0.by_key(name)
+    }
+
+    /// Returns the [value](Attribute::value) of the [`Attribute`]
+    /// with the given `name` if present, otherwise [`None`].
+    pub fn get_value(&self, name: &str) -> Option<&str> {
+        self.0.by_key(name).map(|attr| attr.value())
     }
 
     /// Returns `true` if an [`Attribute`] with the given `name` is present.
     pub fn has_name(&self, name: &str) -> bool {
-        self.0
-            .iter()
-            .any(|data| data.name.as_str().eq_ignore_ascii_case(name))
+        self.0.has_key(name)
     }
 }
 
-impl<'a> From<&'a Vec<AttributeData>> for Attributes<'a> {
-    fn from(attributes: &'a Vec<AttributeData>) -> Self {
-        Self(attributes)
-    }
-}
-
-impl<'a> IntoIterator for &Attributes<'a> {
-    type Item = Attribute<'a>;
+impl<'a> IntoIterator for &'a Attributes {
+    type Item = &'a Attribute;
     type IntoIter = AttributesIter<'a>;
 
     fn into_iter(self) -> Self::IntoIter {
-        AttributesIter(self.0.iter())
-    }
-}
-
-impl<'a> IntoIterator for Attributes<'a> {
-    type Item = Attribute<'a>;
-    type IntoIter = AttributesIter<'a>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        (&self).into_iter()
+        self.iter()
     }
 }
 
 /// An iterator over all [`Attribute`] entries within [`Attributes`].
 ///
 /// # See Also
-/// - [`Attributes::iter`]
+/// - [`Attributes::iter`] to create an instance of this struct.
 ///
 /// # Examples
 /// - Iterating over all attributes:
 /// ```
-/// # use rbook::ebook::errors::EbookResult;
 /// # use rbook::{Ebook, Epub};
-/// # fn main() -> EbookResult<()> {
+/// # fn main() -> rbook::ebook::errors::EbookResult<()> {
 /// let epub = Epub::open("tests/ebooks/example_epub")?;
 /// let nav_xhtml = epub.manifest().by_property("nav").next().unwrap();
 ///
@@ -545,43 +499,76 @@ impl<'a> IntoIterator for Attributes<'a> {
 /// # Ok(())
 /// # }
 /// ```
-pub struct AttributesIter<'a>(SliceIter<'a, AttributeData>);
+pub struct AttributesIter<'a>(std::slice::Iter<'a, Attribute>);
 
 impl<'a> Iterator for AttributesIter<'a> {
     // AttributeData is not returned directly here
     // to allow greater flexibility in the future.
-    type Item = Attribute<'a>;
+    type Item = &'a Attribute;
 
     fn next(&mut self) -> Option<Self::Item> {
-        self.0.next().map(Attribute)
+        self.0.next()
     }
 }
 
 /// An attribute, containing details about an element.
 ///
 /// An attribute encompasses a [`Name`] as `key` and a string as `value`.
-/// The name and value have their leading and trailing ASCII whitespace trimmed at parse time.
-#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
-pub struct Attribute<'a>(
-    /// Wraps [`AttributeData`] **for now**.
-    /// However, this could change in the future.
-    &'a AttributeData,
-);
+///
+/// # Note
+/// - The attribute [name](Self::name) and [value](Self::value)
+///   are trimmed of leading and trailing whitespace on creation.
+/// - When the `write` feature flag is enabled, only modification of the value is allowed.
+///   **The name cannot be modified once an attribute is created.**
+///   This prevents duplicate keys within [`Attributes`].
+#[derive(Clone, Debug, PartialEq)]
+pub struct Attribute {
+    name: String,
+    value: Properties,
+}
 
-impl<'a> Attribute<'a> {
+impl Attribute {
+    /// Internal constructor.
+    ///
+    /// The public constructor [`Self::new`] is available when the `write`
+    /// feature is enabled.
+    pub(crate) fn create(name: impl Into<String>, value: impl Into<String>) -> Self {
+        let mut name = name.into();
+        let mut value = value.into();
+
+        name.trim_in_place();
+        value.trim_in_place();
+
+        Self {
+            value: Properties(value),
+            name,
+        }
+    }
+
     /// The attribute name/key.
-    pub fn name(&self) -> Name<'a> {
-        Name(&self.0.name)
+    pub fn name(&self) -> Name<'_> {
+        Name(&self.name)
     }
 
     /// The attribute value.
-    pub fn value(&self) -> &'a str {
-        &self.0.value
+    ///
+    /// # Note
+    /// Attribute values have their leading and trailing whitespace trimmed.
+    pub fn value(&self) -> &str {
+        self.value.as_str()
     }
 
     /// The attribute [`value`](Self::value) in the form of [`Properties`].
-    pub fn properties(&self) -> Properties<'a> {
-        Properties::new(&self.0.value)
+    pub fn as_properties(&self) -> &Properties {
+        &self.value
+    }
+}
+
+impl Keyed for Attribute {
+    type Key = str;
+
+    fn key(&self) -> &Self::Key {
+        self.name.as_str()
     }
 }
 
@@ -590,20 +577,48 @@ impl<'a> Attribute<'a> {
 pub struct Name<'a>(&'a str);
 
 impl<'a> Name<'a> {
+    pub(crate) fn new(name: &'a str) -> Self {
+        Self(name)
+    }
+
     fn index(&self) -> Option<usize> {
         self.0.find(':')
     }
 
     /// The prefix of a name.
     ///
-    /// For example, the name `dcterms:modified` has a prefix of `dcterms`.
+    /// # Examples
+    /// - The name `dcterms:modified` has a prefix of `dcterms`:
+    /// ```
+    /// # use rbook::Epub;
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
+    /// # let epub = Epub::open("tests/ebooks/example_epub")?;
+    /// # let modified = epub.metadata().by_property("dcterms:modified").next().unwrap();
+    /// # let name = modified.property();
+    /// assert_eq!("dcterms:modified", name);
+    /// assert_eq!(Some("dcterms"), name.prefix());
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn prefix(&self) -> Option<&'a str> {
         self.index().map(|i| &self.0[..i])
     }
 
-    /// The name with its prefix stripped.
+    /// The name with its [prefix](Self::prefix) stripped.
     ///
-    /// For example, the name `dcterms:modified` with its prefix stripped is `modified`.
+    /// # Examples
+    /// - The name `dcterms:modified` with its prefix stripped is `modified`.
+    /// ```
+    /// # use rbook::Epub;
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
+    /// # let epub = Epub::open("tests/ebooks/example_epub")?;
+    /// # let modified = epub.metadata().by_property("dcterms:modified").next().unwrap();
+    /// # let name = modified.property();
+    /// assert_eq!("dcterms:modified", name);
+    /// assert_eq!("modified", name.local());
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn local(&self) -> &'a str {
         self.index().map_or(self.0, |i| &self.0[i + 1..])
     }
@@ -614,20 +629,26 @@ impl<'a> Name<'a> {
     }
 }
 
+impl PartialEq<&str> for Name<'_> {
+    fn eq(&self, other: &&str) -> bool {
+        self.0 == *other
+    }
+}
+
+impl PartialEq<Name<'_>> for &str {
+    fn eq(&self, other: &Name<'_>) -> bool {
+        *self == other.0
+    }
+}
+
 impl<'a> AsRef<str> for Name<'a> {
     fn as_ref(&self) -> &'a str {
         self.0
     }
 }
 
-impl<'a> From<&'a str> for Name<'a> {
-    fn from(name: &'a str) -> Self {
-        Self(name)
-    }
-}
-
 impl Display for Name<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.0)
     }
 }
@@ -654,11 +675,26 @@ pub enum TextDirection {
 }
 
 impl TextDirection {
-    const AUTO: &'static str = "auto";
     const LEFT_TO_RIGHT: &'static str = "ltr";
     const RIGHT_TO_LEFT: &'static str = "rtl";
+    const AUTO: &'static str = "auto";
 
-    /// Returns the string representation of a [`TextDirection`] hint.
+    /// Returns `true` if the text direction is [`TextDirection::LeftToRight`].
+    pub fn is_ltr(self) -> bool {
+        matches!(self, Self::LeftToRight)
+    }
+
+    /// Returns `true` if the text direction is [`TextDirection::RightToLeft`].
+    pub fn is_rtl(self) -> bool {
+        matches!(self, Self::RightToLeft)
+    }
+
+    /// Returns `true` if the text direction is [`TextDirection::Auto`].
+    pub fn is_auto(self) -> bool {
+        matches!(self, Self::Auto)
+    }
+
+    /// The string representation of a [`TextDirection`] hint.
     ///
     /// # Examples
     /// - Observing the string representations:
@@ -678,7 +714,7 @@ impl TextDirection {
 }
 
 impl Display for TextDirection {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.as_str())
     }
 }
@@ -693,57 +729,68 @@ impl<A: AsRef<str>> From<A> for TextDirection {
     }
 }
 
-#[derive(Clone, Debug, Default, Hash, PartialEq, Eq)]
-pub(crate) struct PropertiesData(String);
+////////////////////////////////////////////////////////////////////////////////
+// PRIVATE API - Implements Default
+// Note: Public API for `Properties` and `Attributes`
+//       does not offer explicit creation.
+////////////////////////////////////////////////////////////////////////////////
 
-impl PropertiesData {
-    /// Adds the given property if it is not contained within.
-    pub(crate) fn add_property(&mut self, property: &str) {
-        if !self.has_property(property) {
-            if !self.0.is_empty() {
-                self.0.push(' ');
-            }
-            self.0.push_str(property);
-        }
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct PropertiesData(Properties);
+
+impl Default for PropertiesData {
+    fn default() -> Self {
+        Self(Properties(String::new()))
     }
+}
 
-    pub(crate) fn iter(&self) -> SplitWhitespace<'_> {
-        self.0.split_whitespace()
+impl Deref for PropertiesData {
+    type Target = Properties;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
     }
+}
 
-    pub(crate) fn has_property(&self, property: &str) -> bool {
-        self.iter().any(|value| value == property)
+impl DerefMut for PropertiesData {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }
 
 impl From<Option<String>> for PropertiesData {
     fn from(value: Option<String>) -> Self {
-        value.map(PropertiesData).unwrap_or_default()
+        Self(Properties(value.unwrap_or_default()))
     }
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub(crate) struct AttributeData {
-    name: String,
-    value: String,
-}
+#[derive(Clone, Debug, PartialEq)]
+pub(crate) struct AttributesData(Attributes);
 
-impl AttributeData {
-    pub(crate) fn new<'a>(name: impl Into<Cow<'a, str>>, value: impl Into<Cow<'a, str>>) -> Self {
-        let mut value = value.into().into_owned();
-        value.trim_in_place();
-
-        Self {
-            name: name.into().into_owned(),
-            value,
-        }
+impl Default for AttributesData {
+    fn default() -> Self {
+        Self(Attributes(KeyedVec(Vec::new())))
     }
 }
 
-pub(crate) fn get_attribute<'a>(attributes: &'a [AttributeData], key: &str) -> Option<&'a str> {
-    attributes
-        .iter()
-        .find_map(|attribute| (attribute.name.as_str() == key).then_some(attribute.value.as_str()))
+impl Deref for AttributesData {
+    type Target = Attributes;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for AttributesData {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl From<Vec<Attribute>> for AttributesData {
+    fn from(value: Vec<Attribute>) -> Self {
+        Self(Attributes(KeyedVec(value)))
+    }
 }
 
 #[cfg(test)]
@@ -821,7 +868,7 @@ mod tests {
     #[test]
     fn test_href_fragment() {
         let expected = [
-            (Some("pgepubid00588"), "s04.xhtml#pgepubid00588"),
+            (Some("page-epub-id00588"), "s04.xhtml#page-epub-id00588"),
             (Some("hello%20world"), "/EPUB/c1.xhtml?q=1#hello%20world"),
             (None, "a/b/c"),
             (None, ""),
