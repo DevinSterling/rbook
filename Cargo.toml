@@ -1,7 +1,8 @@
 [package]
 authors = ["Devin Sterling"]
 name = "rbook"
-version = "0.6.11"
+version = "0.6.12"
+rust-version = "1.88.0"
 edition = "2024"
 description = """
 A fast, format-agnostic, ergonomic ebook library with a focus on EPUB 2 and 3.
@@ -18,13 +19,13 @@ threadsafe = []
 prelude = []
 
 [dependencies]
-thiserror = "2.0.17"
-quick-xml = "0.38.4"
+thiserror = "2.0.18"
+quick-xml = "0.39.0"
 percent-encoding = "2.3.2"
-zip = { version = "7.0.0", default-features = false, features = ["deflate"] }
+zip = { version = "7.4.0", default-features = false, features = ["deflate"] }
 
 [dev-dependencies]
-wasm-bindgen-test = "0.3.56"
+wasm-bindgen-test = "0.3.58"
 
 [lints.rust]
 unsafe_code = "forbid"

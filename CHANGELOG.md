@@ -1,15 +1,22 @@
 # Changelog
-## 0.6.11 (2025-02-06)
-### Changes　**⟳**
-- Refine documentation for enhanced clarity.
+## 0.6.12 (2025-02-06)
+## Additions　**＋**
+- Clarify MSRV as `1.88.0`
 
+### Changes　**⟳**
+- Update `thiserror` dependency: 2.0.17 → 2.0.18
+- Update `quick-xml` dependency: 0.38.4 → 0.39.0
+- Update `zip` dependency: 7.0.0 → 7.4.0
+- Update `wasm-bindgen-test` dev dependency: 0.3.56 → 0.3.58
+
+## 0.6.11 (2025-02-05)
 ### Fixes　**✓**
 - Fix compilation error caused by `zip` dependency;
   Cow `AsRef` ambiguity in `ResourceKind::as_static` from transitive `typed_path` dependency.
-  ([#5](https://github.com/DevinSterling/rbook/pull/5))
+  \[[#5](https://github.com/DevinSterling/rbook/pull/5)]
 
 ### Changes　**⟳**
-- Update `zip` dependency: 7.0.0 → 7.3.0
+- Refine documentation for enhanced clarity.
 - Internal refactoring in preparation for the upcoming write/modify API (v.7.0).
 
 ## 0.6.10 (2025-12-20)
@@ -35,6 +42,7 @@
 ### Fixes　**✓**
 - Fix regression from `0.6.7` disallowing self-closing `<dc:*>` metadata elements
   when `EpubOpenOptions::strict` is disabled.
+  \[[#2](https://github.com/DevinSterling/rbook/pull/2)]
 
 ### Changes　**⟳**
 - Update `zip` dependency: 6.0.0 → 7.0.0

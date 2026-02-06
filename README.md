@@ -44,8 +44,8 @@ enabled by default in a project's `Cargo.toml` file:
 `rbook` can be used by adding it as a dependency in a project's `Cargo.toml` file:
 ```toml
 [dependencies]
-rbook = "0.6.11"                                           # With default features
-# rbook = { version = "0.6.11", default-features = false } # Excluding default features
+rbook = "0.6.12"                                           # With default features
+# rbook = { version = "0.6.12", default-features = false } # Excluding default features
 ```
 
 ## WebAssembly
@@ -156,6 +156,9 @@ fn main() {
 
 > [!TIP]
 > More examples are available in the documentation: <https://docs.rs/rbook>
+
+## MSRV
+The current Minimum Supported Rust Version is [1.88.0](https://releases.rs/docs/1.88.0/).
 
 ## License
 Licensed under [**Apache License, Version 2.0**](LICENSE).

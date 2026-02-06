@@ -49,7 +49,7 @@
 //! For example, omitting the `prelude` while retaining the `threadsafe` feature:
 //! ```toml
 //! [dependencies]
-//! rbook = { version = "0.6.11", default-features = false, features = ["threadsafe"] }
+//! rbook = { version = "0.6.12", default-features = false, features = ["threadsafe"] }
 //! ```
 //!
 //! # Opening an [`Ebook`]
@@ -199,7 +199,7 @@
 //! For example, omitting the `prelude` while retaining the `threadsafe` feature:
 //! ```toml
 //! [dependencies]
-//! rbook = { version = "0.6.11", default-features = false, features = ["threadsafe"] }
+//! rbook = { version = "0.6.12", default-features = false, features = ["threadsafe"] }
 //! ```
 //!
 //! # Examples
