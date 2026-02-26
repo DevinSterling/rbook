@@ -1,7 +1,7 @@
 [package]
 authors = ["Devin Sterling"]
 name = "rbook"
-version = "0.7.0"
+version = "0.7.1"
 rust-version = "1.88.0"
 edition = "2024"
 description = """
@@ -27,7 +27,7 @@ quick-xml = { version = "0.39.2", features = ["escape-html"] }
 zip = { version = "8.1.0", default-features = false, features = ["deflate"] }
 
 [dev-dependencies]
-wasm-bindgen-test = "0.3.62"
+wasm-bindgen-test = "0.3.63"
 
 [lints.rust]
 unsafe_code = "forbid"

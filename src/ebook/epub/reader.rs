@@ -423,7 +423,7 @@ impl Default for EpubReaderConfig {
 
 /// Configuration to create an [`EpubReader`].
 ///
-/// `EpubReaderOptions` supports two forms of usages:
+/// `EpubReaderOptions` supports two usage patterns:
 /// 1. **Attached**:
 ///    Created via [`Epub::reader_builder`].
 ///    The options are bound to a specific [`Epub`].

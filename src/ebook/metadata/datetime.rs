@@ -23,6 +23,9 @@ use std::iter::Peekable;
 
 /// The [date](Date) and [time](Time) components.
 ///
+/// # See Also
+/// - [`Self::now`] to get the current date and time.
+///
 /// # Examples
 /// - Retrieving the modification date and time:
 /// ```
@@ -465,6 +468,9 @@ mod write {
         ///
         /// Returns `None` on targets where [`std::time::SystemTime`] is unsupported,
         /// such as `wasm32-unknown-unknown`.
+        ///
+        /// # Note
+        /// This is the non-panicking variant of [`Self::now`].
         pub fn try_now() -> Option<Self> {
             // Unsupported environments that do not support SystemTime
             // (e.g., wasm32-unknown-unknown)

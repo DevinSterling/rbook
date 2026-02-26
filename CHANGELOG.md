@@ -1,4 +1,13 @@
 # Changelog
+## 0.7.1 (2025-02-26)
+### Additions　**＋**
+- New method `EpubEditor::modified_now` to simplify modification workflows
+  by setting the modified date to the current datetime.
+
+### Changes　**⟳**
+- Update `wasm-bindgen-test` dev dependency: 0.3.62 → 0.3.63
+- Refine documentation for enhanced clarity.
+
 ## 0.7.0 (2025-02-24)
 ### Major Release: Write Support
 This release expands `rbook` into a read/write library,
@@ -20,7 +29,7 @@ All new APIs and examples are documented at: https://docs.rs/rbook/latest/rbook/
   - `write`: Returns `EpubWriteOptions` to configure how to write an EPUB to disk/memory.
   - New `_mut` accessors: 
     - `metadata_mut`, `manifest_mut`, `spine_mut`, `toc_mut`
-- New **Mutator** types for fine-grained control:
+- New **Mutator** types for fine-grain control:
   - `EpubMetadataMut`, `EpubMetaEntryMut`, `EpubRefinementsMut`
   - `EpubManifestMut`, `EpubManifestEntryMut`
   - `EpubSpineMut`, `EpubSpineEntryMut`

@@ -20,12 +20,7 @@ fn test_dir_comparison() {
     //   within the package, they are corrected in the generated epub.
     // - If such case happens, the original and new will be not equal here.
     let epub_a = Epub3Dir.open_strict();
-    let epub_b_bytes = epub_a
-        .write()
-        // Remove the EPUB 2 compatibility target to avoid legacy attribute generation
-        .target(None)
-        .to_vec()
-        .unwrap();
+    let epub_b_bytes = epub_a.write().compression(0).to_vec().unwrap();
     let epub_b = Epub::read(Cursor::new(epub_b_bytes)).unwrap();
 
     assert_eq!(epub_a.package(), epub_b.package());
@@ -40,7 +35,7 @@ fn test_dir_comparison() {
 #[wasm_bindgen_test]
 fn test_file_comparison() {
     let epub_a = Epub3File.open_strict();
-    let epub_b_bytes = epub_a.write().target(None).to_vec().unwrap();
+    let epub_b_bytes = epub_a.write().compression(0).to_vec().unwrap();
     let epub_b = Epub::read(Cursor::new(epub_b_bytes)).unwrap();
 
     assert_eq!(epub_a.package(), epub_b.package());
@@ -113,6 +108,7 @@ fn test_epub_keep_orphans() {
             shared.lock().unwrap().push(file.as_str().to_owned());
             true
         })
+        .compression(0)
         .to_vec()
         .unwrap();
 
@@ -148,7 +144,12 @@ fn test_epub_remove_orphans() {
     let mut epub = Epub3File.open_strict();
     epub.manifest_mut().clear();
 
-    let bytes = epub.write().keep_orphans(false).to_vec().unwrap();
+    let bytes = epub
+        .write()
+        .keep_orphans(false)
+        .compression(0)
+        .to_vec()
+        .unwrap();
 
     // Check if orphaned resources are retained
     let epub = Epub::read(Cursor::new(bytes)).unwrap();
@@ -246,15 +247,12 @@ fn test_epub3_editor_metadata() {
 
     // Metadata
     let metadata = epub.metadata();
-    // Automatically generated
-    if cfg!(all(target_family = "wasm", target_os = "unknown")) {
-        // Generated dates are unsupported for `wasm32/64-unknown-unknown`
-        assert!(metadata.published().is_none());
-        assert!(metadata.modified().is_none());
-    } else {
-        assert!(metadata.published().is_some());
-        assert!(metadata.modified().is_some());
-    }
+
+    // Generated dates are unsupported for `wasm32/64-unknown-unknown`
+    let is_generated = !cfg!(all(target_family = "wasm", target_os = "unknown"));
+    // Check if automatically generated
+    assert_eq!(is_generated, metadata.published().is_some());
+    assert_eq!(is_generated, metadata.modified().is_some());
 
     assert_iter!(
         metadata.generators(),

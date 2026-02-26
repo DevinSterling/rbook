@@ -51,7 +51,7 @@
 /// struct Itemref<'a>(&'a str, bool);
 ///
 /// // Map custom type
-/// impl<'a> Into<DetachedEpubSpineEntry> for Itemref<'a> {
+/// impl Into<DetachedEpubSpineEntry> for Itemref<'_> {
 ///     fn into(self) -> DetachedEpubSpineEntry {
 ///         DetachedEpubSpineEntry::new(self.0).linear(self.1)
 ///     }

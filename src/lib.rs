@@ -3,7 +3,8 @@
 //!
 //! A fast, format-agnostic, ergonomic ebook library with a current focus on EPUB.
 //!
-//! The primary goal of `rbook` is to provide an easy-to-use high-level API for handling ebooks.
+//! The primary goal of `rbook` is to provide an easy-to-use high-level API
+//! for reading, creating, and modifying ebooks.
 //! Most importantly, this library is designed with future formats in mind
 //! (`CBZ`, `FB2`, `MOBI`, etc.) via core traits defined within the [`ebook`] and [`reader`]
 //! module, allowing all formats to share the same "base" API.
@@ -50,7 +51,7 @@
 //! For example, only retaining the `threadsafe` default feature:
 //! ```toml
 //! [dependencies]
-//! rbook = { version = "0.7.0", default-features = false, features = ["threadsafe"] }
+//! rbook = { version = "0.7.1", default-features = false, features = ["threadsafe"] }
 //! ```
 //!
 //! # Opening an [`Ebook`]
@@ -258,9 +259,16 @@
 //! # {
 //! # use rbook::Epub;
 //! # fn main() -> rbook::ebook::errors::EbookResult<()> {
+//! use rbook::epub::EpubChapter;
+//!
 //! Epub::open("old.epub")?
 //!     .edit()
-//!     .contributor("Jane Doe") // Adding a contributor
+//!     // Appending a creator
+//!     .creator("Jane Doe")
+//!     // Appending a chapter
+//!     .chapter(EpubChapter::new("Chapter 1337").xhtml_body("1337"))
+//!     // Setting the modified date to now
+//!     .modified_now()
 //!     .write()
 //!     .compression(9)
 //!     .save("new.epub")
@@ -269,7 +277,7 @@
 //! ```
 //! ### Creating a backwards-compatible EPUB 3 file
 //!
-//! > This example uses the high-level builder API.
+//! > This example uses the [high-level builder API](epub::EpubEditor).
 //! > See the [`epub`] module for lower-level control over the manifest, spine, etc.
 //!
 //! ```no_run
@@ -311,7 +319,8 @@
 //!     ])
 //!     .write()
 //!     .compression(0)
-//!     .save("doe_story.epub") // Save to file or alternative write to memory
+//!     // Save to disk or alternatively write to memory
+//!     .save("doe_story.epub")
 //! # }
 //! # }
 //! ```
@@ -376,7 +385,7 @@ pub use {ebook::Ebook, epub::Epub};
 /// For example, omitting the `prelude` while retaining the `threadsafe` and `write` feature:
 /// ```toml
 /// [dependencies]
-/// rbook = { version = "0.7.0", default-features = false, features = ["threadsafe", "write"] }
+/// rbook = { version = "0.7.1", default-features = false, features = ["threadsafe", "write"] }
 /// ```
 #[cfg(feature = "prelude")]
 pub mod prelude {

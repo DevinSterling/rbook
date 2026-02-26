@@ -8,7 +8,7 @@
 
 > A fast, format-agnostic, ergonomic ebook library with a focus on EPUB.
 
-The primary goal of `rbook` is to provide an easy-to-use high-level API for handling and editing ebooks.
+The primary goal of `rbook` is to provide an easy-to-use high-level API for reading, creating, and modifying ebooks.
 Most importantly, this library is designed with future formats in mind
 (`CBZ`, `FB2`, `MOBI`, etc.) via core traits defined within the [ebook](https://docs.rs/rbook/latest/rbook/ebook) 
 and [reader](https://docs.rs/rbook/latest/rbook/reader) module, allowing all formats to share the same "base" API.
@@ -45,8 +45,8 @@ enabled by default in a project's `Cargo.toml` file:
 `rbook` can be used by adding it as a dependency in a project's `Cargo.toml` file:
 ```toml
 [dependencies]
-rbook = "0.7.0"                                           # With default features
-# rbook = { version = "0.7.0", default-features = false } # Excluding default features
+rbook = "0.7.1"                                           # With default features
+# rbook = { version = "0.7.1", default-features = false } # Excluding default features
 ```
 
 ## WebAssembly
@@ -64,14 +64,13 @@ fn main() {
 
     // Create a reader instance 
     // * Configurable via `reader_builder()`
-    let mut reader = epub.reader();
-
-    // Print the readable content
-    for data_result in reader {
+    for data_result in epub.reader() {
         let data = data_result.unwrap();
         let kind = data.manifest_entry().kind();
         assert_eq!("application/xhtml+xml", kind.as_str());
         assert_eq!("xhtml", kind.subtype());
+
+        // Print the readable content
         println!("{}", data.content());
     }
 }
@@ -161,15 +160,20 @@ fn main() {
     }
 }
 ```
-### Editing an EPUB
+### Modifying an existing EPUB
 ```rust
-use rbook::Epub;
+use rbook::epub::{Epub, EpubChapter};
 use rbook::ebook::errors::EbookResult;
 
 fn main() -> EbookResult<()> {
     Epub::open("old.epub")?
         .edit()
-        .creator("Jane Doe") // Adding a creator
+        // Appending a creator
+        .creator("Jane Doe")
+        // Appending a chapter
+        .chapter(EpubChapter::new("Chapter 1337").xhtml_body("1337"))
+        // Setting the modified date to now
+        .modified_now()
         .write()
         .compression(9)
         .save("new.epub")
@@ -177,15 +181,14 @@ fn main() -> EbookResult<()> {
 ```
 ### Creating a backwards-compatible EPUB 3 file
 
-> This example uses the high-level builder API.  
+> This example uses the [high-level builder API](https://docs.rs/rbook/latest/rbook/ebook/epub/struct.EpubEditor.html).  
 > See the [epub module](https://docs.rs/rbook/latest/rbook/ebook/epub)
 > for lower-level control over the manifest, spine, etc.
 
 ```rust
-use rbook::Epub;
+use rbook::epub::{Epub, EpubChapter};
 use rbook::ebook::errors::EbookResult;
 use rbook::ebook::toc::TocEntryKind;
-use rbook::epub::EpubChapter;
 use std::path::Path;
 
 const XHTML: &[u8] = b"<xhtml>...</xhtml>"; // Example data
@@ -218,7 +221,8 @@ fn main() -> EbookResult<()> {
         ])
         .write()
         .compression(0)
-        .save("doe_story.epub") // Save to file or alternative write to memory
+        // Save to disk or alternatively write to memory
+        .save("doe_story.epub")
 }
 ```
 

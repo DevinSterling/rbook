@@ -19,6 +19,7 @@ use crate::ebook::epub::spine::{
 use crate::ebook::epub::toc::{DetachedEpubTocEntry, EpubTocContext, EpubTocData, EpubTocMut};
 use crate::ebook::epub::write::writer::{EpubWriteConfig, EpubWriter};
 use crate::ebook::errors::EbookResult;
+use crate::ebook::metadata::datetime::DateTime;
 use crate::ebook::resource::consts::mime;
 use crate::ebook::resource::{Resource, ResourceContent};
 use crate::ebook::spine::PageDirection;
@@ -316,6 +317,7 @@ impl Default for Epub {
 /// - [`language`](Self::language) ***(required)***
 /// - [`publication_date`](Self::published_date)
 /// - [`modified_date`](Self::modified_date)
+/// - [`modified_now`](Self::modified_now)
 /// - [`creator`](Self::creator)
 /// - [`contributor`](Self::contributor)
 /// - [`publisher`](Self::publisher)
@@ -362,12 +364,21 @@ impl Default for Epub {
 /// - Modifying an [`Epub`]:
 /// ```no_run
 /// # use rbook::Epub;
+/// use rbook::epub::EpubChapter;
+///
 /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
 /// Epub::open("old.epub")?
 ///     .edit()
-///     .clear_meta("dc:title") // Clearing all previous titles, subtitles, etc.
+///     // Clearing all previous titles, subtitles, etc.
+///     .clear_meta("dc:title")
+///     // Appending the now sole title
 ///     .title("New Title")
-///     .contributor("Jane Doe") // Adding a contributor
+///     // Appending a contributor
+///     .contributor("Jane Doe")
+///     // Appending a chapter
+///     .chapter(EpubChapter::new("Chapter 1337").xhtml_body("1337"))
+///     // Setting the modified date to now
+///     .modified_now()
 ///     .write()
 ///     .compression(9)
 ///     .save("new.epub")
@@ -376,10 +387,9 @@ impl Default for Epub {
 /// - Creating an [`Epub`]:
 /// ```no_run
 /// # use rbook::epub::metadata::{EpubVersion};
-/// # use rbook::epub::EpubChapter;
-/// # use rbook::Epub;
+/// # use rbook::epub::{Epub, EpubChapter};
 /// # use std::path::Path;
-/// # const XHTML: &str = "<h1>Content</h1>";
+/// # const XHTML: &[u8] = &[];
 /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
 /// Epub::builder()
 ///     .identifier("urn:doi:10.1234/abc")
@@ -403,7 +413,8 @@ impl Default for Epub {
 ///     .cover_image(("cover.png", Path::new("local/external/file/cover.png")))
 ///     .write()
 ///     .compression(0)
-///     .save("my_first_story.epub") // Save to file or alternative write to memory
+///     // Save to disk or alternatively write to memory
+///     .save("some_story.epub")
 /// # }
 /// ```
 #[derive(Debug, PartialEq)]
@@ -800,6 +811,47 @@ impl EpubEditor<'_> {
         )
     }
 
+    /// Sets the modification date (`dcterms:modified`) to the current [`DateTime`].
+    ///
+    /// When modifying an existing EPUB, it is recommended to call this
+    /// method before [writing](Self::write).
+    ///
+    /// If an [`Epub`] is newly created via [`Epub::new`] or [`Epub::builder`],
+    /// calling this method is optional, as the modification date is
+    /// generated automatically upon writing.
+    /// See the [`epub`](super) module doc for generation details.
+    ///
+    /// This method serves as a convenient helper, so instead of:
+    /// ```
+    /// # use rbook::Epub;
+    /// use rbook::ebook::metadata::datetime::DateTime;
+    ///
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
+    /// # Epub::new().edit()
+    /// .modified_date(DateTime::now());
+    /// # Ok(())
+    /// # }
+    /// ```
+    /// This method can be called instead:
+    /// ```
+    /// # use rbook::Epub;
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
+    /// # Epub::new().edit()
+    /// .modified_now();
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # WebAssembly
+    /// On `wasm32-unknown-unknown`, this method has no effect.
+    /// The date can be explicitly given using [`Self::modified_date`].
+    pub fn modified_now(self) -> Self {
+        match DateTime::try_now() {
+            Some(now) => self.modified_date(now),
+            _ => self,
+        }
+    }
+
     /// Appends one or more titles (`dc:title`) via the [`Many`] trait.
     ///
     /// # See Also
@@ -1093,8 +1145,10 @@ impl EpubEditor<'_> {
     ///     .clear_meta("dc:creator")
     ///     // Add Jane Doe as the sole creator
     ///     .creator("Jane Doe")
+    ///     // Setting the modified date to now
+    ///     .modified_now()
     ///     .write()
-    ///     .save("saved.epub");
+    ///     .save("new.epub");
     /// # Ok(())
     /// # }
     /// ```
@@ -2034,17 +2088,15 @@ impl EpubChapter {
 
 /// Configuration to write an [`Epub`] to a destination.
 ///
-/// `EpubWriteOptions` supports two forms of usages:
+/// `EpubWriteOptions` supports two usage patterns:
 /// 1. **Attached**:
 ///    Created via [`Epub::write`] or [`EpubEditor::write`].
-///    The options are bound to a specific [`Epub`].
-///    Terminal methods (e.g., [`write`](EpubWriteOptions::<&Epub>::write)) consume the builder.
+///    The options are bound to a specific [`Epub`] and terminal methods
+///    operate on it directly.
 /// 2. **Detached**:
 ///    Created via [`EpubWriteOptions::default`].
-///    The options are standalone.
-///    Terminal methods take `&self`
-///    (e.g., [`to_vec`](EpubWriteOptions::to_vec)),
-///    and a reference to an [`Epub`], allowing the same configuration to be reused multiple times.
+///    The options are standalone and terminal methods take a reference to an [`Epub`],
+///    allowing the same configuration to be reused across multiple instances.
 ///
 /// # Renditions
 /// Currently, writing multi-rendition EPUBs is not supported.
@@ -2419,8 +2471,8 @@ impl Default for EpubWriteOptions {
 pub trait OrphanFilter: SendAndSync {
     /// Returns `true` if the orphaned file should be kept in the archive.
     ///
-    /// The given `path` is the absolute location of the file within the EPUB
-    /// container (e.g., `/EPUB/unused.jpg`).
+    /// The given `path` is the percent-decoded absolute location of the file within the EPUB
+    /// container (e.g., `/EPUB/unused image.jpg`).
     fn filter(&self, path: Href<'_>) -> bool;
 }
 
