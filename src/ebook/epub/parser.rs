@@ -102,11 +102,10 @@ pub(super) struct ParsedComponents {
 }
 
 /// The context shared among all EPUB-related parsers.
-///
-/// Currently consists of a single [`EpubParseConfig`] field.
 #[derive(Copy, Clone)]
 pub(super) struct EpubParserContext<'a> {
     config: &'a EpubParseConfig,
+    /// The version of the EPUB being parsed.
     version: EpubVersion,
 }
 

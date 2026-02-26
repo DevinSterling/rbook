@@ -1,6 +1,8 @@
+mod editor;
+
 use crate::epub::manifest::EXPECTED_MANIFEST;
-use crate::epub::util::EPUB3_DIR;
 use crate::epub::util::TestEpub::{Epub3Dir, Epub3File};
+use crate::epub::util::{EPUB3_DIR, round_trip_epub};
 use rbook::Epub;
 use rbook::ebook::element::Href;
 use rbook::ebook::errors::ArchiveError;
@@ -20,8 +22,7 @@ fn test_dir_comparison() {
     //   within the package, they are corrected in the generated epub.
     // - If such case happens, the original and new will be not equal here.
     let epub_a = Epub3Dir.open_strict();
-    let epub_b_bytes = epub_a.write().compression(0).to_vec().unwrap();
-    let epub_b = Epub::read(Cursor::new(epub_b_bytes)).unwrap();
+    let epub_b = round_trip_epub(&epub_a);
 
     assert_eq!(epub_a.package(), epub_b.package());
     assert_eq!(epub_a.metadata(), epub_b.metadata());
@@ -35,8 +36,7 @@ fn test_dir_comparison() {
 #[wasm_bindgen_test]
 fn test_file_comparison() {
     let epub_a = Epub3File.open_strict();
-    let epub_b_bytes = epub_a.write().compression(0).to_vec().unwrap();
-    let epub_b = Epub::read(Cursor::new(epub_b_bytes)).unwrap();
+    let epub_b = round_trip_epub(&epub_a);
 
     assert_eq!(epub_a.package(), epub_b.package());
     assert_eq!(epub_a.metadata(), epub_b.metadata());
@@ -62,8 +62,7 @@ fn test_retain_whitespace() {
     // Insertion
     epub.metadata_mut().push(INSERTED_METADATA.to_vec());
 
-    let epub_bytes = epub.write().compression(0).to_vec().unwrap();
-    let epub = Epub::read(Cursor::new(epub_bytes)).unwrap();
+    let epub = round_trip_epub(&epub);
     let metadata = epub.metadata();
 
     for (property, expected_value) in INSERTED_METADATA {
@@ -199,8 +198,7 @@ fn test_epub2_editor_metadata() {
         .page_direction(PageDirection::RightToLeft)
         .build();
 
-    let bytes = built_epub.write().compression(0).to_vec().unwrap();
-    let epub = Epub::read(Cursor::new(bytes)).unwrap();
+    let epub = round_trip_epub(&built_epub);
 
     // Package
     assert_eq!(epub.package().location().as_str(), "/EPUB/123.opf");
@@ -238,8 +236,7 @@ fn test_epub3_editor_metadata() {
         .page_direction(PageDirection::RightToLeft)
         .build();
 
-    let bytes = built_epub.write().compression(0).to_vec().unwrap();
-    let epub = Epub::read(Cursor::new(bytes)).unwrap();
+    let epub = round_trip_epub(&built_epub);
 
     // Package
     assert_eq!(epub.package().location().as_str(), "/OEBPS/package.opf");
@@ -292,8 +289,7 @@ fn test_epub2_editor_chapters() {
         ])
         .build();
 
-    let bytes = built_epub.write().compression(0).to_vec().unwrap();
-    let epub = Epub::read(Cursor::new(bytes)).unwrap();
+    let epub = round_trip_epub(&built_epub);
 
     #[rustfmt::skip]
     let expected_manifest = [
@@ -402,8 +398,7 @@ fn test_epub3_editor_chapters() {
         .toc_title("Story ToC")
         .build();
 
-    let bytes = built_epub.write().compression(0).to_vec().unwrap();
-    let epub = Epub::read(Cursor::new(bytes)).unwrap();
+    let epub = round_trip_epub(&built_epub);
 
     #[rustfmt::skip]
     let expected_manifest = [
@@ -517,8 +512,7 @@ fn test_epub3_editor_landmarks() {
         .landmarks_title("Points of Interest")
         .build();
 
-    let bytes = built_epub.write().compression(0).to_vec().unwrap();
-    let epub = Epub::read(Cursor::new(bytes)).unwrap();
+    let epub = round_trip_epub(&built_epub);
 
     #[rustfmt::skip]
     let expected_landmarks_contents = [
@@ -564,8 +558,7 @@ fn test_epub_editor_container_resources() {
         );
     }
 
-    let bytes = built_epub.write().compression(0).to_vec().unwrap();
-    let epub = Epub::read(Cursor::new(bytes)).unwrap();
+    let epub = round_trip_epub(&built_epub);
 
     for (location, data) in container_resources {
         assert_eq!(data.as_bytes(), epub.read_resource_bytes(location).unwrap());
@@ -592,8 +585,7 @@ fn test_epub_editor_ignore_container_resources() {
         );
     }
 
-    let bytes = built_epub.write().compression(0).to_vec().unwrap();
-    let epub = Epub::read(Cursor::new(bytes)).unwrap();
+    let epub = round_trip_epub(&built_epub);
 
     for (location, data) in container_resources {
         assert_ne!(data.as_bytes(), epub.read_resource_bytes(location).unwrap());
@@ -677,8 +669,7 @@ fn test_epub_os_files() {
         .cover_image(("cover_image.png", pkg_dir.join("img/cover.png")))
         .build();
 
-    let bytes = built_epub.write().compression(0).to_vec().unwrap();
-    let epub = Epub::read(Cursor::new(bytes)).unwrap();
+    let epub = round_trip_epub(&built_epub);
 
     let expected_manifest_entry = [
         // (id, file reference on disk)

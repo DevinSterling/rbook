@@ -56,14 +56,14 @@
 //!
 //! The API provides two levels of access:
 //! - [`EpubEditor`]: A high-level abstraction for common tasks
-//!   such as updating metadata, adding [creators](EpubEditor::creator),
+//!   such as updating metadata, adding [authors](EpubEditor::author),
 //!   and inserting [resources](EpubEditor::resource) or [chapters](EpubEditor::chapter).
 //! ```
 //! # #[cfg(feature = "write")]
 //! # {
 //! # use rbook::Epub;
 //! Epub::builder()
-//!     .creator("John Doe")
+//!     .author("John Doe")
 //!     .resource(("stylesheet.css", "ol { list-style: none; }"));
 //! # }
 //! ```

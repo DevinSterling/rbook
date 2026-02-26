@@ -1942,13 +1942,15 @@ impl<'ebook> EpubContributor<'ebook> {
     /// Returns an iterator over **all** roles by the order of importance (display sequence).
     #[doc = util::inherent_doc!(Contributor, roles)]
     pub fn roles(&self) -> impl Iterator<Item = Scheme<'ebook>> + 'ebook {
-        let roles = self.get_modern_roles().map(Some);
-        // If the size hint is 0, attempt to retrieve legacy `opf:role` attribute
-        // Note: `size_hint` **works** here as the underlying source is based
-        // on a collection (Vec) with a reliable hint.
-        let fallback = (roles.size_hint().0 == 0).then(|| self.get_legacy_role());
+        let mut roles = self.get_modern_roles().peekable();
+        // Attempt to retrieve the legacy role if modern variants are absent
+        let fallback = if roles.peek().is_none() {
+            self.get_legacy_role()
+        } else {
+            None
+        };
 
-        roles.chain(std::iter::once(fallback.flatten())).flatten()
+        roles.chain(fallback)
     }
 }
 
@@ -2142,14 +2144,13 @@ mod macros {
                     &self,
                 ) -> impl Iterator<Item = AlternateScript<'ebook>> + 'ebook {
                     let mut scripts = self.get_modern_alt_script().peekable();
+                    let fallback = if scripts.peek().is_none() {
+                        self.get_legacy_alt_script()
+                    } else {
+                        None
+                    };
 
-                    let fallback = scripts
-                        .peek()
-                        .is_none()
-                        .then(|| self.get_legacy_alt_script())
-                        .flatten();
-
-                    scripts.chain(std::iter::once(fallback).flatten())
+                    scripts.chain(fallback)
                 }
             }
 

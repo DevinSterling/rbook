@@ -4,7 +4,7 @@ use crate::ebook::archive::ResourceProvider;
 use crate::ebook::element::Href;
 use crate::ebook::epub::Epub;
 use crate::ebook::epub::archive::EpubArchive;
-use crate::ebook::epub::consts::{dc, opf};
+use crate::ebook::epub::consts::{dc, marc, opf};
 use crate::ebook::epub::manifest::{
     DetachedEpubManifestEntry, EpubManifestContext, EpubManifestData, EpubManifestMut,
 };
@@ -93,7 +93,7 @@ impl Epub {
     /// let epub = Epub::builder()
     ///     .identifier("urn:isbn:9780000000001")
     ///     .title("My Book")
-    ///     .creator("Jane Doe")
+    ///     .author("Jane Doe")
     ///     .language("en")
     ///     .chapter(EpubChapter::new("Introduction").xhtml(INTRO))
     ///     .build(); // Returns the Epub
@@ -318,6 +318,7 @@ impl Default for Epub {
 /// - [`publication_date`](Self::published_date)
 /// - [`modified_date`](Self::modified_date)
 /// - [`modified_now`](Self::modified_now)
+/// - [`author`](Self::author)
 /// - [`creator`](Self::creator)
 /// - [`contributor`](Self::contributor)
 /// - [`publisher`](Self::publisher)
@@ -394,7 +395,7 @@ impl Default for Epub {
 /// Epub::builder()
 ///     .identifier("urn:doi:10.1234/abc")
 ///     .title("Some Story")
-///     .creator(["John Doe", "Jane Doe"])
+///     .author(["John Doe", "Jane Doe"])
 ///     .language("en")
 ///     .chapter(
 ///         // Standard Chapter (Auto-generates href/filename "volume_i.xhtml")
@@ -445,7 +446,7 @@ impl EpubEditor<'static> {
     ///
     /// // Resume editing using an `EpubEditor`
     /// epub.edit()
-    ///     .creator(["Jane Doe", "John Doe"])
+    ///     .author(["Jane Doe", "John Doe"])
     ///     .identifier("urn:doi:10.1234/abc");
     ///
     /// let metadata = epub.metadata();
@@ -881,9 +882,83 @@ impl EpubEditor<'_> {
         self.meta(Batch(input.iter_many()))
     }
 
+    /// Appends one or more creators (`dc:creator`) with
+    /// the **author** role via the [`Many`] trait.
+    ///
+    /// If any of the given entries already contain roles,
+    /// they are treated as subsequent (lower-precedence).
+    /// The author (`aut`) role is inserted only if it is not already present.
+    ///
+    /// If an entry has a legacy EPUB 2 `opf:role` attribute present,
+    /// it is set to `aut`.
+    ///
+    /// # See Also
+    /// - [`Self::creator`] to append a creator without the author (`aut`) role.
+    ///
+    /// # Examples
+    /// - Appending authors:
+    /// ```
+    /// # use rbook::Epub;
+    /// use rbook::epub::metadata::DetachedEpubMetaEntry;
+    ///
+    /// Epub::builder()
+    ///     // Single entry
+    ///     .author("John Doe")
+    ///     // Batch entries
+    ///     .author(["Jane Doe", "Joe Shmoe"])
+    ///     // Explicit builder
+    ///     .author(
+    ///         DetachedEpubMetaEntry::creator("Hanako Yamada")
+    ///             // Subsequent roles are treated as secondary
+    ///             .role("ill")
+    ///             .file_as("Yamada, Hanako")
+    ///             .alternate_script("ja", "山田花子"),
+    ///     )
+    ///     // Manually specifying a creator with the author role
+    ///     .creator(DetachedEpubMetaEntry::creator("Taro Yamada").role("aut"));
+    /// ```
+    pub fn author(self, input: impl Many<DetachedEpubMetaEntry<marker::Contributor>>) -> Self {
+        // Ensure the property is `dc:creator` and role is `aut`
+        self.meta(Batch(input.iter_many().map(|mut author| {
+            // NOTE: If the current version is EPUB 2, refinements are downgraded on write.
+            let mut entry = author.as_mut();
+
+            // If an EPUB 2 attribute is present, update it to author.
+            let replace_role_attribute = entry
+                .attributes_mut()
+                .get_value(opf::OPF_ROLE)
+                .is_some_and(|role| role != marc::AUTHOR);
+            // Check if the author role refinement is not present
+            let has_author_role_refinement = entry
+                .as_view()
+                .refinements()
+                .by_property(opf::ROLE)
+                .any(|role| role.value() == marc::AUTHOR);
+
+            if !has_author_role_refinement {
+                // Ensures the author role has the highest precedence
+                entry.refinements_mut().insert(
+                    0,
+                    DetachedEpubMetaEntry::meta(opf::ROLE)
+                        .attribute((opf::SCHEME, marc::RELATORS))
+                        .value(marc::AUTHOR),
+                );
+            }
+            // Update legacy role attribute
+            if replace_role_attribute {
+                // This avoids cases where an EPUB 3 reader sees an author,
+                // while an EPUB 2 reader sees an illustrator
+                entry.attributes_mut().insert((opf::OPF_ROLE, marc::AUTHOR));
+            }
+
+            author.force_property(dc::CREATOR)
+        })))
+    }
+
     /// Appends one or more creators (`dc:creator`) via the [`Many`] trait.
     ///
     /// # See Also
+    /// - [`Self::author`] to append a `creator` with the **author** role.
     /// - [`DetachedEpubMetaEntry::creator`] to explicitly use a builder for greater control.
     ///
     /// # Examples
@@ -901,7 +976,7 @@ impl EpubEditor<'_> {
     ///     .creator(
     ///         DetachedEpubMetaEntry::creator("Hanako Yamada")
     ///             .file_as("Yamada, Hanako")
-    ///             .alternate_script("ja", "山田太郎")
+    ///             .alternate_script("ja", "山田花子")
     ///             // Explicitly specifying the role as `author` and `illustrator`
     ///             .role("aut")
     ///             .role("ill"),
@@ -933,7 +1008,7 @@ impl EpubEditor<'_> {
     ///         DetachedEpubMetaEntry::contributor("Hanako Yamada")
     ///             .id("contributor4")
     ///             .file_as("Yamada, Hanako")
-    ///             .alternate_script("ja", "山田太郎")
+    ///             .alternate_script("ja", "山田花子")
     ///             // Specifying the role as `editor`
     ///             .role("edt"),
     ///     );
@@ -1143,8 +1218,8 @@ impl EpubEditor<'_> {
     ///     .edit()
     ///     // Clears all creators (even if there are several)
     ///     .clear_meta("dc:creator")
-    ///     // Add Jane Doe as the sole creator
-    ///     .creator("Jane Doe")
+    ///     // Add Jane Doe as the sole creator/author
+    ///     .author("Jane Doe")
     ///     // Setting the modified date to now
     ///     .modified_now()
     ///     .write()
@@ -2113,10 +2188,10 @@ impl EpubChapter {
 /// - [`target`](Self::target) (Default: [`EpubVersion::Epub2`])
 /// - [`compression`](Self::compression) (Default: `6`)
 /// ## Cleanup
-/// - [`keep_orphans`](Self::keep_orphans) (Default: `false`)
+/// - [`keep_orphans`](Self::keep_orphans) (Default: Retain files in `META-INF`)
 /// ## Table of Contents
 /// - [`generate_toc`](Self::generate_toc) (Default: `true`)
-/// - [`toc_stylesheet`](Self::toc_stylesheet) (Default: Preserve)
+/// - [`toc_stylesheet`](Self::toc_stylesheet) (Default: Preserve existing)
 ///
 /// # Examples
 /// - One-off write (Attached):
@@ -2124,7 +2199,7 @@ impl EpubChapter {
 /// # use rbook::Epub;
 /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
 /// Epub::builder()
-///     .creator("Jane Doe")
+///     .author("Jane Doe")
 ///     // ...Populate epub... //
 ///     .write()
 ///     .compression(9)
@@ -2401,7 +2476,7 @@ impl<T> EpubWriteOptions<T> {
     ///     .keep_orphans(|file: Href| file.extension() == Some("json"));
     /// ```
     ///
-    /// Default: Retain resources within `/META-INF/`.
+    /// Default: Retain files within `/META-INF/`.
     pub fn keep_orphans(&mut self, keep: impl OrphanFilter + 'static) -> &mut Self {
         self.config.keep_orphans = Some(std::sync::Arc::new(keep));
         self

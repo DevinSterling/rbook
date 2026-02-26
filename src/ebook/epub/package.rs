@@ -295,8 +295,17 @@ impl Prefixes {
     }
 
     /// Returns the [`Prefix`] with the given `name` if present, otherwise [`None`].
+    ///
+    /// # See Also
+    /// - [`Self::get_uri`] to retrieve the prefix [uri](Prefix::uri) directly.
     pub fn by_name(&self, name: &str) -> Option<&Prefix> {
         self.0.by_key(name)
+    }
+
+    /// Returns the [uri](Prefix::uri) of the [`Prefix`]
+    /// with the given `name` if present, otherwise [`None`].
+    pub fn get_uri(&self, name: &str) -> Option<&str> {
+        self.0.by_key(name).map(|prefix| prefix.uri.as_str())
     }
 
     /// Returns `true` if a [`Prefix`] with the given `name` is present.

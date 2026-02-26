@@ -56,3 +56,14 @@ impl TestEpub {
         }
     }
 }
+
+#[cfg(feature = "write")]
+pub fn round_trip_epub(epub: &Epub) -> Epub {
+    let bytes = epub
+        .write()
+        .compression(0)
+        .to_vec()
+        .expect("All content should be written");
+
+    Epub::read(Cursor::new(bytes)).expect("EPUB should be valid")
+}

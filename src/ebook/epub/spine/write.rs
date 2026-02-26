@@ -297,7 +297,7 @@ impl<'ebook> EpubSpineMut<'ebook> {
         index: usize,
         mut detached: impl Iterator<Item = DetachedEpubSpineEntry>,
     ) {
-        if detached.has_one_remaining()
+        if detached.has_one_remaining_hint()
             && let Some(entry) = detached.next()
         {
             self.spine.entries.insert(index, entry.0);

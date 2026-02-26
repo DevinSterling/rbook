@@ -793,7 +793,7 @@ impl<'ebook> EpubTocEntryMut<'ebook> {
             entry
         });
 
-        if detached.has_one_remaining()
+        if detached.has_one_remaining_hint()
             && let Some(entry) = detached.next()
         {
             children.insert(index, entry.data);

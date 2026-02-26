@@ -51,7 +51,7 @@
 //! For example, only retaining the `threadsafe` default feature:
 //! ```toml
 //! [dependencies]
-//! rbook = { version = "0.7.1", default-features = false, features = ["threadsafe"] }
+//! rbook = { version = "0.7.2", default-features = false, features = ["threadsafe"] }
 //! ```
 //!
 //! # Opening an [`Ebook`]
@@ -264,7 +264,7 @@
 //! Epub::open("old.epub")?
 //!     .edit()
 //!     // Appending a creator
-//!     .creator("Jane Doe")
+//!     .author("Jane Doe")
 //!     // Appending a chapter
 //!     .chapter(EpubChapter::new("Chapter 1337").xhtml_body("1337"))
 //!     // Setting the modified date to now
@@ -295,7 +295,7 @@
 //! Epub::builder()
 //!     .identifier("urn:example")
 //!     .title("Doe Story")
-//!     .creator(["John Doe", "Jane Doe"])
+//!     .author(["John Doe", "Jane Doe"])
 //!     .language("en")
 //!     // Reference a file stored on disk or provide in-memory bytes
 //!     .cover_image(("cover.png", Path::new("local/file/cover.png")))
@@ -385,7 +385,7 @@ pub use {ebook::Ebook, epub::Epub};
 /// For example, omitting the `prelude` while retaining the `threadsafe` and `write` feature:
 /// ```toml
 /// [dependencies]
-/// rbook = { version = "0.7.1", default-features = false, features = ["threadsafe", "write"] }
+/// rbook = { version = "0.7.2", default-features = false, features = ["threadsafe", "write"] }
 /// ```
 #[cfg(feature = "prelude")]
 pub mod prelude {

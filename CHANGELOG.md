@@ -1,4 +1,18 @@
 # Changelog
+## 0.7.2 (2025-02-28)
+### Additions　**＋**
+- New method `EpubEditor::author` to simplify appending authors.
+  This avoids callers having to manually specify the marc:relators `aut` code for `dc:creator` metadata entries.
+- New method `Prefixes::get_uri` to simplify retrieving the URI of a `Prefix`.
+
+### Fixes　**✓**
+- Fix `EpubContributor::roles` incorrectly providing both EPUB 3 refinements roles and the EPUB 2 legacy `opf:role`.
+  Now prioritizes EPUB 3 refinements over the legacy `opf:role` attribute.
+
+### Changes　**⟳**
+- Update `wasm-bindgen-test` dev dependency: 0.3.63 → 0.3.64
+- Refine documentation for enhanced clarity.
+
 ## 0.7.1 (2025-02-26)
 ### Additions　**＋**
 - New method `EpubEditor::modified_now` to simplify modification workflows

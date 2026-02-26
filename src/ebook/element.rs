@@ -455,6 +455,9 @@ impl Attributes {
     }
 
     /// Returns the [`Attribute`] with the given `name` if present, otherwise [`None`].
+    ///
+    /// # See Also
+    /// - [`Self::get_value`] to retrieve the attribute [value](Attribute::value) directly.
     pub fn by_name(&self, name: &str) -> Option<&Attribute> {
         self.0.by_key(name)
     }

@@ -45,8 +45,8 @@ enabled by default in a project's `Cargo.toml` file:
 `rbook` can be used by adding it as a dependency in a project's `Cargo.toml` file:
 ```toml
 [dependencies]
-rbook = "0.7.1"                                           # With default features
-# rbook = { version = "0.7.1", default-features = false } # Excluding default features
+rbook = "0.7.2"                                           # With default features
+# rbook = { version = "0.7.2", default-features = false } # Excluding default features
 ```
 
 ## WebAssembly
@@ -168,8 +168,8 @@ use rbook::ebook::errors::EbookResult;
 fn main() -> EbookResult<()> {
     Epub::open("old.epub")?
         .edit()
-        // Appending a creator
-        .creator("Jane Doe")
+        // Appending an author
+        .author("Jane Doe")
         // Appending a chapter
         .chapter(EpubChapter::new("Chapter 1337").xhtml_body("1337"))
         // Setting the modified date to now
@@ -197,7 +197,7 @@ fn main() -> EbookResult<()> {
     Epub::builder()
         .identifier("urn:example")
         .title("Doe Story")
-        .creator(["John Doe", "Jane Doe"])
+        .author(["John Doe", "Jane Doe"])
         .language("en")
         // Reference a file stored on disk or provide in-memory bytes
         .cover_image(("cover.png", Path::new("local/file/cover.png")))

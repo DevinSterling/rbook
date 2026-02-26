@@ -1,5 +1,5 @@
 use crate::ebook::element::{Attribute, Attributes, TextDirection};
-use crate::ebook::epub::consts::{dc, opf, xml};
+use crate::ebook::epub::consts::{dc, marc, opf, xml};
 use crate::ebook::epub::metadata::{
     EpubMetaEntry, EpubMetaEntryData, EpubMetaEntryKind, EpubMetadata, EpubMetadataData,
     EpubRefinements, EpubRefinementsData, EpubVersion, InnerMetadataIter,
@@ -435,7 +435,7 @@ impl<M> DetachedEpubMetaEntry<M> {
     /// ```
     /// # use rbook::epub::metadata::DetachedEpubMetaEntry;
     /// DetachedEpubMetaEntry::creator("Hanako Yamada")
-    ///     .alternate_script("ja", "山田太郎");
+    ///     .alternate_script("ja", "山田花子");
     /// ```
     pub fn alternate_script(
         mut self,
@@ -615,7 +615,7 @@ impl DetachedEpubMetaEntry<marker::Contributor> {
         // Note: A contributor can have multiple roles
         refinements.push(
             DetachedEpubMetaEntry::meta(opf::ROLE)
-                .attribute((opf::SCHEME, opf::MARC_RELATORS))
+                .attribute((opf::SCHEME, marc::RELATORS))
                 .value(marc_relators_code),
         );
 
@@ -1156,7 +1156,7 @@ impl<'ebook> EpubMetadataMut<'ebook> {
         let mut detached = detached.iter_many();
 
         // Optimized path for a single item (Common use-case)
-        if detached.has_one_remaining()
+        if detached.has_one_remaining_hint()
             && let Some(entry) = detached.next()
         {
             let property = &entry.0.property;
@@ -1803,7 +1803,7 @@ impl<'ebook> EpubRefinementsMut<'ebook> {
         index: usize,
         mut detached: impl Iterator<Item = DetachedEpubMetaEntry>,
     ) {
-        if detached.has_one_remaining()
+        if detached.has_one_remaining_hint()
             && let Some(entry) = detached.next()
         {
             self.data.insert(index, entry.0);

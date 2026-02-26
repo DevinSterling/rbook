@@ -44,6 +44,16 @@ pub(crate) mod epub {
     }
 }
 
+// Currently, this module is only used when the `write` feature is enabled.
+#[cfg(feature = "write")]
+pub(crate) mod marc {
+    // Meta attribute values
+    pub(crate) const RELATORS: &str = "marc:relators";
+
+    // Roles
+    pub(crate) const AUTHOR: &str = "aut";
+}
+
 pub(crate) mod dc {
     #[cfg(feature = "write")]
     pub(crate) use write::*;
@@ -207,9 +217,6 @@ pub(crate) mod opf {
     mod write {
         pub(crate) const XMLNS_OPF: &str = "xmlns:opf";
         pub(crate) const OPF_NS: &str = "http://www.idpf.org/2007/opf";
-
-        // Meta attribute values
-        pub(crate) const MARC_RELATORS: &str = "marc:relators";
 
         // Spine attribute values
         pub(crate) const NO: &str = "no";

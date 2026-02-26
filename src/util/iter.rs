@@ -1,11 +1,12 @@
 #[cfg(feature = "write")]
 pub(crate) trait IteratorExt {
-    fn has_one_remaining(&self) -> bool;
+    fn has_one_remaining_hint(&self) -> bool;
 }
 
 #[cfg(feature = "write")]
 impl<I: Iterator> IteratorExt for I {
-    fn has_one_remaining(&self) -> bool {
+    /// This is an optimization ***hint***.
+    fn has_one_remaining_hint(&self) -> bool {
         matches!(self.size_hint(), (1, Some(1)))
     }
 }
