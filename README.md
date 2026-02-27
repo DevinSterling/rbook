@@ -1,4 +1,13 @@
 # rbook
+## Experimental CLI Feature Branch
+
+This is an unstable experimental command-line interface for `rbook`.
+
+Location: [cli](cli)
+
+Please do not contribute to this branch/feature as this is still in a very early stage of development.
+
+---
 
 [![Crates.io](https://img.shields.io/crates/v/rbook.svg?logo=rust&style=flat-square)](https://crates.io/crates/rbook)
 [![Documentation](https://img.shields.io/badge/documentation-latest%20release-19e.svg?logo=docs.rs&style=flat-square)](https://docs.rs/rbook)
