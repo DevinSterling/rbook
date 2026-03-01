@@ -267,7 +267,7 @@ impl<'ebook> EpubPackage<'ebook> {
 pub struct Prefixes(KeyedVec<Prefix>);
 
 impl Prefixes {
-    pub(super) const EMPTY: Prefixes = Self::new(Vec::new());
+    pub(super) const EMPTY: Self = Self::new(Vec::new());
 
     pub(super) const fn new(prefixes: Vec<Prefix>) -> Self {
         Self(KeyedVec(prefixes))
@@ -336,6 +336,10 @@ impl<'ebook> Iterator for PrefixesIter<'ebook> {
     fn next(&mut self) -> Option<Self::Item> {
         self.0.next()
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.0.size_hint()
+    }
 }
 
 /// A prefix, defining a mapping for use in [`property`](EpubMetaEntry::property) values.
@@ -347,7 +351,7 @@ impl<'ebook> Iterator for PrefixesIter<'ebook> {
 /// When the `write` feature flag is enabled, only modification of the URI is allowed.
 /// **The name cannot be modified once a prefix is created.**
 /// This prevents duplicate keys within [`Prefixes`].
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
 pub struct Prefix {
     name: String,
     uri: String,

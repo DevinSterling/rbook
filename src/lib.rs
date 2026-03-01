@@ -26,16 +26,16 @@
 //! # Features
 //! Here is a non-exhaustive list of the features `rbook` provides:
 //!
-//! | Feature                                   | Overview                                                                                                        |
-//! |-------------------------------------------|-----------------------------------------------------------------------------------------------------------------|
-//! | [**EPUB 2 and 3**](epub)                  | Read/write view of EPUB `2` and `3` formats.                                                                    |
-//! | [**Streaming Reader**](reader)            | Random‐access or sequential iteration over readable content.                                                    |
-//! | **Detailed Types**                        | Abstractions built on expressive traits and types.                                                              |
-//! | [**Metadata**](ebook::metadata)           | Typed access to titles, creators, publishers, languages, tags, roles, attributes, and more.                     |
-//! | [**Manifest**](ebook::manifest)           | Lookup and traverse contained resources such as readable content (XHTML) and images.                            |
-//! | [**Spine**](ebook::spine)                 | Chronological reading order and preferred page direction.                                                       |
-//! | [**Table of Contents (ToC)**](ebook::toc) | Navigation points, including the EPUB 2 guide and EPUB 3 landmarks.                                             |
-//! | [**Resources**](ebook::resource)          | On-demand retrieval of bytes or strings for any manifest resource; data is not loaded up-front until requested. |                                  |
+//! | Feature                                   | Overview                                                                                                   |
+//! |-------------------------------------------|------------------------------------------------------------------------------------------------------------|
+//! | [**EPUB 2 and 3**](epub)                  | EPUB builder and parser, providing simple and advanced read/write views for EPUB `2` and `3`.              |
+//! | [**Streaming Reader**](reader)            | Random‐access or sequential iteration over readable content.                                               |
+//! | **Detailed Types**                        | Abstractions built on expressive traits and types.                                                         |
+//! | [**Metadata**](ebook::metadata)           | Typed access to titles, creators, publishers, languages, tags, roles, attributes, and more.                |
+//! | [**Manifest**](ebook::manifest)           | Lookup and traverse contained resources such as readable content (XHTML) and images.                       |
+//! | [**Spine**](ebook::spine)                 | Chronological reading order and preferred page direction.                                                  |
+//! | [**Table of Contents (ToC)**](ebook::toc) | Navigation points, including the EPUB 2 guide and EPUB 3 landmarks.                                        |
+//! | [**Resources**](ebook::resource)          | Lazy retrieval of bytes or strings for any manifest resource; data is not loaded up-front until requested. |
 //!
 //! ## Default crate features
 //! These are toggleable features for `rbook` that are
@@ -51,7 +51,7 @@
 //! For example, only retaining the `threadsafe` default feature:
 //! ```toml
 //! [dependencies]
-//! rbook = { version = "0.7.2", default-features = false, features = ["threadsafe"] }
+//! rbook = { version = "0.7.3", default-features = false, features = ["threadsafe"] }
 //! ```
 //!
 //! # Opening an [`Ebook`]
@@ -72,7 +72,7 @@
 //!   # use rbook::Epub;
 //!   # let bytes = Vec::new();
 //!   let cursor = std::io::Cursor::new(bytes);
-//!   let epub = Epub::options().read(cursor);
+//!   let epub = Epub::read(cursor);
 //!   ```
 //!
 //! Aside from how the contents of an ebook are stored, options can also be given
@@ -385,7 +385,7 @@ pub use {ebook::Ebook, epub::Epub};
 /// For example, omitting the `prelude` while retaining the `threadsafe` and `write` feature:
 /// ```toml
 /// [dependencies]
-/// rbook = { version = "0.7.2", default-features = false, features = ["threadsafe", "write"] }
+/// rbook = { version = "0.7.3", default-features = false, features = ["threadsafe", "write"] }
 /// ```
 #[cfg(feature = "prelude")]
 pub mod prelude {

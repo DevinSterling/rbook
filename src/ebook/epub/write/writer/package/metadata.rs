@@ -278,7 +278,7 @@ impl<'package, 'ebook, W: Write> MetadataWriter<'package, 'ebook, W> {
             return;
         }
 
-        let writer = &mut self.writer;
+        let writer = &mut *self.writer;
         let attributes = &meta.attributes;
         // Retrieves a refinement by property
         let get_ref = |property| {

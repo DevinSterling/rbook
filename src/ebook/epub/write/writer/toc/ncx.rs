@@ -113,8 +113,7 @@ impl<'ebook, W: Write> NcxTocWriter<'ebook, W> {
             .epub
             .metadata()
             .identifier()
-            .map(|id| id.value())
-            .unwrap_or(UNKNOWN);
+            .map_or(UNKNOWN, |id| id.value());
         let depth = self
             .ctx
             .epub

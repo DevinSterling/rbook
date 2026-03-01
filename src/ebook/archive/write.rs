@@ -103,10 +103,8 @@ impl ResourceContent {
         mut writer: W,
     ) -> ArchiveResult<u64> {
         match self {
-            ResourceContent::Memory(content) => {
-                writer.write_all(content).map(|_| content.len() as u64)
-            }
-            ResourceContent::File(path) => {
+            Self::Memory(content) => writer.write_all(content).map(|()| content.len() as u64),
+            Self::File(path) => {
                 fs::File::open(path).and_then(|mut file| io::copy(&mut file, &mut writer))
             }
         }

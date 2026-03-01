@@ -169,7 +169,7 @@ impl_single_insertable! {
 /// # Specialization
 /// Once [specialization](https://github.com/rust-lang/rust/issues/31844) is available,
 /// this adapter may no longer be necessary.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Batch<Iter>(pub Iter);
 
 impl<T, I: Into<T>, It: IntoIterator<Item = I>> Many<T> for Batch<It> {
@@ -214,7 +214,7 @@ mod write {
     use crate::input::IntoOption;
 
     impl<T> IntoOption<T> for Option<T> {
-        fn into_option(self) -> Option<T> {
+        fn into_option(self) -> Self {
             self
         }
     }
@@ -231,8 +231,8 @@ mod write {
         }
     }
 
-    impl IntoOption<String> for String {
-        fn into_option(self) -> Option<String> {
+    impl IntoOption<Self> for String {
+        fn into_option(self) -> Option<Self> {
             Some(self)
         }
     }

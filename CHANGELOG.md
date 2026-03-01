@@ -1,4 +1,15 @@
 # Changelog
+## 0.7.3 (2025-03-07)
+### Additions **＋**
+- Implement `Eq` and `Hash` for `Prefix`.
+- Implement `Eq` for `ResourceContent`.
+- Implement `Display` for all associated `EpubMetaEntry` structs, delegating to `EpubMetaEntry::value`.
+- Override the default `size_hint` for all structs that implement `Iterator`.
+
+### Changes　**⟳**
+- Update `zip` dependency: 8.1.0 → 8.2.0
+- Refine documentation for enhanced clarity.
+
 ## 0.7.2 (2025-02-28)
 ### Additions　**＋**
 - New method `EpubEditor::author` to simplify appending authors.

@@ -269,7 +269,7 @@ impl<'a> From<&'a String> for ResourceKey<'a> {
     }
 }
 
-impl<'a> From<String> for ResourceKey<'a> {
+impl From<String> for ResourceKey<'_> {
     fn from(value: String) -> Self {
         Self::Value(Cow::Owned(value))
     }

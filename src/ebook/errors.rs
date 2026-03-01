@@ -39,9 +39,9 @@ pub enum EbookError {
 impl From<ReaderError> for EbookError {
     fn from(reader_error: ReaderError) -> Self {
         match reader_error {
-            ReaderError::Archive(error) => EbookError::Archive(error),
-            ReaderError::Format(error) => EbookError::Format(error),
-            error => EbookError::Reader(error),
+            ReaderError::Archive(error) => Self::Archive(error),
+            ReaderError::Format(error) => Self::Format(error),
+            error => Self::Reader(error),
         }
     }
 }

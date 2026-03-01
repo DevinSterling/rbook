@@ -20,24 +20,24 @@ and [reader](https://docs.rs/rbook/latest/rbook/reader) module, allowing all for
 ## Features
 Here is a non-exhaustive list of the features `rbook` provides:
 
-| Feature                     | Overview                                                                                                        | Documentation                                                        |
-|-----------------------------|-----------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------|
-| **EPUB 2 and 3**            | Simple and advanced read/write view of EPUB `2` and `3` formats.                                                | [epub module](https://docs.rs/rbook/latest/rbook/ebook/epub)         |
-| **Reader**                  | Random‐access or sequential iteration over readable content.                                                    | [reader module](https://docs.rs/rbook/latest/rbook/reader)           |
-| **Detailed Types**          | Abstractions built on expressive traits and types.                                                              |                                                                      |
-| **Metadata**                | Typed access to dates, titles, creators, publishers, languages, tags, roles, attributes, and more.              | [metadata module](https://docs.rs/rbook/latest/rbook/ebook/metadata) |
-| **Manifest**                | Lookup and traverse contained resources such as readable content (XHTML) and images.                            | [manifest module](https://docs.rs/rbook/latest/rbook/ebook/manifest) |
-| **Spine**                   | Chronological reading order and preferred page direction.                                                       | [spine module](https://docs.rs/rbook/latest/rbook/ebook/spine)       |
-| **Table of Contents (ToC)** | Navigation points, including the EPUB 2 guide and EPUB 3 landmarks.                                             | [toc module](https://docs.rs/rbook/latest/rbook/ebook/toc)           |
-| **Resources**               | On-demand retrieval of bytes or strings for any manifest resource; data is not loaded up-front until requested. | [resource module](https://docs.rs/rbook/latest/rbook/ebook/resource) |
+| Feature                     | Overview                                                                                                   | Documentation                                                        |
+|-----------------------------|------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------|
+| **EPUB 2 and 3**            | EPUB builder and parser, providing simple and advanced read/write views for EPUB `2` and `3`.              | [epub module](https://docs.rs/rbook/latest/rbook/ebook/epub)         |
+| **Reader**                  | Random‐access or sequential iteration over readable content.                                               | [reader module](https://docs.rs/rbook/latest/rbook/reader)           |
+| **Detailed Types**          | Abstractions built on expressive traits and types.                                                         |                                                                      |
+| **Metadata**                | Typed access to dates, titles, creators, publishers, languages, tags, roles, attributes, and more.         | [metadata module](https://docs.rs/rbook/latest/rbook/ebook/metadata) |
+| **Manifest**                | Lookup and traverse contained resources such as readable content (XHTML) and images.                       | [manifest module](https://docs.rs/rbook/latest/rbook/ebook/manifest) |
+| **Spine**                   | Chronological reading order and preferred page direction.                                                  | [spine module](https://docs.rs/rbook/latest/rbook/ebook/spine)       |
+| **Table of Contents (ToC)** | Navigation points, including the EPUB 2 guide and EPUB 3 landmarks.                                        | [toc module](https://docs.rs/rbook/latest/rbook/ebook/toc)           |
+| **Resources**               | Lazy retrieval of bytes or strings for any manifest resource; data is not loaded up-front until requested. | [resource module](https://docs.rs/rbook/latest/rbook/ebook/resource) |
 
-### Default crate features
+### Default Crate Features
 These are toggleable features for `rbook` that are
 enabled by default in a project's `Cargo.toml` file:
 
 | Feature        | Description                                                                                           |
 |----------------|-------------------------------------------------------------------------------------------------------|
-| **write**      | Creation and modification of EPUB `2` and `3` formats.                                                |
+| **write**      | Creation and modification for EPUB `2` and `3`.                                                       |
 | **prelude**    | Convenience [prelude](https://docs.rs/rbook/latest/rbook/prelude) ***only*** including common traits. |
 | **threadsafe** | Enables `Send` + `Sync` constraint for `Epub`.                                                        |
 
@@ -45,8 +45,8 @@ enabled by default in a project's `Cargo.toml` file:
 `rbook` can be used by adding it as a dependency in a project's `Cargo.toml` file:
 ```toml
 [dependencies]
-rbook = "0.7.2"                                           # With default features
-# rbook = { version = "0.7.2", default-features = false } # Excluding default features
+rbook = "0.7.3"                                           # With default features
+# rbook = { version = "0.7.3", default-features = false } # Excluding default features
 ```
 
 ## WebAssembly
@@ -85,7 +85,7 @@ fn main() {
         .strict(true) // Enable strict checks (`false` by default)
         .skip_toc(true) // Skips ToC-related parsing, such as toc.ncx (`false` by default)
         .open("example.epub")
-        .unwrap();    
+        .unwrap();
 
     // Retrieve the main title (all titles retrievable via `titles()`)
     let title = epub.metadata().title().unwrap();

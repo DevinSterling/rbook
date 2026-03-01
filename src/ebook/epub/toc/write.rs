@@ -57,7 +57,7 @@ impl EpubTocData {
                 entry.recursive_retain_children(f);
             }
             retain
-        })
+        });
     }
 }
 
@@ -378,7 +378,7 @@ impl DetachedEpubTocEntry {
     ///             .href("c2_1.xhtml"),
     ///     );
     /// ```
-    pub fn children(mut self, child: impl Many<DetachedEpubTocEntry>) -> Self {
+    pub fn children(mut self, child: impl Many<Self>) -> Self {
         self.as_mut().push(child);
         self
     }
@@ -390,7 +390,7 @@ impl DetachedEpubTocEntry {
 /// # Note
 /// If an [`Epub`](crate::epub::Epub) was loaded from an open operation
 /// (e.g. [`EpubOpenOptions`](crate::epub::EpubOpenOptions)),
-/// all toc information is not loaded.
+/// all toc information may not be loaded.
 /// For more details see:
 /// - [`EpubOpenOptions::retain_variants`](crate::epub::EpubOpenOptions::retain_variants),
 /// - [`EpubOpenOptions::preferred_toc`](crate::epub::EpubOpenOptions::preferred_toc),
@@ -411,8 +411,8 @@ impl<'ebook> EpubTocMut<'ebook> {
     ) -> Self {
         Self {
             ctx,
-            toc,
             href_resolver,
+            toc,
         }
     }
 
@@ -625,7 +625,7 @@ impl<'ebook> EpubTocMut<'ebook> {
     pub fn retain(&mut self, mut f: impl FnMut(EpubTocEntry) -> bool) {
         self.toc
             .entries
-            .retain(|key, entry| f(self.ctx.create_root(key.version, entry)))
+            .retain(|key, entry| f(self.ctx.create_root(key.version, entry)));
     }
 
     /// Removes and returns only the root entries specified by the predicate.
@@ -665,7 +665,7 @@ impl<'ebook> EpubTocMut<'ebook> {
             .map(|(key, data)| DetachedEpubTocEntry::detached(key.version, data))
     }
 
-    /// Removes and returns all root entries within the given `range`.
+    /// Removes and returns all root entries.
     pub fn drain(&mut self) -> impl Iterator<Item = DetachedEpubTocEntry> {
         self.toc
             .entries
@@ -745,6 +745,10 @@ impl<'ebook> Iterator for EpubTocIterMut<'ebook> {
             self.ctx
                 .create_root_mut(key.version, Some(self.href_resolver), root)
         })
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.iter.size_hint()
     }
 }
 
@@ -879,7 +883,7 @@ impl<'ebook> EpubTocEntryMut<'ebook> {
     /// - [`EpubEditor::resource`](crate::epub::EpubEditor::resource) for path details.
     ///   The same path resolution rules apply to this method.
     pub fn set_href(&mut self, raw_href: impl IntoOption<String>) -> Option<String> {
-        let data = &mut self.data;
+        let data = &mut *self.data;
 
         if let Some(href_raw) = raw_href.into_option() {
             data.href = self
@@ -964,7 +968,7 @@ impl<'ebook> EpubTocEntryMut<'ebook> {
     pub fn retain(&mut self, mut f: impl FnMut(EpubTocEntry<'_>) -> bool) {
         self.data
             .children
-            .retain(|child| f(self.ctx.create_entry(self.version, child, self.depth + 1)))
+            .retain(|child| f(self.ctx.create_entry(self.version, child, self.depth + 1)));
     }
 
     /// Removes and returns only the direct children specified by the predicate.
@@ -1051,7 +1055,7 @@ impl<'a, 'ebook: 'a> IntoIterator for &'a mut EpubTocEntryMut<'ebook> {
 }
 
 impl<'ebook> IntoIterator for EpubTocEntryMut<'ebook> {
-    type Item = EpubTocEntryMut<'ebook>;
+    type Item = Self;
     type IntoIter = EpubTocEntryIterMut<'ebook>;
 
     fn into_iter(self) -> Self::IntoIter {
@@ -1085,6 +1089,10 @@ impl<'ebook> Iterator for EpubTocEntryIterMut<'ebook> {
             self.ctx
                 .create_entry_mut(self.version, self.href_resolver, entry, self.next_depth)
         })
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.iter.size_hint()
     }
 }
 

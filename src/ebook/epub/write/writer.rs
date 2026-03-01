@@ -58,7 +58,7 @@ pub(super) struct EpubWriteTargets {
 
 impl EpubWriteTargets {
     fn new(initial_target: EpubVersion) -> Self {
-        let mut targets = EpubWriteTargets::default();
+        let mut targets = Self::default();
         targets.add(initial_target);
         targets
     }
@@ -72,7 +72,7 @@ impl EpubWriteTargets {
     }
 
     pub(super) fn clear(&mut self) {
-        *self = EpubWriteTargets::default();
+        *self = Self::default();
     }
 }
 

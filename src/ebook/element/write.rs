@@ -246,7 +246,7 @@ impl Attributes {
     /// # See Also
     /// - [`Self::extract_if`] to retrieve an iterator of the removed attributes.
     pub fn retain(&mut self, f: impl FnMut(&Attribute) -> bool) {
-        self.0.retain(f)
+        self.0.retain(f);
     }
 
     /// Removes and returns only the attributes specified by the predicate.
@@ -311,5 +311,9 @@ impl<'a> Iterator for AttributesIterMut<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.0.next()
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.0.size_hint()
     }
 }

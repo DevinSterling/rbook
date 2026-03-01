@@ -302,6 +302,10 @@ impl<'ebook> Iterator for EpubSpineIter<'ebook> {
             .next()
             .map(|(i, data)| self.ctx.create_entry(data, i))
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.iter.size_hint()
+    }
 }
 
 /// An entry contained within an [`EpubSpine`], encompassing associated metadata.

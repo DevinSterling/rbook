@@ -33,13 +33,12 @@ impl<K: Keyed> KeyedVec<K> {
 #[cfg(feature = "write")]
 impl<K: Keyed> KeyedVec<K> {
     pub fn insert(&mut self, value: K) -> Option<K> {
-        match self.0.iter_mut().find(|entry| entry.key() == value.key()) {
+        if let Some(current) = self.0.iter_mut().find(|entry| entry.key() == value.key()) {
             // If the key exists, replace it
-            Some(current) => Some(std::mem::replace(current, value)),
-            None => {
-                self.0.push(value);
-                None
-            }
+            Some(std::mem::replace(current, value))
+        } else {
+            self.0.push(value);
+            None
         }
     }
 
@@ -55,7 +54,7 @@ impl<K: Keyed> KeyedVec<K> {
     }
 
     pub fn retain(&mut self, f: impl FnMut(&K) -> bool) {
-        self.0.retain(f)
+        self.0.retain(f);
     }
 
     pub fn extract_if(&mut self, mut f: impl FnMut(&K) -> bool) -> impl Iterator<Item = K> {

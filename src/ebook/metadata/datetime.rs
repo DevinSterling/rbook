@@ -56,10 +56,9 @@ impl DateTime {
 
         let (date_str, time_str) = raw
             .split_once(['T', ' '])
-            .map(|(date, time)| (date, Some(time)))
-            .unwrap_or((raw, None));
+            .map_or((raw, None), |(date, time)| (date, Some(time)));
 
-        Some(DateTime {
+        Some(Self {
             date: Date::parse(date_str)?,
             // If `None`, default the time to `00:00:00`
             time: time_str.and_then(Time::parse).unwrap_or(Time::EMPTY),
@@ -175,7 +174,7 @@ impl Date {
             }
         }
 
-        Some(Date::new_clamped(year, month, day))
+        Some(Self::new_clamped(year, month, day))
     }
 
     /// The year (typically `0000-9999`).
@@ -214,7 +213,7 @@ pub struct Time {
 }
 
 impl Time {
-    const EMPTY: Time = Time {
+    const EMPTY: Self = Self {
         hour: 0,
         minute: 0,
         second: 0,
@@ -295,7 +294,7 @@ impl Time {
             }
         }
 
-        Some(Time::new_clamped(hour, minute, second, offset))
+        Some(Self::new_clamped(hour, minute, second, offset))
     }
 
     /// The number of hours (`0-23`).
@@ -482,9 +481,9 @@ mod write {
             #[cfg(not(all(target_family = "wasm", target_os = "unknown")))]
             {
                 let epoch_time = match std::time::UNIX_EPOCH.elapsed() {
-                    Ok(after_epoch) => after_epoch.as_secs() as i64,
+                    Ok(after_epoch) => after_epoch.as_secs().cast_signed(),
                     // Handle times before UNIX epoch (1970-1-1T00:00:00Z)
-                    Err(before_epoch) => -(before_epoch.duration().as_secs() as i64),
+                    Err(before_epoch) => -before_epoch.duration().as_secs().cast_signed(),
                 };
 
                 Some(Self::from_unix(epoch_time))
@@ -583,7 +582,7 @@ mod write {
         /// assert_eq!(39, time.second());
         /// ```
         pub fn new(hour: u8, minute: u8, second: u8, utc_offset: Option<i16>) -> Self {
-            Time::new_clamped(hour, minute, second, utc_offset)
+            Self::new_clamped(hour, minute, second, utc_offset)
         }
 
         /// Construct a UTC time from the given parts.
@@ -624,10 +623,10 @@ mod write {
         let hour = ((secs_of_day / 3600) % 24) as u8;
 
         // Calculate `Date` components (Howard Hinnant's Algorithm)
-        let z = days_since_epoch + 719468; // Shift epoch from 1970-01-01 to 0000-03-01
-        let era = (if z >= 0 { z } else { z - 146096 }) / 146097;
-        let doe = (z - era * 146097) as u32;
-        let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365;
+        let z = days_since_epoch + 719_468; // Shift epoch from 1970-01-01 to 0000-03-01
+        let era = (if z >= 0 { z } else { z - 146_096 }) / 146_097;
+        let doe = (z - era * 146_097) as u32;
+        let yoe = (doe - doe / 1460 + doe / 36524 - doe / 146_096) / 365;
         let y = yoe as i32 + era * 400;
         let doy = doe - (365 * yoe + yoe / 4 - yoe / 100);
         let mp = (5 * doy + 2) / 153;

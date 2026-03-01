@@ -372,7 +372,7 @@ impl TryFrom<XmlAttributes<'_>> for AttributesData {
                 Ok(Attribute::create(name, value))
             })
             .collect::<Result<Vec<_>, _>>()
-            .map(AttributesData::from)
+            .map(Self::from)
     }
 }
 

@@ -571,6 +571,10 @@ impl<'ebook> Iterator for EpubSpineIterMut<'ebook> {
             .next()
             .map(|(i, entry)| self.ctx.create_entry_mut(entry, i))
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.iter.size_hint()
+    }
 }
 
 /// Mutable view of [`EpubSpineEntry`], allowing modification of spine entry (`itemref`) fields,

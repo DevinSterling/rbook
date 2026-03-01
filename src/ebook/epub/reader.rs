@@ -46,7 +46,7 @@ pub struct EpubReader<'ebook> {
 }
 
 impl<'ebook> EpubReader<'ebook> {
-    pub(super) fn new(epub: &'ebook Epub, config: EpubReaderConfig) -> Self {
+    pub(super) fn new(epub: &'ebook Epub, config: &EpubReaderConfig) -> Self {
         let entries = Self::get_entries(epub, config.linear_behavior);
 
         EpubReader {
@@ -249,7 +249,7 @@ impl Sealed for EpubReader<'_> {}
 #[allow(refining_impl_trait)]
 impl<'ebook> Reader<'ebook> for EpubReader<'ebook> {
     fn reset(&mut self) {
-        self.reset()
+        self.reset();
     }
 
     fn read_next(&mut self) -> Option<ReaderResult<EpubReaderContent<'ebook>>> {
@@ -293,6 +293,12 @@ impl<'ebook> Iterator for EpubReader<'ebook> {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.read_next()
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        let remaining = self.remaining();
+
+        (remaining, Some(remaining))
     }
 }
 
@@ -506,7 +512,7 @@ impl<'ebook> EpubReaderOptions<&'ebook Epub> {
 
     /// Consume this builder and create an [`EpubReader`].
     pub fn create(self) -> EpubReader<'ebook> {
-        EpubReader::new(self.container, self.config)
+        EpubReader::new(self.container, &self.config)
     }
 }
 
@@ -521,6 +527,6 @@ impl EpubReaderOptions {
 
     /// Consume this builder and create an [`EpubReader`] associated with the given [`Epub`].
     pub fn create<'ebook>(&self, epub: &'ebook Epub) -> EpubReader<'ebook> {
-        EpubReader::new(epub, self.config.clone())
+        EpubReader::new(epub, &self.config)
     }
 }

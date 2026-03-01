@@ -101,7 +101,7 @@ impl Archive for DirectoryArchive {
                     // The path is made absolute to maintain consistency throughout the API
                     let value = if cfg!(windows) {
                         // Enforce forward slashes
-                        util::str::prefix("/", &utf8_path.replace("\\", "/"))
+                        util::str::prefix("/", &utf8_path.replace('\\', "/"))
                     } else {
                         util::str::prefix("/", utf8_path)
                     };

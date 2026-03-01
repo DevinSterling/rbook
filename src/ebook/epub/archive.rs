@@ -63,7 +63,7 @@ impl EpubArchive {
         self.0.relocate(
             Self::transform_owned_href(current.into()),
             Self::transform_owned_href(new_href.into()),
-        )
+        );
     }
 
     /// Checks if the given `href` points to an overlay resource.

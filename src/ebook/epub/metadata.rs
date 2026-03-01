@@ -746,6 +746,10 @@ impl<'ebook> Iterator for EpubMetadataIter<'ebook> {
             .next()
             .map(|(i, data)| self.ctx.create_entry(data, i))
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.iter.size_hint()
+    }
 }
 
 /// A collection of [`EpubMetaEntry`] refinements providing further clarifying detail.
@@ -916,6 +920,10 @@ impl<'ebook> Iterator for EpubRefinementsIter<'ebook> {
         self.iter
             .next()
             .map(|(i, data)| self.ctx.create_refining_entry(self.parent_id, data, i))
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.iter.size_hint()
     }
 }
 
@@ -1616,7 +1624,7 @@ pub enum EpubVersion {
 
 impl EpubVersion {
     /// Utility to retrieve the major of each compatible EPUB versions.
-    pub(crate) const VERSIONS: [EpubVersion; 2] = [Self::EPUB2, Self::EPUB3];
+    pub(crate) const VERSIONS: [Self; 2] = [Self::EPUB2, Self::EPUB3];
 
     /// [`EpubVersion::Epub2`] constant with a predefined [`Version`] of `2.0`.
     pub const EPUB2: Self = Self::Epub2(Version(2, 0));
@@ -2067,6 +2075,12 @@ mod macros {
                 }
             }
 
+            impl<'ebook> PartialEq<$implementation<'ebook>> for EpubMetaEntry<'_> {
+                fn eq(&self, other: &$implementation<'ebook>) -> bool {
+                    self == &other.entry
+                }
+            }
+
             impl<'ebook> std::ops::Deref for $implementation<'ebook> {
                 type Target = EpubMetaEntry<'ebook>;
 
@@ -2173,6 +2187,12 @@ mod macros {
                     &self,
                 ) -> impl Iterator<Item = AlternateScript<'ebook>> + 'ebook {
                     self.alternate_scripts()
+                }
+            }
+
+            impl Display for $implementation<'_> {
+                fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+                    f.write_str(&self.value())
                 }
             }
         };

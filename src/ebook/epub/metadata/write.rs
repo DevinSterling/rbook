@@ -224,7 +224,7 @@ impl<M> DetachedEpubMetaEntry<M> {
 
     pub(crate) fn force_property(mut self, property: &str) -> Self {
         if self.0.property != property {
-            self.0.property = property.to_owned();
+            property.clone_into(&mut self.0.property);
         }
         self
     }
@@ -532,7 +532,7 @@ impl DetachedEpubMetaEntry {
 
         if self.0.kind.is_dublin_core() && !property.starts_with(dc::NAMESPACE) {
             // Correct property to include the namespace
-            property.insert_str(0, dc::NAMESPACE)
+            property.insert_str(0, dc::NAMESPACE);
         }
 
         self.0.property = property;
@@ -1087,6 +1087,7 @@ impl<'ebook> EpubMetadataMut<'ebook> {
     /// // Newly added creator:
     /// let added_creator = creators.next().unwrap();
     /// assert_eq!("Jane Doe", added_creator.value());
+    /// assert_eq!(Some("jane"), added_creator.id());
     /// assert_eq!(Some("Doe, Jane"), added_creator.file_as());
     /// assert_eq!(None, creators.next());
     /// # Ok(())
@@ -1106,14 +1107,14 @@ impl<'ebook> EpubMetadataMut<'ebook> {
     ///     // ...,
     /// ]);
     ///
-    /// let mut tags = epub.metadata().tags();
+    /// let mut tags = epub.metadata().tags().map(|tag| tag.value());
     /// // Initial tags:
-    /// assert_eq!("FICTION / Occult & Supernatural", tags.next().unwrap().value());
-    /// assert_eq!("Quests (Expeditions) -- Fiction", tags.next().unwrap().value());
-    /// assert_eq!("Fantasy", tags.next().unwrap().value());
+    /// assert_eq!(Some("FICTION / Occult & Supernatural"), tags.next());
+    /// assert_eq!(Some("Quests (Expeditions) -- Fiction"), tags.next());
+    /// assert_eq!(Some("Fantasy"), tags.next());
     /// // Newly added tags:
-    /// assert_eq!("Fiction", tags.next().unwrap().value());
-    /// assert_eq!("Romance", tags.next().unwrap().value());
+    /// assert_eq!(Some("Fiction"), tags.next());
+    /// assert_eq!(Some("Romance"), tags.next());
     /// assert_eq!(None, tags.next());
     /// # Ok(())
     /// # }
@@ -1147,9 +1148,9 @@ impl<'ebook> EpubMetadataMut<'ebook> {
     /// // Insert "First Author" as the first creator
     /// epub.metadata_mut().insert(0, DetachedEpubMetaEntry::creator("First Author"));
     ///
-    /// let mut creators = epub.metadata().creators();
-    /// assert_eq!("First Author", creators.next().unwrap().value());
-    /// assert_eq!("Second Author", creators.next().unwrap().value());
+    /// let mut creators = epub.metadata().creators().map(|creator| creator.value());
+    /// assert_eq!(Some("First Author"), creators.next());
+    /// assert_eq!(Some("Second Author"), creators.next());
     /// assert_eq!(None, creators.next());
     /// ```
     pub fn insert(&mut self, index: usize, detached: impl Many<DetachedEpubMetaEntry>) {
@@ -1215,18 +1216,20 @@ impl<'ebook> EpubMetadataMut<'ebook> {
     /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
     /// let mut epub = Epub::open("tests/ebooks/example_epub")?;
     ///
-    /// // Original author name
-    /// assert_eq!("John Doe", epub.metadata().by_id("author").unwrap().value());
+    /// // Original author
+    /// let john_doe = epub.metadata().by_id("author").unwrap();
+    /// assert_eq!("John Doe", john_doe.value());
     ///
     /// let mut metadata = epub.metadata_mut();
     /// // `None` is returned if a non-existent `id` is given
     /// assert!(metadata.by_id_mut("doesn't exist").is_none());
     ///
-    /// let mut entry = metadata.by_id_mut("author").unwrap();
-    /// entry.set_value("Jane Doe");
+    /// let mut author_mut = metadata.by_id_mut("author").unwrap();
+    /// author_mut.set_value("Jane Doe");
     ///
-    /// // New author name
-    /// assert_eq!("Jane Doe", epub.metadata().by_id("author").unwrap().value());
+    /// // New author
+    /// let jane_doe = epub.metadata().by_id("author").unwrap();
+    /// assert_eq!("Jane Doe", jane_doe.value());
     /// # Ok(())
     /// # }
     /// ```
@@ -1279,10 +1282,10 @@ impl<'ebook> EpubMetadataMut<'ebook> {
     /// let mut epub = Epub::open("tests/ebooks/example_epub")?;
     ///
     /// // Original tags
-    /// let mut tags = epub.metadata().tags();
-    /// assert_eq!("FICTION / Occult & Supernatural", tags.next().unwrap().value());
-    /// assert_eq!("Quests (Expeditions) -- Fiction", tags.next().unwrap().value());
-    /// assert_eq!("Fantasy", tags.next().unwrap().value());
+    /// let mut tags = epub.metadata().tags().map(|tag| tag.value());
+    /// assert_eq!(Some("FICTION / Occult & Supernatural"), tags.next());
+    /// assert_eq!(Some("Quests (Expeditions) -- Fiction"), tags.next());
+    /// assert_eq!(Some("Fantasy"), tags.next());
     /// assert_eq!(0, tags.count());
     ///
     /// // Making all tags uppercase:
@@ -1292,10 +1295,10 @@ impl<'ebook> EpubMetadataMut<'ebook> {
     /// }
     ///
     /// // Modified tags
-    /// let mut tags = epub.metadata().tags();
-    /// assert_eq!("FICTION / OCCULT & SUPERNATURAL", tags.next().unwrap().value());
-    /// assert_eq!("QUESTS (EXPEDITIONS) -- FICTION", tags.next().unwrap().value());
-    /// assert_eq!("FANTASY", tags.next().unwrap().value());
+    /// let mut tags = epub.metadata().tags().map(|tag| tag.value());
+    /// assert_eq!(Some("FICTION / OCCULT & SUPERNATURAL"), tags.next());
+    /// assert_eq!(Some("QUESTS (EXPEDITIONS) -- FICTION"), tags.next());
+    /// assert_eq!(Some("FANTASY"), tags.next());
     /// assert_eq!(None, tags.next());
     /// # Ok(())
     /// # }
@@ -1354,7 +1357,8 @@ impl<'ebook> EpubMetadataMut<'ebook> {
     /// let mut epub = Epub::open("tests/ebooks/example_epub")?;
     ///
     /// // Existing entry
-    /// assert_eq!("John Doe", epub.metadata().by_id("author").unwrap().value());
+    /// let john_doe = epub.metadata().by_id("author").unwrap();
+    /// assert_eq!("John Doe", john_doe.value());
     ///
     /// let mut metadata = epub.metadata_mut();
     /// // `None` is returned if a non-existent `id` is given
@@ -1581,7 +1585,7 @@ impl Debug for EpubMetadataMut<'_> {
 
 impl<M> Extend<DetachedEpubMetaEntry<M>> for EpubMetadataMut<'_> {
     fn extend<T: IntoIterator<Item = DetachedEpubMetaEntry<M>>>(&mut self, iter: T) {
-        self.push_detached(iter.into_iter().map(DetachedEpubMetaEntry::into_any))
+        self.push_detached(iter.into_iter().map(DetachedEpubMetaEntry::into_any));
     }
 }
 
@@ -1639,6 +1643,10 @@ impl<'ebook> Iterator for EpubMetadataIterMut<'ebook> {
         self.iter
             .next()
             .map(|(i, entry)| EpubMetaEntryMut::new(self.meta_ctx, entry, None, i))
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.iter.size_hint()
     }
 }
 
@@ -1990,7 +1998,7 @@ impl Extend<DetachedEpubMetaEntry> for EpubRefinementsMut<'_> {
     }
 }
 
-impl<'a, 'ebook> IntoIterator for &'a mut EpubRefinementsMut<'ebook> {
+impl<'a> IntoIterator for &'a mut EpubRefinementsMut<'_> {
     type Item = EpubMetaEntryMut<'a>;
     type IntoIter = EpubRefinementsIterMut<'a>;
 
@@ -2039,5 +2047,9 @@ impl<'ebook> Iterator for EpubRefinementsIterMut<'ebook> {
         self.iter
             .next()
             .map(|(i, entry)| EpubMetaEntryMut::new(self.meta_ctx, entry, self.parent_id, i))
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.iter.size_hint()
     }
 }

@@ -1,7 +1,7 @@
 [package]
 authors = ["Devin Sterling"]
 name = "rbook"
-version = "0.7.2"
+version = "0.7.3"
 rust-version = "1.88.0"
 edition = "2024"
 description = """
@@ -11,7 +11,7 @@ license = "Apache-2.0"
 repository = "https://github.com/DevinSterling/rbook"
 documentation = "https://docs.rs/rbook"
 categories = ["parser-implementations", "wasm"]
-keywords = ["ebook", "e-book", "epub", "epub2", "epub3"]
+keywords = ["ebook", "epub", "builder", "epub2", "epub3"]
 
 [features]
 default = ["threadsafe", "prelude", "write"]
@@ -24,7 +24,7 @@ thiserror = "2.0.18"
 percent-encoding = "2.3.2"
 indexmap = "2.13.0"
 quick-xml = { version = "0.39.2", features = ["escape-html"] }
-zip = { version = "8.1.0", default-features = false, features = ["deflate"] }
+zip = { version = "8.2.0", default-features = false, features = ["deflate"] }
 
 [dev-dependencies]
 wasm-bindgen-test = "0.3.64"

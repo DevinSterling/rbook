@@ -171,7 +171,7 @@ impl AttachedEntryContext<'_> {
             if let Some(reference) = reference
                 && reference == old_id
             {
-                *reference = new_id.to_owned();
+                new_id.clone_into(reference);
             }
         }
 
@@ -182,7 +182,7 @@ impl AttachedEntryContext<'_> {
         }
 
         // Multiple `itemref` elements can reference a manifest `item`
-        for entry in self.spine.entries.iter_mut() {
+        for entry in &mut self.spine.entries {
             update_idref(Some(&mut entry.idref), old_id, new_id);
         }
 
@@ -192,12 +192,12 @@ impl AttachedEntryContext<'_> {
             && let Some(entry) = cover.first_mut()
             && entry.id.as_deref().is_some_and(|id| id == old_id)
         {
-            entry.value = new_id.to_owned();
+            new_id.clone_into(&mut entry.value);
         }
     }
 
     fn cascade_new_href(&mut self, old_href: &str, new_href: &str) {
-        for (_, root) in self.toc.entries.iter_mut() {
+        for (_, root) in &mut self.toc.entries {
             root.cascade_toc_href(uri::path(old_href), new_href);
         }
     }
@@ -1056,7 +1056,7 @@ impl Debug for EpubManifestMut<'_> {
 
 impl Extend<DetachedEpubManifestEntry> for EpubManifestMut<'_> {
     fn extend<T: IntoIterator<Item = DetachedEpubManifestEntry>>(&mut self, iter: T) {
-        for entry in iter.into_iter() {
+        for entry in iter {
             self.insert_detached(entry);
         }
     }
@@ -1232,6 +1232,7 @@ impl<'ebook> EpubManifestEntryMut<'ebook> {
         }
 
         self.try_set_id(id_options.id)
+            // The given id is unique at this point, so a panic should never occur
             .expect("The given id should be unique")
     }
 

@@ -2,7 +2,7 @@ use crate::ebook::errors::EbookError;
 use crate::ebook::metadata::datetime::DateTime;
 use crate::writer::WriterResult;
 use std::io::Write;
-use zip::write::SimpleFileOptions;
+use zip::write::{SimpleFileOptions, StreamWriter};
 use zip::{CompressionMethod, DateTime as ZipDateTime};
 
 pub(crate) trait ZipFileOptionsExt {
@@ -26,7 +26,7 @@ impl ZipFileOptionsExt for SimpleFileOptions {
             let time = datetime.time();
 
             ZipDateTime::from_date_and_time(
-                date.year().clamp(0, 9999) as u16,
+                date.year().clamp(0, 9999).cast_unsigned(),
                 date.month(),
                 date.day(),
                 time.hour(),
@@ -41,7 +41,7 @@ impl ZipFileOptionsExt for SimpleFileOptions {
 }
 
 pub(crate) struct ZipWriter<W: Write> {
-    inner: zip::ZipWriter<zip::write::StreamWriter<W>>,
+    inner: zip::ZipWriter<StreamWriter<W>>,
     options: SimpleFileOptions,
 }
 
@@ -76,7 +76,7 @@ impl<W: Write> ZipWriter<W> {
         self.inner
             .finish()
             .map_err(from_zip_error)
-            .map(|stream_writer| stream_writer.into_inner())
+            .map(StreamWriter::into_inner)
     }
 }
 

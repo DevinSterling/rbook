@@ -447,6 +447,10 @@ impl<'ebook> Iterator for EpubManifestIter<'ebook> {
             .next()
             .map(|(id, data)| self.ctx.create_entry(id, data))
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.iter.size_hint()
+    }
 }
 
 /// A [`ManifestEntry`] contained within an [`EpubManifest`], encompassing

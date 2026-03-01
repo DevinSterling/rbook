@@ -276,7 +276,7 @@ impl Prefixes {
     /// # See Also
     /// - [`Self::extract_if`] to retrieve an iterator of the removed prefixes.
     pub fn retain(&mut self, f: impl FnMut(&Prefix) -> bool) {
-        self.0.retain(f)
+        self.0.retain(f);
     }
 
     /// Removes and returns only the prefixes specified by the predicate.
@@ -336,5 +336,9 @@ impl<'ebook> Iterator for PrefixesMutIter<'ebook> {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.0.next()
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.0.size_hint()
     }
 }

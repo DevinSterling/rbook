@@ -29,7 +29,7 @@ impl<T> MaybeOwned<'_, T> {
 }
 
 #[cfg(feature = "write")]
-impl<'a, T> std::ops::Deref for MaybeOwned<'a, T> {
+impl<T> std::ops::Deref for MaybeOwned<'_, T> {
     type Target = T;
 
     fn deref(&self) -> &Self::Target {
@@ -41,7 +41,7 @@ impl<'a, T> std::ops::Deref for MaybeOwned<'a, T> {
 }
 
 #[cfg(feature = "write")]
-impl<'a, T> std::ops::DerefMut for MaybeOwned<'a, T> {
+impl<T> std::ops::DerefMut for MaybeOwned<'_, T> {
     fn deref_mut(&mut self) -> &mut Self::Target {
         match self {
             Self::Owned(owned) => owned,

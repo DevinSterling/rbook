@@ -22,7 +22,7 @@ struct TempEpubMetaEntry {
     /// Absolute natural order among all metadata entries
     natural_order: usize,
     refines: Option<String>,
-    temp_refinements: Vec<TempEpubMetaEntry>,
+    temp_refinements: Vec<Self>,
     data: EpubMetaEntryData,
 }
 
@@ -51,7 +51,7 @@ impl TempEpubMetaEntry {
         data.refinements = EpubRefinementsData::new(
             self.temp_refinements
                 .into_iter()
-                .map(TempEpubMetaEntry::finish)
+                .map(Self::finish)
                 .collect(),
         );
         data
@@ -174,7 +174,7 @@ impl<'package, 'a> MetadataParser<'package, 'a> {
             EpubMetaEntryKind::Link {} => {
                 // No specialized parsing required
             }
-        };
+        }
 
         let id = attributes.remove(xml::ID)?;
 
@@ -506,7 +506,7 @@ impl<'package, 'a> MetadataParser<'package, 'a> {
 
     fn sort_by_display_sequence(group: &mut [TempEpubMetaEntry]) {
         // Sort refinements as they must be ordered as well
-        for meta in group.iter_mut() {
+        for meta in &mut *group {
             Self::sort_by_display_sequence(&mut meta.temp_refinements);
         }
 
@@ -521,7 +521,7 @@ impl EpubParserValidator for MetadataParser<'_, '_> {
     }
 }
 
-impl<'a> PackageParser<'a, '_> {
+impl PackageParser<'_, '_> {
     pub(super) fn parse_metadata(&mut self) -> ParserResult<EpubMetadataData> {
         let package = self.package.as_ref().ok_or(EpubError::NoPackageFound)?;
 

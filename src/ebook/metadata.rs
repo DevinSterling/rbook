@@ -32,10 +32,10 @@ use std::hash::Hash;
 ///
 /// // An EPUB may include multiple titles,
 /// // here we retrieve the second title:
-/// let title = metadata.titles().nth(1).unwrap();
-/// assert_eq!("A subtitle", title.value());
-/// assert_eq!(TitleKind::Subtitle, title.kind());
-/// assert_eq!(1, title.order());
+/// let subtitle = metadata.titles().nth(1).unwrap();
+/// assert_eq!("A subtitle", subtitle.value());
+/// assert_eq!(TitleKind::Subtitle, subtitle.kind());
+/// assert_eq!(1, subtitle.order());
 ///
 /// // Retrieving the last modified date:
 /// let modified = epub.metadata().modified().unwrap();

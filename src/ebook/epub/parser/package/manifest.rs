@@ -145,7 +145,7 @@ impl PackageParser<'_, '_> {
             ncx = manifest
                 .entries
                 .get(ncx_id)
-                .map(|entry| TocLocation::new(entry.href.to_owned(), EpubVersion::EPUB2));
+                .map(|entry| TocLocation::new(entry.href.clone(), EpubVersion::EPUB2));
         }
         // Retrieve EPUB 3 XHTML nav
         if config.retain_variants || preferred_toc.is_epub3() || ncx.is_none() {
@@ -153,7 +153,7 @@ impl PackageParser<'_, '_> {
                 .entries
                 .values()
                 .find(|e| e.properties.has_property(opf::NAV_PROPERTY))
-                .map(|entry| TocLocation::new(entry.href.to_owned(), EpubVersion::EPUB3));
+                .map(|entry| TocLocation::new(entry.href.clone(), EpubVersion::EPUB3));
         }
 
         let locations: Vec<_> = if config.retain_variants {

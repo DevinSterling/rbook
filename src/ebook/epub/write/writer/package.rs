@@ -39,7 +39,7 @@ impl<'ebook> PackageIdGenerator<'ebook> {
     }
 
     fn check_id(prefix: &str, max: &mut usize, id: &str) {
-        if let Some(Ok(num)) = id.strip_prefix(prefix).map(|value| value.parse()) {
+        if let Some(Ok(num)) = id.strip_prefix(prefix).map(str::parse) {
             *max = (*max).max(num);
         }
     }

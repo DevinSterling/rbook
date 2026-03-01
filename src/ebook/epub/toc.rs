@@ -93,7 +93,7 @@ pub(super) struct EpubTocEntryData {
     pub(super) href: Option<String>,
     pub(super) href_raw: Option<String>,
     pub(super) attributes: AttributesData,
-    pub(super) children: Vec<EpubTocEntryData>,
+    pub(super) children: Vec<Self>,
 }
 
 #[derive(Copy, Clone)]
@@ -379,6 +379,10 @@ impl<'ebook> Iterator for EpubTocIter<'ebook> {
             .next()
             .map(move |(key, data)| self.ctx.create_root(key.version, data))
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.iter.size_hint()
+    }
 }
 
 /// A [`TocEntry`] contained within an [`EpubToc`], encompassing associated metadata.
@@ -609,7 +613,7 @@ impl<'ebook> EpubTocEntry<'ebook> {
     /// Returns the associated direct child [`EpubTocEntry`] if the given `index` is less than
     /// [`Self::len`], otherwise [`None`].
     #[doc = util::inherent_doc!(TocEntry, get)]
-    pub fn get(&self, index: usize) -> Option<EpubTocEntry<'ebook>> {
+    pub fn get(&self, index: usize) -> Option<Self> {
         self.data
             .children
             .get(index)
@@ -630,7 +634,7 @@ impl<'ebook> EpubTocEntry<'ebook> {
 
     /// Returns a recursive iterator over **all** children.
     #[doc = util::inherent_doc!(TocEntry, flatten)]
-    pub fn flatten(&self) -> impl Iterator<Item = EpubTocEntry<'ebook>> + 'ebook {
+    pub fn flatten(&self) -> impl Iterator<Item = Self> + 'ebook {
         struct FlatEpubTocEntryIterator<'ebook> {
             ctx: EpubTocContext<'ebook>,
             version: EpubVersion,
@@ -647,6 +651,10 @@ impl<'ebook> EpubTocEntry<'ebook> {
                 self.stack
                     .extend(data.children.iter().rev().map(|data| (depth + 1, data)));
                 Some(self.ctx.create_entry(self.version, data, depth))
+            }
+
+            fn size_hint(&self) -> (usize, Option<usize>) {
+                (self.stack.len(), None)
             }
         }
 
@@ -716,7 +724,7 @@ impl<'ebook> TocEntry<'ebook> for EpubTocEntry<'ebook> {
         self.manifest_entry()
     }
 
-    fn get(&self, index: usize) -> Option<EpubTocEntry<'ebook>> {
+    fn get(&self, index: usize) -> Option<Self> {
         self.get(index)
     }
 
@@ -724,7 +732,7 @@ impl<'ebook> TocEntry<'ebook> for EpubTocEntry<'ebook> {
         self.iter()
     }
 
-    fn flatten(&self) -> impl Iterator<Item = EpubTocEntry<'ebook>> + 'ebook {
+    fn flatten(&self) -> impl Iterator<Item = Self> + 'ebook {
         self.flatten()
     }
 
@@ -799,5 +807,9 @@ impl<'ebook> Iterator for EpubTocEntryIter<'ebook> {
         self.iter
             .next()
             .map(|data| self.ctx.create_entry(self.version, data, self.next_depth))
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.iter.size_hint()
     }
 }

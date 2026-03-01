@@ -104,7 +104,7 @@ impl Debug for ResourceArchive {
         let mut f = f.debug_struct("ResourceArchive");
         #[cfg(feature = "write")]
         f.field("overlay", &self.overlay);
-        f.finish()
+        f.finish_non_exhaustive()
     }
 }
 
@@ -117,7 +117,7 @@ pub(super) enum ResourceProvider<'ebook> {
     Empty,
 }
 
-impl<'ebook> ResourceProvider<'ebook> {
+impl ResourceProvider<'_> {
     pub(super) fn copy_bytes<W: Write>(
         &self,
         resource: &Resource<'_>,

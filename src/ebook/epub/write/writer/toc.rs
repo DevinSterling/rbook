@@ -152,7 +152,7 @@ pub(super) fn get_toc_root<'ebook>(
     let toc = &ctx.epub.toc.entries;
     let kind = kind.as_str();
 
-    for version in versions.into_iter() {
+    for version in versions {
         if let Some(root) = toc.get(&(kind, version)) {
             return Some(root);
         }

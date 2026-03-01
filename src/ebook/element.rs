@@ -255,7 +255,7 @@ impl Display for Href<'_> {
 pub struct Properties(String);
 
 impl Properties {
-    pub(crate) const EMPTY_REFERENCE: &'static Properties = &Properties(String::new());
+    pub(crate) const EMPTY_REFERENCE: &'static Self = &Self(String::new());
 
     /// The number of property entries contained within.
     ///
@@ -426,6 +426,10 @@ impl<'a> Iterator for PropertiesIter<'a> {
     fn next(&mut self) -> Option<Self::Item> {
         self.0.next()
     }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.0.size_hint()
+    }
 }
 
 /// A collection of [`Attribute`] entries associated with an element.
@@ -465,7 +469,7 @@ impl Attributes {
     /// Returns the [value](Attribute::value) of the [`Attribute`]
     /// with the given `name` if present, otherwise [`None`].
     pub fn get_value(&self, name: &str) -> Option<&str> {
-        self.0.by_key(name).map(|attr| attr.value())
+        self.0.by_key(name).map(Attribute::value)
     }
 
     /// Returns `true` if an [`Attribute`] with the given `name` is present.
@@ -511,6 +515,10 @@ impl<'a> Iterator for AttributesIter<'a> {
 
     fn next(&mut self) -> Option<Self::Item> {
         self.0.next()
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self.0.size_hint()
     }
 }
 
@@ -610,7 +618,7 @@ impl<'a> Name<'a> {
     /// The name with its [prefix](Self::prefix) stripped.
     ///
     /// # Examples
-    /// - The name `dcterms:modified` with its prefix stripped is `modified`.
+    /// - The name `dcterms:modified` with its prefix stripped is `modified`:
     /// ```
     /// # use rbook::Epub;
     /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
@@ -683,17 +691,17 @@ impl TextDirection {
     const AUTO: &'static str = "auto";
 
     /// Returns `true` if the text direction is [`TextDirection::LeftToRight`].
-    pub fn is_ltr(self) -> bool {
+    pub fn is_ltr(&self) -> bool {
         matches!(self, Self::LeftToRight)
     }
 
     /// Returns `true` if the text direction is [`TextDirection::RightToLeft`].
-    pub fn is_rtl(self) -> bool {
+    pub fn is_rtl(&self) -> bool {
         matches!(self, Self::RightToLeft)
     }
 
     /// Returns `true` if the text direction is [`TextDirection::Auto`].
-    pub fn is_auto(self) -> bool {
+    pub fn is_auto(&self) -> bool {
         matches!(self, Self::Auto)
     }
 

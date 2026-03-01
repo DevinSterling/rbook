@@ -36,7 +36,7 @@ use std::path::{Path, PathBuf};
 ///     .resource(("art4.png", file_content))
 ///     .build();
 /// ```
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ResourceContent {
     /// Content stored in-memory.
     ///
@@ -78,7 +78,7 @@ impl ResourceContent {
     /// assert!(!content.is_file());
     /// ```
     pub fn is_memory(&self) -> bool {
-        matches!(self, ResourceContent::Memory(_))
+        matches!(self, Self::Memory(_))
     }
 
     /// Returns `true` if the content is [`ResourceContent::File`].
@@ -93,7 +93,7 @@ impl ResourceContent {
     /// assert!(!content.is_memory());
     /// ```
     pub fn is_file(&self) -> bool {
-        matches!(self, ResourceContent::File(_))
+        matches!(self, Self::File(_))
     }
 }
 

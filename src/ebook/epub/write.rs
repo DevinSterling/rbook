@@ -430,9 +430,10 @@ impl EpubEditor<'static> {
         }
     }
 
-    /// Consumes the builder and returns the underlying [`Epub`].
+    /// Consumes the builder and returns the constructed [`Epub`].
     ///
-    /// This method is only available when the editor owns the underlying EPUB via [`Epub::builder`].
+    /// This method is only available on editors created via [`Epub::builder`],
+    /// which own the underlying EPUB.
     /// Editors created via [`Epub::edit`] borrow an existing EPUB and
     /// cannot be consumed to create a new one.
     ///
@@ -453,10 +454,10 @@ impl EpubEditor<'static> {
     /// assert_eq!("urn:doi:10.1234/abc", metadata.identifier().unwrap().value());
     /// assert_eq!("An Original Story", metadata.title().unwrap().value());
     ///
-    /// let mut creators = metadata.creators();
-    /// assert_eq!("Jane Doe", creators.next().unwrap().value());
-    /// assert_eq!("John Doe", creators.next().unwrap().value());
-    /// assert!(creators.next().is_none());
+    /// let mut creators = metadata.creators().map(|creator| creator.value());
+    /// assert_eq!(Some("Jane Doe"), creators.next());
+    /// assert_eq!(Some("John Doe"), creators.next());
+    /// assert_eq!(None, creators.next());
     /// ```
     #[must_use]
     pub fn build(self) -> Epub {
@@ -469,7 +470,7 @@ impl EpubEditor<'static> {
 
 impl EpubEditor<'_> {
     const UNIQUE_IDENTIFIER: &'static str = "unique-identifier";
-    /// The default toc title an EpubEditor uses when generating
+    /// The default toc title an [`EpubEditor`] uses when generating
     /// a new table of contents.
     const DEFAULT_TOC_TITLE: &'static str = "Table of Contents";
     const DEFAULT_LANDMARKS_TITLE: &'static str = "Landmarks";
@@ -911,6 +912,7 @@ impl EpubEditor<'_> {
     ///         DetachedEpubMetaEntry::creator("Hanako Yamada")
     ///             // Subsequent roles are treated as secondary
     ///             .role("ill")
+    ///             .role("trl")
     ///             .file_as("Yamada, Hanako")
     ///             .alternate_script("ja", "山田花子"),
     ///     )
@@ -929,13 +931,13 @@ impl EpubEditor<'_> {
                 .get_value(opf::OPF_ROLE)
                 .is_some_and(|role| role != marc::AUTHOR);
             // Check if the author role refinement is not present
-            let has_author_role_refinement = entry
+            let needs_author_role_refinement = entry
                 .as_view()
                 .refinements()
                 .by_property(opf::ROLE)
-                .any(|role| role.value() == marc::AUTHOR);
+                .all(|role| role.value() != marc::AUTHOR);
 
-            if !has_author_role_refinement {
+            if needs_author_role_refinement {
                 // Ensures the author role has the highest precedence
                 entry.refinements_mut().insert(
                     0,
@@ -1501,7 +1503,7 @@ impl EpubEditor<'_> {
         let mut found = false;
 
         // Try to find and update existing roots
-        for mut root in self.epub.toc_mut().iter_mut() {
+        for mut root in self.epub.toc_mut() {
             if root.as_view().kind() == kind {
                 root.set_label(&title);
                 found = true;
@@ -1700,7 +1702,7 @@ impl EpubEditor<'_> {
 /// ```
 #[derive(Clone, Debug, PartialEq)]
 pub struct EpubChapter {
-    sub_chapters: Vec<EpubChapter>,
+    sub_chapters: Vec<Self>,
     spine_entry: Option<DetachedEpubSpineEntry>,
     manifest_entry: Option<DetachedEpubManifestEntry>,
     toc_entry: Option<DetachedEpubTocEntry>,
@@ -2155,7 +2157,7 @@ impl EpubChapter {
     ///         EpubChapter::new("V").href("v1c5.xhtml").xhtml(SAMPLE_XHTML),
     ///     ]);
     /// ```
-    pub fn children(mut self, sub_chapter: impl Many<EpubChapter>) -> Self {
+    pub fn children(mut self, sub_chapter: impl Many<Self>) -> Self {
         self.sub_chapters.extend(sub_chapter.iter_many());
         self
     }
@@ -2233,10 +2235,9 @@ pub struct EpubWriteOptions<T = ()> {
 }
 
 impl<T> EpubWriteOptions<T> {
-    fn save_epub(epub: &Epub, config: &EpubWriteConfig, path: impl AsRef<Path>) -> EbookResult<()> {
+    fn save_epub(epub: &Epub, config: &EpubWriteConfig, path: &Path) -> EbookResult<()> {
         const TEMP: &str = "rbook.tmp";
 
-        let path = path.as_ref();
         let temp = path.with_extension(TEMP);
 
         let write_result = (|| {
@@ -2487,13 +2488,13 @@ impl<'ebook> EpubWriteOptions<&'ebook Epub> {
     fn new(epub: &'ebook Epub) -> Self {
         Self {
             container: epub,
-            config: Default::default(),
+            config: EpubWriteConfig::default(),
         }
     }
 
     /// Saves an [`Epub`] to disk using the given `path`.
     pub fn save(&self, path: impl AsRef<Path>) -> EbookResult<()> {
-        Self::save_epub(self.container, &self.config, path)
+        Self::save_epub(self.container, &self.config, path.as_ref())
     }
 
     /// Writes an [`Epub`] to the given `writer`.
@@ -2512,7 +2513,7 @@ impl EpubWriteOptions {
     ///
     /// If options are one-off, prefer [`EpubWriteOptions::<&Epub>::save`].
     pub fn save(&self, epub: &Epub, path: impl AsRef<Path>) -> EbookResult<()> {
-        Self::save_epub(epub, &self.config, path)
+        Self::save_epub(epub, &self.config, path.as_ref())
     }
 
     /// Writes the provided [`Epub`] to the given `writer`.

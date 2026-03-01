@@ -671,7 +671,7 @@ impl EpubOpenOptions {
     /// # let epub_bytes = b"";
     /// let bytes_vec: Vec<u8> = Vec::from(epub_bytes);
     /// let cursor = std::io::Cursor::new(bytes_vec);
-    /// let epub = Epub::options().read(cursor)?;
+    /// let epub = Epub::read(cursor)?;
     /// # Ok(())
     /// # }
     /// ```
@@ -681,7 +681,7 @@ impl EpubOpenOptions {
     /// # use std::error::Error;
     /// # fn main() -> Result<(), Box<dyn Error>> {
     /// let epub_file = std::fs::File::open("tests/ebooks/example.epub")?;
-    /// let epub = Epub::options().read(epub_file)?;
+    /// let epub = Epub::read(epub_file)?;
     /// # Ok(())
     /// # }
     /// ```

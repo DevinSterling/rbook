@@ -28,14 +28,14 @@ impl<'ebook> SpineIdGenerator<'ebook> {
 
     pub(super) fn generate_id(&mut self, entry: &EpubSpineEntryData) -> &str {
         self.generated
-            .entry(entry as *const EpubSpineEntryData)
-            .or_insert(self.generator.generate_id())
+            .entry(std::ptr::from_ref(entry))
+            .or_insert_with(|| self.generator.generate_id())
     }
 
     fn get(&self, entry: &EpubSpineEntryData) -> Option<&str> {
         self.generated
-            .get(&(entry as *const EpubSpineEntryData))
-            .map(|generated_id| generated_id.as_str())
+            .get(&std::ptr::from_ref(entry))
+            .map(String::as_str)
     }
 }
 
