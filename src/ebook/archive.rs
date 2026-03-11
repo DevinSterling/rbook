@@ -1,12 +1,12 @@
 mod directory;
-pub(super) mod errors;
-pub(super) mod zip;
+pub(crate) mod errors;
+pub(crate) mod zip;
 
 // Write-only modules
 #[cfg(feature = "write")]
-mod empty;
+pub(crate) mod empty;
 #[cfg(feature = "write")]
-mod write;
+pub(crate) mod write;
 
 use crate::ebook::archive::directory::DirectoryArchive;
 use crate::ebook::archive::errors::{ArchiveError, ArchiveResult};
@@ -24,7 +24,7 @@ use {
     write::{ArchiveOverlay, OverlayResource, ResourceKeySet},
 };
 
-pub(super) trait Archive: util::sync::SendAndSync {
+pub(crate) trait Archive: util::sync::SendAndSync {
     fn copy_resource(&self, resource: &Resource, writer: &mut dyn Write) -> ArchiveResult<u64>;
 
     fn read_resource_as_utf8_bytes(&self, resource: &Resource) -> ArchiveResult<Vec<u8>> {
@@ -49,17 +49,28 @@ pub(super) trait Archive: util::sync::SendAndSync {
     fn resources(&self) -> ArchiveResult<ResourceKeySet<'_>>;
 }
 
+impl Archive for Box<dyn Archive> {
+    fn copy_resource(&self, resource: &Resource, writer: &mut dyn Write) -> ArchiveResult<u64> {
+        (**self).copy_resource(resource, writer)
+    }
+
+    #[cfg(feature = "write")]
+    fn resources(&self) -> ArchiveResult<ResourceKeySet<'_>> {
+        (**self).resources()
+    }
+}
+
 /// A decorator over an [`Archive`] that enables write overlays.
-pub(super) struct ResourceArchive {
+pub(crate) struct ResourceArchive<A> {
     /// The original state of an ebook
-    base: Box<dyn Archive>,
+    base: A,
     /// Files/content to add or overwrite from `base`
     #[cfg(feature = "write")]
     overlay: ArchiveOverlay,
 }
 
-impl ResourceArchive {
-    pub(super) fn new(base: Box<dyn Archive>) -> Self {
+impl<A: Archive> ResourceArchive<A> {
+    pub(crate) fn new(base: A) -> Self {
         Self {
             base,
             #[cfg(feature = "write")]
@@ -68,7 +79,7 @@ impl ResourceArchive {
     }
 }
 
-impl Archive for ResourceArchive {
+impl<A: Archive> Archive for ResourceArchive<A> {
     fn copy_resource(&self, resource: &Resource, writer: &mut dyn Write) -> ArchiveResult<u64> {
         // `overlay` takes precedence even if the resource exists in `base`
         #[cfg(feature = "write")]
@@ -99,7 +110,7 @@ impl Archive for ResourceArchive {
     }
 }
 
-impl Debug for ResourceArchive {
+impl<A> Debug for ResourceArchive<A> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let mut f = f.debug_struct("ResourceArchive");
         #[cfg(feature = "write")]
@@ -109,7 +120,7 @@ impl Debug for ResourceArchive {
 }
 
 #[derive(Copy, Clone)]
-pub(super) enum ResourceProvider<'ebook> {
+pub(crate) enum ResourceProvider<'ebook> {
     Archive(&'ebook dyn Archive),
     #[cfg(feature = "write")]
     Single(&'ebook ResourceContent),
@@ -118,7 +129,7 @@ pub(super) enum ResourceProvider<'ebook> {
 }
 
 impl ResourceProvider<'_> {
-    pub(super) fn copy_bytes<W: Write>(
+    pub(crate) fn copy_bytes<W: Write>(
         &self,
         resource: &Resource<'_>,
         mut writer: W,
@@ -147,7 +158,7 @@ impl ResourceProvider<'_> {
 ///
 /// If it is, the contents can be accessed directly,
 /// which makes using a zip file unnecessary.
-pub(super) fn get_archive(path: &std::path::Path) -> ArchiveResult<Box<dyn Archive>> {
+pub(crate) fn get_archive(path: &std::path::Path) -> ArchiveResult<Box<dyn Archive>> {
     Ok(if path.is_file() {
         let file = fs::File::open(path).map_err(|error| ArchiveError::UnreadableArchive {
             source: error,
@@ -174,7 +185,7 @@ fn extract_resource_path<'a>(resource: &'a Resource<'a>) -> ArchiveResult<&'a st
     }
 }
 
-pub(super) fn into_utf8_string(resource: &Resource, bytes: Vec<u8>) -> ArchiveResult<String> {
+pub(crate) fn into_utf8_string(resource: &Resource, bytes: Vec<u8>) -> ArchiveResult<String> {
     util::utf::into_utf8_str(bytes).map_err(|source| ArchiveError::InvalidUtf8Resource {
         resource: resource.as_static(),
         source,

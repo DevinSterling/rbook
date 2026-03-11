@@ -698,7 +698,7 @@ impl TitleKind {
     // **For now**, there is no public From<&str>/as_str method for TitleKind because
     // other ebook formats may have different (and potentially conflicting)
     // mappings (e.g., main-title, primary, etc.)
-    pub(super) fn from(kind: &str) -> Self {
+    pub(crate) fn from_str(kind: &str) -> Self {
         match kind {
             Self::MAIN => Self::Main,
             Self::SUBTITLE => Self::Subtitle,
@@ -711,7 +711,7 @@ impl TitleKind {
     }
 
     #[cfg(feature = "write")]
-    pub(super) fn as_str(&self) -> Option<&'static str> {
+    pub(crate) fn as_str(&self) -> Option<&'static str> {
         match self {
             Self::Main => Some(Self::MAIN),
             Self::Subtitle => Some(Self::SUBTITLE),

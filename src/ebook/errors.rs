@@ -2,7 +2,7 @@
 
 pub use crate::ebook::archive::errors::ArchiveError;
 pub use crate::ebook::archive::errors::ArchiveResult;
-use crate::ebook::epub::errors::EpubError;
+use crate::epub::errors::EpubError;
 use crate::reader::errors::ReaderError;
 use std::char::DecodeUtf16Error;
 use std::error::Error;
@@ -12,8 +12,7 @@ use thiserror::Error;
 /// Alias for `Result<T, EbookError>`.
 pub type EbookResult<T> = Result<T, EbookError>;
 
-/// Unified error type.
-/// Possible errors for an [`Ebook`](crate::Ebook).
+/// Unified error type encompassing all possible errors for [ebooks](crate::ebook).
 #[non_exhaustive]
 #[derive(thiserror::Error, Debug)]
 pub enum EbookError {
@@ -46,7 +45,7 @@ impl From<ReaderError> for EbookError {
     }
 }
 
-/// Possible format errors for an [`Ebook`](crate::Ebook).
+/// Possible format errors for [ebooks](crate::ebook).
 #[non_exhaustive]
 #[derive(thiserror::Error, Debug)]
 pub enum FormatError {
@@ -56,7 +55,7 @@ pub enum FormatError {
     #[error(transparent)]
     Unparsable(#[from] Box<dyn Error + Send + Sync + 'static>),
 
-    /// Format errors specific to an [`Epub`](crate::Epub).
+    /// Format errors specific to [`epub`](crate::epub).
     #[error(transparent)]
     Epub(#[from] EpubError),
 }

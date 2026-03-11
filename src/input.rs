@@ -45,7 +45,7 @@
 /// ```
 /// # #[cfg(feature = "write")]
 /// # {
-/// # use rbook::ebook::epub::spine::DetachedEpubSpineEntry;
+/// # use rbook::epub::spine::DetachedEpubSpineEntry;
 /// # let mut epub = rbook::Epub::new();
 /// # let mut spine = epub.spine_mut();
 /// struct Itemref<'a>(&'a str, bool);

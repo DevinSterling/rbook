@@ -4,6 +4,7 @@
 mod write;
 
 use crate::util::collection::{Keyed, KeyedVec};
+use crate::util::iter::IteratorExt;
 use crate::util::str::StringExt;
 use crate::util::uri;
 use std::borrow::Cow;
@@ -356,7 +357,7 @@ impl Properties {
     /// # }
     /// ```
     pub fn has_property(&self, property: &str) -> bool {
-        self.iter().any(|value| value == property)
+        self.iter().contains(property)
     }
 
     /// The underlying raw properties.

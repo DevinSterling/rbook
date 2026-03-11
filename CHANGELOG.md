@@ -1,5 +1,16 @@
 # Changelog
-## 0.7.3 (2025-03-07)
+## 0.7.4 (2026-03-23)
+### Changes　**⟳**
+- Update `zip` dependency: 8.2.0 → 8.4.0
+- Refine documentation for enhanced clarity.
+- Optimize `EpubManifest::by_kind` to avoid heap allocations when the query contains a single item (common case).
+- Move EPUB-specific logic from `rbook::ebook::epub` to the crate root at `rbook::epub` for a cleaner structure
+  and in preparation for upcoming `MOBI` (`rbook::mobi`) support.
+
+### Deprecations　**−**
+- Deprecate module `rbook::ebook::epub` in favor of `rbook::epub`.
+
+## 0.7.3 (2026-03-07)
 ### Additions **＋**
 - Implement `Eq` and `Hash` for `Prefix`.
 - Implement `Eq` for `ResourceContent`.
@@ -10,7 +21,7 @@
 - Update `zip` dependency: 8.1.0 → 8.2.0
 - Refine documentation for enhanced clarity.
 
-## 0.7.2 (2025-02-28)
+## 0.7.2 (2026-02-28)
 ### Additions　**＋**
 - New method `EpubEditor::author` to simplify appending authors.
   This avoids callers having to manually specify the marc:relators `aut` code for `dc:creator` metadata entries.
@@ -24,7 +35,7 @@
 - Update `wasm-bindgen-test` dev dependency: 0.3.63 → 0.3.64
 - Refine documentation for enhanced clarity.
 
-## 0.7.1 (2025-02-26)
+## 0.7.1 (2026-02-26)
 ### Additions　**＋**
 - New method `EpubEditor::modified_now` to simplify modification workflows
   by setting the modified date to the current datetime.
@@ -33,7 +44,7 @@
 - Update `wasm-bindgen-test` dev dependency: 0.3.62 → 0.3.63
 - Refine documentation for enhanced clarity.
 
-## 0.7.0 (2025-02-24)
+## 0.7.0 (2026-02-24)
 ### Major Release: Write Support
 This release expands `rbook` into a read/write library,
 introducing a comprehensive API for creating EPUBs from scratch and modifying
@@ -111,7 +122,7 @@ All new APIs and examples are documented at: https://docs.rs/rbook/latest/rbook/
 - Remove `TocEntry::order` in favor of `TocEntry::flatten` paired with `Iterator::enumerate`,
   ensuring the order remains accurate after ToC modifications.
 
-## 0.6.12 (2025-02-06)
+## 0.6.12 (2026-02-06)
 ## Additions　**＋**
 - Clarify MSRV as `1.88.0`
 
@@ -121,7 +132,7 @@ All new APIs and examples are documented at: https://docs.rs/rbook/latest/rbook/
 - Update `zip` dependency: 7.0.0 → 7.4.0
 - Update `wasm-bindgen-test` dev dependency: 0.3.56 → 0.3.58
 
-## 0.6.11 (2025-02-05)
+## 0.6.11 (2026-02-05)
 ### Fixes　**✓**
 - Fix compilation error caused by `zip` dependency;
   Cow `AsRef` ambiguity in `ResourceKind::as_static` from transitive `typed_path` dependency.

@@ -1,7 +1,7 @@
 //! Archive `write` module that enables adding, removing,
 //! and relocating content in a [`ResourceArchive`].
 
-use crate::ebook::archive::{ResourceArchive, empty};
+use crate::ebook::archive::ResourceArchive;
 use crate::ebook::errors::{ArchiveError, ArchiveResult};
 use crate::ebook::resource::{Resource, ResourceContent, ResourceKey};
 use std::borrow::Cow;
@@ -10,13 +10,9 @@ use std::io::Write;
 use std::{fs, io};
 
 pub(super) type ArchiveOverlay = HashMap<ArchiveResourceKey, OverlayResource>;
-pub(super) type ResourceKeySet<'a> = HashSet<Cow<'a, ResourceKey<'a>>>;
+pub(crate) type ResourceKeySet<'a> = HashSet<Cow<'a, ResourceKey<'a>>>;
 
-impl ResourceArchive {
-    pub(crate) fn empty() -> Self {
-        Self::new(Box::new(empty::EmptyArchive))
-    }
-
+impl<A> ResourceArchive<A> {
     pub(crate) fn remove(&mut self, key: &ResourceKey) -> Option<ResourceContent> {
         self.overlay
             .remove(key)

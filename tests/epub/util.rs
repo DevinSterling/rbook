@@ -1,5 +1,4 @@
-use rbook::Epub;
-use rbook::epub::EpubOpenOptions;
+use rbook::epub::{Epub, EpubOpenOptions};
 use std::io::Cursor;
 
 pub const EPUB3_DIR: &str = "tests/ebooks/example_epub";

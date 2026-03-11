@@ -22,7 +22,7 @@ Here is a non-exhaustive list of the features `rbook` provides:
 
 | Feature                     | Overview                                                                                                   | Documentation                                                        |
 |-----------------------------|------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------|
-| **EPUB 2 and 3**            | EPUB builder and parser, providing simple and advanced read/write views for EPUB `2` and `3`.              | [epub module](https://docs.rs/rbook/latest/rbook/ebook/epub)         |
+| **EPUB 2 and 3**            | EPUB builder and parser, with simple and advanced read/write views for EPUB `2` and `3`.                   | [epub module](https://docs.rs/rbook/latest/rbook/ebook/epub)         |
 | **Reader**                  | Random‐access or sequential iteration over readable content.                                               | [reader module](https://docs.rs/rbook/latest/rbook/reader)           |
 | **Detailed Types**          | Abstractions built on expressive traits and types.                                                         |                                                                      |
 | **Metadata**                | Typed access to dates, titles, creators, publishers, languages, tags, roles, attributes, and more.         | [metadata module](https://docs.rs/rbook/latest/rbook/ebook/metadata) |
@@ -45,8 +45,8 @@ enabled by default in a project's `Cargo.toml` file:
 `rbook` can be used by adding it as a dependency in a project's `Cargo.toml` file:
 ```toml
 [dependencies]
-rbook = "0.7.3"                                           # With default features
-# rbook = { version = "0.7.3", default-features = false } # Excluding default features
+rbook = "0.7.4"                                           # With default features
+# rbook = { version = "0.7.4", default-features = false } # Excluding default features
 ```
 
 ## WebAssembly
@@ -58,7 +58,7 @@ The `wasm32-unknown-unknown` target is supported by default.
 use rbook::Epub;
 
 fn main() {
-    // Open an epub from a file or directory
+    // Open an epub from a file or an unzipped/exploded directory
     // * `Read + Seek` implementations supported via `read(...)` for byte streams/buffers
     let epub = Epub::open("example.epub").unwrap();
 

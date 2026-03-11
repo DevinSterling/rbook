@@ -5,7 +5,7 @@
 //! associated traits, and supporting modules.
 //!
 //! ## Supported Formats
-//! - [`epub`]: EPUB 2 and 3
+//! - [`epub`](crate::epub): EPUB 2 and 3
 //!
 //! ## Core Components
 //! - [`errors`]: Ebook-related error types.
@@ -20,7 +20,6 @@
 
 pub(super) mod archive;
 pub mod element;
-pub mod epub;
 pub mod errors;
 pub mod manifest;
 pub mod metadata;
@@ -28,8 +27,17 @@ pub mod resource;
 pub mod spine;
 pub mod toc;
 
+#[deprecated(since = "0.7.4", note = "Use `rbook::epub` instead")]
+pub mod epub {
+    //! Deprecated module alias; please use [`rbook::epub`](crate::epub) instead.
+    //!
+    //! Currently, this is kept for backwards-compatibility.
+    //!
+    //! This deprecated module will be removed in `0.8.0` in favor of [`rbook::epub`](crate::epub).
+    pub use crate::epub::*;
+}
+
 use crate::ebook::archive::errors::ArchiveResult;
-use crate::ebook::errors::EbookResult;
 use crate::ebook::manifest::Manifest;
 use crate::ebook::metadata::Metadata;
 use crate::ebook::resource::Resource;
@@ -48,7 +56,7 @@ use std::io::Write;
 /// - [`Toc`]: Table of contents
 ///
 /// # Supported ebook formats:
-/// - [EPUB 2 and 3](epub::Epub)
+/// - [EPUB 2 and 3](crate::Epub)
 ///
 /// # Lifetime
 /// All views, such as [`Reader`], [`Manifest`], [`Metadata`], [`Spine`], [`Toc`], etc. are
