@@ -27,13 +27,13 @@ pub mod resource;
 pub mod spine;
 pub mod toc;
 
+/// Deprecated module alias; please use [`rbook::epub`](crate::epub) instead.
+///
+/// Currently, this is kept for backwards-compatibility.
+///
+/// This deprecated module will be removed in `0.8.0` in favor of [`rbook::epub`](crate::epub).
 #[deprecated(since = "0.7.4", note = "Use `rbook::epub` instead")]
 pub mod epub {
-    //! Deprecated module alias; please use [`rbook::epub`](crate::epub) instead.
-    //!
-    //! Currently, this is kept for backwards-compatibility.
-    //!
-    //! This deprecated module will be removed in `0.8.0` in favor of [`rbook::epub`](crate::epub).
     pub use crate::epub::*;
 }
 

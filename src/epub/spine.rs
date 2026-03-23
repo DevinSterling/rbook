@@ -114,7 +114,8 @@ impl<'ebook> EpubSpine<'ebook> {
     /// Returns the [`EpubSpineEntry`] matching the given `id`, or [`None`] if not found.
     ///
     /// # See Also
-    /// - [`Self::by_idref`] to retrieve spine entries by the [`id`](EpubManifestEntry::id)
+    /// - [`EpubSpineMut::by_id_mut`] to get a mutable entry.
+    /// - [`Self::by_idref`] to get spine entries by the [`id`](EpubManifestEntry::id)
     ///   of an [`EpubManifestEntry`].
     ///
     /// # Examples
@@ -149,6 +150,9 @@ impl<'ebook> EpubSpine<'ebook> {
     ///
     /// Albeit uncommon, more than one spine entry can reference the same manifest entry.
     ///
+    /// # See Also
+    /// - [`EpubSpineMut::by_idref_mut`] to iterate over mutable entries.
+    ///
     /// # Examples
     /// - Retrieving a spine entry by its idref:
     /// ```
@@ -181,6 +185,8 @@ impl<'ebook> EpubSpine<'ebook> {
 
     /// The [`PageDirection`] hint, indicating how readable content flows.
     #[doc = doc::inherent!(Spine, page_direction)]
+    /// # See Also
+    /// - [`EpubSpineMut::set_page_direction`] to modify the page direction.
     pub fn page_direction(&self) -> PageDirection {
         self.spine.page_direction
     }
@@ -200,6 +206,8 @@ impl<'ebook> EpubSpine<'ebook> {
     /// Returns the associated [`EpubSpineEntry`] if the given `index` is less than
     /// [`Self::len`], otherwise [`None`].
     #[doc = doc::inherent!(Spine, get)]
+    /// # See Also
+    /// - [`EpubSpineMut::get_mut`] to get a mutable entry.
     pub fn get(&self, index: usize) -> Option<EpubSpineEntry<'ebook>> {
         self.spine
             .entries
@@ -210,6 +218,8 @@ impl<'ebook> EpubSpine<'ebook> {
     /// Returns an iterator over all [entries](EpubSpineEntry) within
     /// the spine in canonical order.
     #[doc = doc::inherent!(Spine, iter)]
+    /// # See Also
+    /// - [`EpubSpineMut::iter_mut`] to iterate over mutable entries.
     pub fn iter(&self) -> EpubSpineIter<'ebook> {
         EpubSpineIter {
             ctx: self.ctx,
@@ -320,7 +330,10 @@ pub struct EpubSpineEntry<'ebook> {
 }
 
 impl<'ebook> EpubSpineEntry<'ebook> {
-    /// The unique ID of a spine entry.
+    /// The unique `id` of a spine entry.
+    ///
+    /// # See Also
+    /// - [`EpubSpineEntryMut::set_id`] to modify the `id`.
     pub fn id(&self) -> Option<&'ebook str> {
         self.data.id.as_deref()
     }
@@ -330,6 +343,9 @@ impl<'ebook> EpubSpineEntry<'ebook> {
     ///
     /// For direct access to the resource, [`Self::resource`] or
     /// [`Self::manifest_entry`] is preferred.
+    ///
+    /// # See Also
+    /// - [`EpubSpineEntryMut::set_idref`] to modify the `idref`.
     pub fn idref(&self) -> &'ebook str {
         &self.data.idref
     }
@@ -345,6 +361,9 @@ impl<'ebook> EpubSpineEntry<'ebook> {
     /// is shown in the exact order as written in the spine.
     /// This behavior can be changed through
     /// [`EpubReaderOptions::linear_behavior`](super::EpubReaderOptions::linear_behavior).
+    ///
+    /// # See Also
+    /// - [`EpubSpineEntryMut::set_linear`] to modify the linearity.
     pub fn is_linear(&self) -> bool {
         self.data.linear
     }
@@ -360,6 +379,9 @@ impl<'ebook> EpubSpineEntry<'ebook> {
     ///
     /// See the specification for more details regarding properties:
     /// <https://www.w3.org/TR/epub/#app-itemref-properties-vocab>
+    ///
+    /// # See Also
+    /// - [`EpubSpineEntryMut::properties_mut`] to modify the properties.
     pub fn properties(&self) -> &'ebook Properties {
         &self.data.properties
     }
@@ -372,11 +394,17 @@ impl<'ebook> EpubSpineEntry<'ebook> {
     /// - [`idref`](Self::idref)
     /// - [`linear`](Self::is_linear)
     /// - [`properties`](Self::properties)
+    ///
+    /// # See Also
+    /// - [`EpubSpineEntryMut::attributes_mut`] to modify the attributes.
     pub fn attributes(&self) -> &'ebook Attributes {
         &self.data.attributes
     }
 
     /// Complementary refinement metadata entries.
+    ///
+    /// # See Also
+    /// - [`EpubSpineEntryMut::refinements_mut`] to modify the refinements.
     pub fn refinements(&self) -> EpubRefinements<'ebook> {
         self.ctx
             .meta_ctx

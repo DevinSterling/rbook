@@ -162,7 +162,7 @@ pub mod marker {
 /// - **Order:** [`DetachedEpubMetaEntry`] instances always have an
 ///   [`order`](crate::ebook::metadata::MetaEntry::order)/display sequence of `0`.
 ///   Order is assigned once the entry is inserted into
-///   [`EpubMetadataMut`] or [`EpubRefinementsMut`].
+///   [`EpubEditor`](crate::epub::EpubEditor), [`EpubMetadataMut`], or [`EpubRefinementsMut`].
 /// - **Kind:** The [`EpubMetaEntryKind`] is determined at creation time via specific constructors:
 ///   - [`Self::dublin_core`]
 ///     - [`Self::creator`]
@@ -298,7 +298,7 @@ impl<M> DetachedEpubMetaEntry<M> {
     /// The entry value is stored as plain text (e.g. `"1 < 2 & 3"`)
     /// and is XML-escaped automatically during [writing](crate::epub::Epub::write).
     ///
-    /// See the [epub](crate::epub) trait-level documentation for more details.
+    /// See the [epub](crate::epub) module-level documentation for more details.
     ///
     /// # Value Mapping
     /// Depending on the underlying element type and EPUB version, this value is written to
@@ -1059,6 +1059,11 @@ impl<'ebook> EpubMetadataMut<'ebook> {
     // PUBLIC API
     //////////////////////////////////
 
+    /// Returns a read-only view, useful for inspecting state before applying modifications.
+    pub fn as_view(&self) -> EpubMetadata<'_> {
+        EpubMetadata::new(self.package, self.metadata)
+    }
+
     /// Inserts one or more metadata entries via the [`Many`] trait.
     ///
     /// New entries are appended to the end of the list for their specific
@@ -1142,23 +1147,42 @@ impl<'ebook> EpubMetadataMut<'ebook> {
     /// # use rbook::Epub;
     /// # use rbook::epub::metadata::DetachedEpubMetaEntry;
     /// let mut epub = Epub::new();
+    /// let mut metadata = epub.metadata_mut();
     ///
-    /// epub.metadata_mut().push(DetachedEpubMetaEntry::creator("Second Author"));
-    ///
+    /// metadata.push(DetachedEpubMetaEntry::creator("Second Author"));
     /// // Insert "First Author" as the first creator
-    /// epub.metadata_mut().insert(0, DetachedEpubMetaEntry::creator("First Author"));
+    /// metadata.insert(0, DetachedEpubMetaEntry::creator("First Author"));
     ///
     /// let mut creators = epub.metadata().creators().map(|creator| creator.value());
     /// assert_eq!(Some("First Author"), creators.next());
     /// assert_eq!(Some("Second Author"), creators.next());
     /// assert_eq!(None, creators.next());
     /// ```
+    /// - Inserting into a new property group:
+    /// ```
+    /// # use rbook::Epub;
+    /// # use rbook::epub::metadata::DetachedEpubMetaEntry;
+    /// # let mut epub = Epub::new();
+    /// # let mut metadata = epub.metadata_mut();
+    /// # metadata.clear();
+    ///
+    /// metadata.push(DetachedEpubMetaEntry::title("Awesome Title"));
+    /// // The index (0) is relative to the `dc:publisher` group (doesn't exist yet),
+    /// // so this creates a new group.
+    /// // New property groups are appended after existing ones,
+    /// // so `dc:publisher` appears last.
+    /// metadata.insert(0, DetachedEpubMetaEntry::publisher("P"));
+    ///
+    /// let mut properties = epub.metadata().iter().map(|meta| meta.property().as_str());
+    /// assert_eq!(Some("dc:title"), properties.next());
+    /// assert_eq!(Some("dc:publisher"), properties.next());
+    /// assert_eq!(None, properties.next());
+    /// ```
     pub fn insert(&mut self, index: usize, detached: impl Many<DetachedEpubMetaEntry>) {
         let detached = match detached.iter_many().one_or_many() {
             // Nothing to insert; return early
-            OneOrMany::None => {
-                return;
-            }
+            OneOrMany::None => return,
+            OneOrMany::Many(many) => many,
             // Optimized path for a single item (Common use-case)
             OneOrMany::One(entry) => {
                 let property = &entry.0.property;
@@ -1174,11 +1198,10 @@ impl<'ebook> EpubMetadataMut<'ebook> {
                 }
                 return;
             }
-            OneOrMany::Many(many) => many,
         };
 
         // partition
-        let mut batches = std::collections::HashMap::<_, Vec<EpubMetaEntryData>>::new();
+        let mut batches = indexmap::IndexMap::<_, Vec<_>>::new();
 
         for entry in detached {
             let property = entry.0.property.as_str();
@@ -1571,11 +1594,6 @@ impl<'ebook> EpubMetadataMut<'ebook> {
     pub fn clear(&mut self) {
         self.metadata.entries.clear();
     }
-
-    /// Returns a read-only view, useful for inspecting state before applying modifications.
-    pub fn as_view(&self) -> EpubMetadata<'_> {
-        EpubMetadata::new(self.package, self.metadata)
-    }
 }
 
 impl Debug for EpubMetadataMut<'_> {
@@ -1680,10 +1698,17 @@ impl<'ebook> EpubMetaEntryMut<'ebook> {
         }
     }
 
+    /// Returns a read-only view, useful for inspecting state before applying modifications.
+    pub fn as_view(&self) -> EpubMetaEntry<'_> {
+        self.meta_ctx
+            .create_refining_entry(self.refines, self.data, self.index)
+    }
+
     /// Sets the unique `id` and returns the previous value.
     ///
     /// # See Also
     /// - [`DetachedEpubMetaEntry::id`] for important details.
+    /// - [`EpubMetaEntry::id`] to get the `id` (Accessible via [`Self::as_view`]).
     pub fn set_id(&mut self, id: impl IntoOption<String>) -> Option<String> {
         std::mem::replace(&mut self.data.id, id.into_option())
     }
@@ -1692,14 +1717,20 @@ impl<'ebook> EpubMetaEntryMut<'ebook> {
     ///
     /// # See Also
     /// - [`DetachedEpubMetaEntry::value`] for more details.
+    /// - [`EpubMetaEntry::value`] to get the value (Accessible via [`Self::as_view`]).
     pub fn set_value(&mut self, value: impl Into<String>) -> String {
         std::mem::replace(&mut self.data.value, value.into())
     }
 
-    /// Sets the language (`xml:lang`) and returns the previous code.
+    /// Sets the language code (`xml:lang`) and returns the previous code.
+    ///
+    /// The given language code is not validated and ***should*** be a valid
+    /// [BCP 47](https://tools.ietf.org/html/bcp47) tag (e.g. `en`, `ja`, `fr-CA`).
     ///
     /// # See Also
     /// - [`DetachedEpubMetaEntry::xml_language`] for more details.
+    /// - [`EpubMetaEntry::xml_language`] to get the language code
+    ///   (Accessible via [`Self::as_view`]).
     pub fn set_xml_language(&mut self, code: impl IntoOption<String>) -> Option<String> {
         std::mem::replace(&mut self.data.language, code.into_option())
     }
@@ -1708,6 +1739,8 @@ impl<'ebook> EpubMetaEntryMut<'ebook> {
     ///
     /// # See Also
     /// - [`DetachedEpubMetaEntry::text_direction`] for more details.
+    /// - [`EpubMetaEntry::text_direction`] to get the text direction
+    ///   (Accessible via [`Self::as_view`]).
     pub fn set_text_direction(&mut self, direction: TextDirection) -> TextDirection {
         std::mem::replace(&mut self.data.text_direction, direction)
     }
@@ -1743,12 +1776,6 @@ impl<'ebook> EpubMetaEntryMut<'ebook> {
             self.data.id.as_deref(),
             &mut self.data.refinements,
         )
-    }
-
-    /// Returns a read-only view, useful for inspecting state before applying modifications.
-    pub fn as_view(&self) -> EpubMetaEntry<'_> {
-        self.meta_ctx
-            .create_refining_entry(self.refines, self.data, self.index)
     }
 }
 
@@ -1814,15 +1841,12 @@ impl<'ebook> EpubRefinementsMut<'ebook> {
         index: usize,
         detached: impl Iterator<Item = DetachedEpubMetaEntry>,
     ) {
-        match detached.one_or_many() {
-            OneOrMany::None => { /* no-op */ }
-            OneOrMany::One(entry) => {
-                self.data.insert(index, entry.0);
-            }
-            OneOrMany::Many(many) => {
-                self.data.splice(index..index, many.map(|e| e.0));
-            }
-        }
+        self.data.splice(index..index, detached.map(|e| e.0));
+    }
+
+    /// Returns a read-only view, useful for inspecting state before applying modifications.
+    pub fn as_view(&self) -> EpubRefinements<'_> {
+        self.meta_ctx.create_refinements(self.parent_id, self.data)
     }
 
     /// Appends one or more refinements to the end via the [`Many`] trait.
@@ -1980,11 +2004,6 @@ impl<'ebook> EpubRefinementsMut<'ebook> {
     /// - [`Self::drain`] to retrieve an iterator of the removed refinements.
     pub fn clear(&mut self) {
         self.data.clear();
-    }
-
-    /// Returns a read-only view, useful for inspecting state before applying modifications.
-    pub fn as_view(&self) -> EpubRefinements<'_> {
-        self.meta_ctx.create_refinements(self.parent_id, self.data)
     }
 }
 

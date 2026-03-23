@@ -128,6 +128,7 @@ impl<'ebook> EpubPackage<'ebook> {
     /// # See Also
     /// - [`Href::decode`] to retrieve the percent-decoded form.
     /// - [`Href::name`] to retrieve the filename.
+    /// - [`EpubPackageMut::set_location`] to modify the location.
     ///
     /// # Examples
     /// - Retrieving the package file:
@@ -179,11 +180,13 @@ impl<'ebook> EpubPackage<'ebook> {
     /// The returned version may be [`EpubVersion::Unknown`] if
     /// [`EpubOpenOptions::strict`](super::EpubOpenOptions::strict) is disabled.
     ///
-    /// See [`Self::version_str`] for the original representation.
-    ///
     /// # Note
     /// This method is equivalent to calling
     /// [`EpubMetadata::version`](super::metadata::EpubMetadata::version).
+    ///
+    /// # See Also
+    /// - [`Self::version_str`] for the original representation.
+    /// - [`EpubPackageMut::set_version`] to modify the version.
     pub fn version(&self) -> EpubVersion {
         self.0.version.parsed
     }
@@ -197,10 +200,13 @@ impl<'ebook> EpubPackage<'ebook> {
         self.0.version.raw.as_str()
     }
 
-    /// The `id` of the packages's unique identifier metadata entry.
+    /// The `id` of the package's unique identifier metadata entry.
     ///
     /// This is a lower-level call than
     /// [`EpubMetadata::identifier`](super::metadata::EpubMetadata::identifier).
+    ///
+    /// # See Also
+    /// - [`EpubPackageMut::set_unique_identifier`] to modify the identifier.
     ///
     /// # Examples
     /// - Comparing the unique identifier:
@@ -226,6 +232,9 @@ impl<'ebook> EpubPackage<'ebook> {
     /// All metadata entries within an [`Epub`](super::Epub) implicitly inherit this
     /// field if their [`EpubMetaEntry::text_direction`](EpubMetaEntry::text_direction)
     /// is set to [`TextDirection::Auto`].
+    ///
+    /// # See Also
+    /// - [`EpubPackageMut::set_text_direction`] to modify the text direction.
     pub fn text_direction(&self) -> TextDirection {
         self.0.text_direction
     }
@@ -235,12 +244,18 @@ impl<'ebook> EpubPackage<'ebook> {
     /// All metadata entries within an [`Epub`](super::Epub) implicitly inherit this
     /// field if their [`EpubMetaEntry::xml_language`](EpubMetaEntry::xml_language)
     /// is set to [`None`].
+    ///
+    /// # See Also
+    /// - [`EpubPackageMut::set_xml_language`] to modify the language code.
     pub fn xml_language(&self) -> Option<&'ebook str> {
         self.0.language.as_deref()
     }
 
     /// The package-level prefixes, defining prefix mappings for use in
     /// [`property`](EpubMetaEntry::property) values.
+    ///
+    /// # See Also
+    /// - [`EpubPackageMut::prefixes_mut`] to modify the prefixes.
     pub fn prefixes(&self) -> &'ebook Prefixes {
         &self.0.prefixes
     }
@@ -257,6 +272,9 @@ impl<'ebook> EpubPackage<'ebook> {
     /// - [`dir`](Self::text_direction)
     /// - [`xml:lang`](Self::xml_language)
     /// - [`prefix`](Self::prefixes)
+    ///
+    /// # See Also
+    /// - [`EpubPackageMut::attributes_mut`] to modify the attributes.
     pub fn attributes(&self) -> &'ebook Attributes {
         &self.0.attributes
     }

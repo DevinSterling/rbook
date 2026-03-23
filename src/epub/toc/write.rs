@@ -7,7 +7,6 @@ use crate::epub::toc::{
     EpubToc, EpubTocContext, EpubTocData, EpubTocEntry, EpubTocEntryData, EpubTocKey,
 };
 use crate::input::{IntoOption, Many};
-use crate::util::iter::{IteratorExt, OneOrMany};
 use crate::util::uri::{self, UriResolver};
 use std::fmt::Debug;
 
@@ -440,6 +439,11 @@ impl<'ebook> EpubTocMut<'ebook> {
     // PUBLIC API
     //////////////////////////////////
 
+    /// Returns a read-only view, useful for inspecting state before applying modifications.
+    pub fn as_view(&mut self) -> EpubToc<'_> {
+        self.ctx.create(self.toc)
+    }
+
     /// Returns the preferred **table of contents** root entry.
     ///
     /// This maps to:
@@ -680,11 +684,6 @@ impl<'ebook> EpubTocMut<'ebook> {
     pub fn clear(&mut self) {
         self.toc.entries.clear();
     }
-
-    /// Returns a read-only view, useful for inspecting state before applying modifications.
-    pub fn as_view(&mut self) -> EpubToc<'_> {
-        self.ctx.create(self.toc)
-    }
 }
 
 impl Debug for EpubTocMut<'_> {
@@ -787,31 +786,28 @@ impl<'ebook> EpubTocEntryMut<'ebook> {
         index: usize,
         detached: impl Iterator<Item = DetachedEpubTocEntry>,
     ) {
-        let children = &mut self.data.children;
+        self.data.children.splice(
+            index..index,
+            // Update each entry before insertion
+            detached.map(|mut entry| {
+                if let Some(resolver) = self.href_resolver {
+                    entry.data.resolve_hrefs(resolver);
+                }
+                entry.data
+            }),
+        );
+    }
 
-        // Update each entry before insertion
-        let detached = detached.map(|mut entry| {
-            if let Some(resolver) = self.href_resolver {
-                entry.data.resolve_hrefs(resolver);
-            }
-            entry
-        });
-
-        match detached.one_or_many() {
-            OneOrMany::None => { /* no-op */ }
-            OneOrMany::One(entry) => {
-                children.insert(index, entry.data);
-            }
-            OneOrMany::Many(many) => {
-                children.splice(index..index, many.map(|e| e.data));
-            }
-        }
+    /// Returns a read-only view, useful for inspecting state before applying modifications.
+    pub fn as_view(&self) -> EpubTocEntry<'_> {
+        self.ctx.create_entry(self.version, self.data, self.depth)
     }
 
     /// Sets the unique `id` and returns the previous value.
     ///
     /// # See Also
     /// - [`DetachedEpubTocEntry::id`] for important details.
+    /// - [`EpubTocEntry::id`] to get the `id` (Accessible via [`Self::as_view`]).
     pub fn set_id(&mut self, id: impl IntoOption<String>) -> Option<String> {
         std::mem::replace(&mut self.data.id, id.into_option())
     }
@@ -820,6 +816,7 @@ impl<'ebook> EpubTocEntryMut<'ebook> {
     ///
     /// # See Also
     /// - [`DetachedEpubTocEntry::label`] for more details.
+    /// - [`EpubTocEntry::label`] to get the label (Accessible via [`Self::as_view`]).
     pub fn set_label(&mut self, label: impl Into<String>) -> String {
         std::mem::replace(&mut self.data.label, label.into())
     }
@@ -858,6 +855,7 @@ impl<'ebook> EpubTocEntryMut<'ebook> {
     ///
     /// # See Also
     /// - [`DetachedEpubTocEntry::kind`] for more details.
+    /// - [`EpubTocEntry::kind_raw`] to get the kind (Accessible via [`Self::as_view`]).
     pub fn set_kind(&mut self, kind: impl IntoOption<String>) -> Option<String> {
         // We can determine if the entry is attached by checking the resolver.
         // Detached entries do not have an href resolver.
@@ -884,6 +882,9 @@ impl<'ebook> EpubTocEntryMut<'ebook> {
     /// - [`DetachedEpubTocEntry::href`] for important details.
     /// - [`EpubEditor::resource`](crate::epub::EpubEditor::resource) for path details.
     ///   The same path resolution rules apply to this method.
+    /// - [`EpubTocEntry::href`] to get the resolved href
+    ///   (Accessible via [`Self::as_view`]).
+    /// - [`EpubTocEntry::href_raw`] to get the raw href given here.
     pub fn set_href(&mut self, raw_href: impl IntoOption<String>) -> Option<String> {
         let data = &mut *self.data;
 
@@ -1022,11 +1023,6 @@ impl<'ebook> EpubTocEntryMut<'ebook> {
     /// - [`Self::drain`] to retrieve an iterator of the removed entries.
     pub fn clear(&mut self) {
         self.data.children.clear();
-    }
-
-    /// Returns a read-only view, useful for inspecting state before applying modifications.
-    pub fn as_view(&self) -> EpubTocEntry<'_> {
-        self.ctx.create_entry(self.version, self.data, self.depth)
     }
 }
 

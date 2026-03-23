@@ -183,6 +183,7 @@ impl<'ebook> EpubToc<'ebook> {
     ///
     /// # See Also
     /// - **[`Self::by_kind`] to see selection and fallback behavior, which this method uses.*
+    /// - [`EpubTocMut::page_list_mut`] to get the mutable page list.
     pub fn page_list(&self) -> Option<EpubTocEntry<'ebook>> {
         self.by_kind(TocEntryKind::PageList)
     }
@@ -202,6 +203,7 @@ impl<'ebook> EpubToc<'ebook> {
     ///
     /// # See Also
     /// - **[`Self::by_kind`] to see selection and fallback behavior, which this method uses.**
+    /// - [`EpubTocMut::landmarks_mut`] to get the mutable landmarks/guide.
     pub fn landmarks(&self) -> Option<EpubTocEntry<'ebook>> {
         self.by_kind(TocEntryKind::Landmarks)
     }
@@ -214,7 +216,8 @@ impl<'ebook> EpubToc<'ebook> {
     ///
     /// # See Also
     /// - [`EpubOpenOptions`](super::EpubOpenOptions) to see conditional ToC-related parsing options.
-    /// - [`Toc::by_kind`] to retrieve the toc root for a given [`TocEntryKind`].
+    /// - [`Self::by_kind`] to retrieve the toc root for a given [`TocEntryKind`].
+    /// - [`EpubTocMut::by_kind_version_mut`] to get a mutable root entry.
     pub fn by_kind_version(
         &self,
         kind: impl Into<TocEntryKind<'ebook>>,
@@ -244,6 +247,7 @@ impl<'ebook> EpubToc<'ebook> {
     /// # See Also
     /// - **[`Self::by_kind`] to see selection and fallback behavior, which this method uses.**
     /// - [`Self::by_kind_version`] to retrieve a specific variant (e.g. EPUB 2 NCX).
+    /// - [`EpubTocMut::contents_mut`] to get the mutable contents.
     pub fn contents(&self) -> Option<EpubTocEntry<'ebook>> {
         self.by_kind(TocEntryKind::Toc)
     }
@@ -269,6 +273,7 @@ impl<'ebook> EpubToc<'ebook> {
     /// # See Also
     /// - [`Self::by_kind_version`]
     ///   to retrieve a specific root entry without any fallback behavior.
+    /// - [`EpubTocMut::by_kind_mut`] to get a mutable root entry.
     pub fn by_kind(&self, kind: impl Into<TocEntryKind<'ebook>>) -> Option<EpubTocEntry<'ebook>> {
         let kind = kind.into();
         let preferred_version = self.toc.get_preferred_version(kind);
@@ -289,6 +294,8 @@ impl<'ebook> EpubToc<'ebook> {
 
     /// Returns an iterator over all **root** [entries](EpubTocEntry).
     #[doc = doc::inherent!(Toc, iter)]
+    /// # See Also
+    /// - [`EpubTocMut::iter_mut`] to iterate over mutable entries.
     pub fn iter(&self) -> EpubTocIter<'ebook> {
         self.into_iter()
     }
@@ -430,10 +437,13 @@ impl<'ebook> EpubTocEntry<'ebook> {
         self.version
     }
 
-    /// The unique ID of a toc entry.
+    /// The unique `id` of a toc entry.
     ///
     /// # Note
     /// For EPUB 3, this field is derived from the anchor (`a`) element.
+    ///
+    /// # See Also
+    /// - [`EpubTocEntryMut::set_id`] to modify the `id`.
     pub fn id(&self) -> Option<&'ebook str> {
         self.data.id.as_deref()
     }
@@ -442,6 +452,9 @@ impl<'ebook> EpubTocEntry<'ebook> {
     ///
     /// This method is a lower-level call than [`Self::kind`],
     /// which allows inspecting the original value before normalization by [`TocEntryKind`].
+    ///
+    /// # See Also
+    /// - [`EpubTocEntryMut::set_kind`] to modify the entry type.
     ///
     /// # Examples
     /// - Retrieving the raw and normalized value:
@@ -496,6 +509,7 @@ impl<'ebook> EpubTocEntry<'ebook> {
     /// # See Also
     /// - [`Href::path`] to retrieve the href value without the query and fragment.
     /// - [`Self::resource`] as the primary means for retrieving ebook content.
+    /// - [`EpubTocEntryMut::set_href`] to modify the `href`.
     pub fn href(&self) -> Option<Href<'ebook>> {
         self.data.href.as_deref().map(Href::new)
     }
@@ -527,6 +541,7 @@ impl<'ebook> EpubTocEntry<'ebook> {
     /// # See Also
     /// - [`Epub`](super::Epub) documentation of `copy_resource` for normalization details.
     /// - [`Href::path`] to retrieve the href value without the query and fragment.
+    /// - [`EpubTocEntryMut::set_href`] to modify the `href`.
     pub fn href_raw(&self) -> Option<Href<'ebook>> {
         self.data.href_raw.as_deref().map(Href::new)
     }
@@ -571,6 +586,9 @@ impl<'ebook> EpubTocEntry<'ebook> {
     /// # Ok(())
     /// # }
     /// ```
+    ///
+    /// # See Also
+    /// - [`EpubTocEntryMut::attributes_mut`] to modify the attributes.
     pub fn attributes(&self) -> &'ebook Attributes {
         &self.data.attributes
     }
@@ -583,12 +601,16 @@ impl<'ebook> EpubTocEntry<'ebook> {
 
     /// The human-readable label.
     #[doc = doc::inherent!(TocEntry, label)]
+    /// # See Also
+    /// - [`EpubTocEntryMut::set_label`] to modify the label.
     pub fn label(&self) -> &'ebook str {
         &self.data.label
     }
 
     /// The semantic kind of content associated with an entry.
     #[doc = doc::inherent!(TocEntry, kind)]
+    /// # See Also
+    /// - [`EpubTocEntryMut::set_kind`] to modify the semantic kind.
     pub fn kind(&self) -> TocEntryKind<'ebook> {
         self.data
             .kind
@@ -613,6 +635,8 @@ impl<'ebook> EpubTocEntry<'ebook> {
     /// Returns the associated direct child [`EpubTocEntry`] if the given `index` is less than
     /// [`Self::len`], otherwise [`None`].
     #[doc = doc::inherent!(TocEntry, get)]
+    /// # See Also
+    /// - [`EpubTocEntryMut::get_mut`] to get a mutable entry.
     pub fn get(&self, index: usize) -> Option<Self> {
         self.data
             .children
@@ -623,6 +647,8 @@ impl<'ebook> EpubTocEntry<'ebook> {
     /// Returns an iterator over direct child entries
     /// (whose [`depth`](EpubTocEntry::depth) is one greater than the parent).
     #[doc = doc::inherent!(TocEntry, iter)]
+    /// # See Also
+    /// - [`EpubTocEntryMut::iter_mut`] to iterate over mutable entries.
     pub fn iter(&self) -> EpubTocEntryIter<'ebook> {
         EpubTocEntryIter {
             ctx: self.ctx,

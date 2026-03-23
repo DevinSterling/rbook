@@ -134,7 +134,15 @@ impl Epub {
         EpubEditor::new()
     }
 
-    /// Creates an edit session by returning an [`EpubEditor`].
+    /// Returns an [`EpubEditor`] to edit an [`Epub`].
+    ///
+    /// # See Also
+    /// For lower-level modifications, access the underlying components via:
+    /// - [`Self::package_mut`]
+    /// - [`Self::metadata_mut`]
+    /// - [`Self::manifest_mut`]
+    /// - [`Self::spine_mut`]
+    /// - [`Self::toc_mut`]
     pub fn edit(&mut self) -> EpubEditor<'_> {
         EpubEditor {
             epub: MaybeOwned::Borrowed(self),
@@ -345,7 +353,7 @@ impl Default for Epub {
 /// stored as plain text (e.g. `"1 < 2 & 3"`).
 /// They are XML-escaped automatically during [writing](Self::write).
 ///
-/// See the [epub](super) trait-level documentation for more details.
+/// See the [epub](super) module-level documentation for more details.
 ///
 /// # See Also
 /// All operations performed here are replicable using the lower-level write API,

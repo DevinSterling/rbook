@@ -6,7 +6,7 @@
 
 ![rbook](https://raw.githubusercontent.com/DevinSterling/devinsterling-com/master/public/images/rbook/rbook.png)
 
-> A fast, format-agnostic, ergonomic ebook library with a focus on EPUB.
+> A fast, format-agnostic, ergonomic ebook library with a focus on EPUB and upcoming support for MOBI/AZW3.
 
 The primary goal of `rbook` is to provide an easy-to-use high-level API for reading, creating, and modifying ebooks.
 Most importantly, this library is designed with future formats in mind
@@ -22,7 +22,7 @@ Here is a non-exhaustive list of the features `rbook` provides:
 
 | Feature                     | Overview                                                                                                   | Documentation                                                        |
 |-----------------------------|------------------------------------------------------------------------------------------------------------|----------------------------------------------------------------------|
-| **EPUB 2 and 3**            | EPUB builder and parser, with simple and advanced read/write views for EPUB `2` and `3`.                   | [epub module](https://docs.rs/rbook/latest/rbook/ebook/epub)         |
+| **EPUB 2 and 3**            | EPUB builder and parser, with simple and advanced read/write views for EPUB `2` and `3`.                   | [epub module](https://docs.rs/rbook/latest/rbook/epub)               |
 | **Reader**                  | Random‐access or sequential iteration over readable content.                                               | [reader module](https://docs.rs/rbook/latest/rbook/reader)           |
 | **Detailed Types**          | Abstractions built on expressive traits and types.                                                         |                                                                      |
 | **Metadata**                | Typed access to dates, titles, creators, publishers, languages, tags, roles, attributes, and more.         | [metadata module](https://docs.rs/rbook/latest/rbook/ebook/metadata) |
@@ -45,8 +45,8 @@ enabled by default in a project's `Cargo.toml` file:
 `rbook` can be used by adding it as a dependency in a project's `Cargo.toml` file:
 ```toml
 [dependencies]
-rbook = "0.7.4"                                           # With default features
-# rbook = { version = "0.7.4", default-features = false } # Excluding default features
+rbook = "0.7.5"                                           # With default features
+# rbook = { version = "0.7.5", default-features = false } # Excluding default features
 ```
 
 ## WebAssembly
@@ -181,8 +181,8 @@ fn main() -> EbookResult<()> {
 ```
 ### Creating a backwards-compatible EPUB 3 file
 
-> This example uses the [high-level builder API](https://docs.rs/rbook/latest/rbook/ebook/epub/struct.EpubEditor.html).  
-> See the [epub module](https://docs.rs/rbook/latest/rbook/ebook/epub)
+> This example uses the [high-level builder API](https://docs.rs/rbook/latest/rbook/epub/struct.EpubEditor.html).  
+> See the [epub module](https://docs.rs/rbook/latest/rbook/epub)
 > for lower-level control over the manifest, spine, etc.
 
 ```rust

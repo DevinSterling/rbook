@@ -1,4 +1,11 @@
 # Changelog
+## 0.7.5 (2026-03-24)
+### Fixes　**✓**
+- Fix `README.md` to reference the `rbook::epub` module instead of the deprecated `rbook::ebook::epub` module.
+
+### Changes　**⟳**
+- Refine documentation for enhanced clarity.
+
 ## 0.7.4 (2026-03-23)
 ### Changes　**⟳**
 - Update `zip` dependency: 8.2.0 → 8.4.0

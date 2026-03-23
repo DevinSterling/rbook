@@ -166,6 +166,95 @@
 //! | `\n`       | `&#10;`                                 |
 //! | `\r`       | `&#13;`                                 |
 //! | `\u{00A0}` | `&#160;` (Non-breaking space: `&nbsp;`) |
+//!
+//! # Architecture
+//! ## Smart Views
+//! `rbook` uses a "Smart View" pattern to enable features that are difficult
+//! to express with traditional borrowing, such as cross-struct lookup and
+//! [cascading updates](#cascading-updates).
+//!
+//! Rather than providing a single struct (e.g., `EpubMetaEntry`) and passing
+//! `&` or `&mut` references, data is split into three distinct types:
+//!
+//! - **Read-Only Views** (e.g., [`EpubMetaEntry`](metadata::EpubMetaEntry)):
+//!   These borrow data from an [`Epub`] and support cross-struct lookup.
+//!   They are lightweight, implement `Copy` and `Clone`, and allow
+//!   applications to read data concurrently without exclusive borrows.
+//!   ```
+//!   # use rbook::epub::Epub;
+//!   # fn main() -> rbook::ebook::errors::EbookResult<()> {
+//!   # let epub = Epub::open("tests/ebooks/example_epub")?;
+//!   let cover_page = epub.spine().get(0).unwrap();
+//!
+//!   // Cross-struct access allows the spine entry to lookup from the manifest
+//!   let resource = cover_page.manifest_entry().unwrap();
+//!
+//!   // Lazily access and lookup the underlying resource from the archive
+//!   let bytes = resource.read_bytes()?;
+//!   # Ok(())
+//!   # }
+//!   ```
+//!
+//! - **Mutable Views** (e.g.,[`EpubMetaEntryMut`](metadata::EpubMetaEntryMut)):
+//!   These provide exclusive access to specific portions of an [`Epub`].
+//!   They are lightweight, allow in-place modifications,
+//!   and can trigger [cascading updates](#cascading-updates).
+//!   ```
+//!   # #[cfg(feature = "write")]
+//!   # {
+//!   # use rbook::epub::Epub;
+//!   # fn main() -> rbook::ebook::errors::EbookResult<()> {
+//!   # let mut epub = Epub::open("tests/ebooks/example_epub")?;
+//!   let mut manifest = epub.manifest_mut();
+//!   let mut chapter_1 = manifest.by_id_mut("c1").unwrap();
+//!
+//!   // Updates cascade to the spine, updating associated idrefs
+//!   chapter_1.set_id("chapter1");
+//!
+//!   // Access content lazily from the underlying archive
+//!   let mut xhtml = chapter_1.as_view().read_str()?;
+//!   xml_libz::prettify(&mut xhtml);
+//!   chapter_1.set_content(xhtml);
+//!   # Ok(())
+//!   # }
+//!   # mod xml_libz {
+//!   #     pub fn prettify(_xml: &mut String) {/* stub */}
+//!   # }
+//!   # }
+//!   ```
+//!
+//! - **Detached** (e.g.,[`DetachedEpubMetaEntry`](metadata::DetachedEpubMetaEntry)):
+//!   Owned data detached from an [`Epub`].
+//!   These are used to build new components or inspect data independently.
+//!   ```
+//!   # #[cfg(feature = "write")]
+//!   # {
+//!   # use rbook::epub::Epub;
+//!   # use rbook::epub::metadata::DetachedEpubMetaEntry;
+//!   # fn main() -> rbook::ebook::errors::EbookResult<()> {
+//!   # let mut epub = Epub::open("tests/ebooks/example_epub")?;
+//!   let mut metadata = epub.metadata_mut();
+//!
+//!   // Attaching a detached entry
+//!   metadata.push(
+//!       DetachedEpubMetaEntry::contributor("Hanako Yamada")
+//!           .file_as("Yamada, Hanako")
+//!           .alternate_script("ja", "山田花子")
+//!           // Specifying the role as `editor`
+//!           .role("edt"),
+//!   );
+//!
+//!   // Extracting creators for independent inspection
+//!   let creators: Vec<DetachedEpubMetaEntry> = metadata
+//!       .extract_if(|entry| entry.property() == "dc:creator")
+//!       .collect();
+//!   # Ok(())
+//!   # }
+//!   # }
+//!   ```
+//!
+//! Separating these states enables greater flexibility by circumventing Rust's borrowing
+//! constraints that make cross-struct lookup and updates difficult.
 
 mod archive;
 mod consts;
@@ -225,10 +314,10 @@ pub use write::{EpubChapter, EpubEditor, EpubWriteOptions, OrphanFilter};
 ///
 /// # See Also
 /// - [`EpubEditor`] to conveniently [create](Epub::builder) or [modify](Epub::edit) an [`Epub`].
-/// - [`epub`](self) trait-level documentation for more information.
+/// - [`epub`](self) module-level documentation for more information.
 ///
 /// # Examples
-/// - Reading the contents of an epub:
+/// - [Reading](Self::reader) the contents of an [`Epub`]:
 /// ```
 /// # use rbook::Epub;
 /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
@@ -246,6 +335,36 @@ pub use write::{EpubChapter, EpubEditor, EpubWriteOptions, OrphanFilter};
 ///     println!("{media_type}: {xhtml}");
 /// }
 /// # Ok(())
+/// # }
+/// ```
+/// - [Modifying](Self::edit) an [`Epub`]:
+/// ```
+/// # #[cfg(feature = "write")]
+/// # {
+/// # use rbook::Epub;
+/// use rbook::ebook::spine::PageDirection;
+/// # const NEW_JPEG_IMAGE: &[u8] = &[];
+///
+/// # fn main() -> rbook::ebook::errors::EbookResult<()> {
+/// let mut epub = Epub::open("tests/ebooks/example_epub")?;
+///
+/// // Edit using the higher-level API
+/// epub.edit()
+///     // Append an author and description
+///     .author("Jane Doe")
+///     .description("Hello World!");
+///
+/// // Alternatively, modify using lower-level API
+/// let mut manifest = epub.manifest_mut();
+/// let mut cover = manifest.cover_image_mut().unwrap();
+///
+/// let old_type = cover.set_media_type("image/jpeg");
+/// assert_eq!("image/webm", old_type);
+///
+/// // Pass content as in-memory bytes or a file path stored on disk
+/// cover.set_content(NEW_JPEG_IMAGE);
+/// # Ok(())
+/// # }
 /// # }
 /// ```
 #[derive(Debug)]

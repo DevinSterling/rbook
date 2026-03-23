@@ -38,6 +38,11 @@ impl<'ebook> EpubPackageMut<'ebook> {
         EpubPackageMut { archive, package }
     }
 
+    /// Returns a read-only view, useful for inspecting state before applying modifications.
+    pub fn as_view(&self) -> EpubPackage<'_> {
+        EpubPackage::new(self.package)
+    }
+
     /// Sets the package file location and returns the previous location.
     ///
     /// This method effectively moves the package file.
@@ -64,6 +69,9 @@ impl<'ebook> EpubPackageMut<'ebook> {
     /// # Normalization
     /// If the location is relative, it is treated as relative to the container root
     /// (effectively absolute). If needed, the given location is normalized.
+    ///
+    /// # See Also
+    /// - [`EpubPackage::location`] to get the location (Accessible via [`Self::as_view`]).
     ///
     /// # Examples
     /// - Setting the package file location:
@@ -97,6 +105,9 @@ impl<'ebook> EpubPackageMut<'ebook> {
     }
 
     /// Sets the EPUB version and returns the previous version.
+    ///
+    /// # See Also
+    /// - [`EpubPackage::version`] to get the version (Accessible via [`Self::as_view`]).
     pub fn set_version(&mut self, version: impl Into<EpubVersion>) -> EpubVersion {
         let version = version.into();
         let previous = self.package.version.parsed;
@@ -117,6 +128,8 @@ impl<'ebook> EpubPackageMut<'ebook> {
     /// # See Also
     /// - [`EpubEditor::identifier`](crate::epub::EpubEditor::identifier) to conveniently
     ///   set the unique identifier of a newly created [`Epub`](crate::epub::Epub).
+    /// - [`EpubPackage::unique_identifier`] to get the identifier
+    ///   (Accessible via [`Self::as_view`]).
     ///
     /// # Examples
     /// - Updating the unique identifier of an [`Epub`](crate::epub::Epub):
@@ -163,6 +176,8 @@ impl<'ebook> EpubPackageMut<'ebook> {
     /// # See Also
     /// - [`EpubMetaEntryMut::set_text_direction`](crate::epub::metadata::EpubMetaEntryMut::set_xml_language)
     ///   to set the direction for a specific entry.
+    /// - [`EpubPackage::text_direction`] to get the text direction
+    ///   (Accessible via [`Self::as_view`]).
     pub fn set_text_direction(&mut self, direction: TextDirection) -> TextDirection {
         std::mem::replace(&mut self.package.text_direction, direction)
     }
@@ -179,6 +194,8 @@ impl<'ebook> EpubPackageMut<'ebook> {
     /// # See Also
     /// - [`EpubMetaEntryMut::set_xml_language`](crate::epub::metadata::EpubMetaEntryMut::set_xml_language)
     ///   to set the language for a specific entry.
+    /// - [`EpubPackage::xml_language`] to get the language code
+    ///   (Accessible via [`Self::as_view`]).
     pub fn set_xml_language(&mut self, code: impl IntoOption<String>) -> Option<String> {
         std::mem::replace(&mut self.package.language, code.into_option())
     }
@@ -199,11 +216,6 @@ impl<'ebook> EpubPackageMut<'ebook> {
     /// - [`EpubPackage::attributes`] for important details.
     pub fn attributes_mut(&mut self) -> &mut Attributes {
         &mut self.package.attributes
-    }
-
-    /// Returns a read-only view, useful for inspecting state before applying modifications.
-    pub fn as_view(&self) -> EpubPackage<'_> {
-        EpubPackage::new(self.package)
     }
 }
 

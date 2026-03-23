@@ -227,6 +227,7 @@ impl<'ebook> EpubMetadata<'ebook> {
     ///
     /// # See Also
     /// - [`Self::iter`] to iterate over non-refining metadata entries.
+    /// - [`EpubMetadataMut::by_property_mut`] to iterate over mutable entries.
     pub fn by_property(
         &self,
         property: &str,
@@ -251,6 +252,9 @@ impl<'ebook> EpubMetadata<'ebook> {
     /// [`EpubManifestEntry`](super::manifest::EpubManifestEntry::refinements) and
     /// [`EpubSpineEntry`](super::spine::EpubSpineEntry::refinements)
     /// are not searched.
+    ///
+    /// # See Also
+    /// - [`EpubMetadataMut::by_id_mut`] to get a mutable entry.
     ///
     /// # Examples
     /// - Retrieving a creator by ID:
@@ -315,11 +319,14 @@ impl<'ebook> EpubMetadata<'ebook> {
     /// The returned version may be [`EpubVersion::Unknown`] if
     /// [`EpubOpenOptions::strict`](super::EpubOpenOptions::strict) is disabled.
     ///
-    /// See [`EpubMetadata::version_str`] for the original representation.
-    ///
     /// # Note
     /// This method is equivalent to calling
     /// [`EpubPackage::version`](super::EpubPackage::version).
+    ///
+    /// # See Also
+    /// - [`EpubMetadata::version_str`] for the original representation.
+    /// - [`EpubPackage::set_version`](super::package::EpubPackageMut::set_version)
+    ///   to modify the version.
     pub fn version(&self) -> EpubVersion {
         self.package.version.parsed
     }
@@ -329,6 +336,10 @@ impl<'ebook> EpubMetadata<'ebook> {
     /// # Note
     /// This method is equivalent to calling
     /// [`EpubPackage::version_str`](super::EpubPackage::version_str).
+    ///
+    /// # See Also
+    /// - [`EpubPackage::set_version`](super::package::EpubPackageMut::set_version)
+    ///   to modify the version.
     pub fn version_str(&self) -> &'ebook str {
         self.package.version.raw.as_str()
     }
@@ -345,6 +356,7 @@ impl<'ebook> EpubMetadata<'ebook> {
     ///
     /// # See Also
     /// - [`Self::iter`] to iterate over **non-refining** metadata entries, including links.
+    /// - [`EpubMetadataMut::links_mut`] to iterate over mutable link entries.
     pub fn links(&self) -> impl Iterator<Item = EpubLink<'ebook>> + 'ebook {
         self.iter().filter_map(|entry| entry.as_link())
     }
@@ -568,6 +580,7 @@ impl<'ebook> EpubMetadata<'ebook> {
     #[doc = doc::inherent!(Metadata, iter)]
     /// # See Also
     /// - [`EpubMetadataIter`] for important details.
+    /// - [`EpubMetadataMut::iter_mut`] to iterate over mutable entries.
     pub fn iter(&self) -> EpubMetadataIter<'ebook> {
         EpubMetadataIter {
             ctx: self.ctx,
@@ -801,6 +814,9 @@ impl<'ebook> EpubRefinements<'ebook> {
 
     /// Returns the associated refinement ([`EpubMetaEntry`])
     /// if the given `index` is less than [`Self::len`], otherwise [`None`].
+    ///
+    /// # See Also
+    /// - [`EpubRefinementsMut::get_mut`] to get a mutable entry.
     pub fn get(&self, index: usize) -> Option<EpubMetaEntry<'ebook>> {
         self.data
             .get(index)
@@ -812,6 +828,9 @@ impl<'ebook> EpubRefinements<'ebook> {
     /// # Nested Refinements
     /// The returned iterator is not recursive.
     /// To iterate over nested refinements, call [`Self::iter`] on yielded entries.
+    ///
+    /// # See Also
+    /// - [`EpubRefinementsMut::iter_mut`] to iterate over mutable entries.
     pub fn iter(&self) -> EpubRefinementsIter<'ebook> {
         EpubRefinementsIter {
             ctx: self.ctx,
@@ -821,6 +840,9 @@ impl<'ebook> EpubRefinements<'ebook> {
     }
 
     /// Returns an iterator over all **direct** refinements matching the specified `property`.
+    ///
+    /// # See Also
+    /// - [`EpubRefinementsMut::by_property_mut`] to iterate over mutable entries.
     ///
     /// # Examples
     /// - Retrieving the `role` refinement for a creator:
@@ -981,6 +1003,9 @@ impl<'ebook> EpubMetaEntry<'ebook> {
     }
 
     /// The unique `id` of a metadata entry.
+    ///
+    /// # See Also
+    /// - [`EpubMetaEntryMut::set_id`] to modify the `id`.
     pub fn id(&self) -> Option<&'ebook str> {
         self.data.id.as_deref()
     }
@@ -1031,8 +1056,8 @@ impl<'ebook> EpubMetaEntry<'ebook> {
     /// Depending on the underlying element type and EPUB version, this field may be mapped
     /// differently:
     ///
-    /// | Element Type         | Mapped From                                                        |
-    /// |----------------------|--------------------------------------------------------------------|
+    /// | Element Type         | Mapped From                                                      |
+    /// |----------------------|------------------------------------------------------------------|
     /// | Dublin Core `<dc:*>` | Element tag (`<dc:title>…</dc:title>`)                           |
     /// | EPUB 2 `<meta>`      | `name` attribute (`<meta name="cover" content="…"/>`)            |
     /// | EPUB 3 `<meta>`      | `property` attribute (`<meta property="media:duration">…</meta>`)|
@@ -1121,7 +1146,7 @@ impl<'ebook> EpubMetaEntry<'ebook> {
         Scheme::new(self.data.attributes.get_value(opf::SCHEME), self.value())
     }
 
-    /// The specified or inherited language in `BCP 47` format.
+    /// The specified or inherited language code in `BCP 47` format (e.g. `en`, `ja`).
     ///
     /// [`None`] is returned if the element contains no `xml:lang` attribute
     /// (and the `<package>` has none).
@@ -1129,6 +1154,7 @@ impl<'ebook> EpubMetaEntry<'ebook> {
     /// # See Also
     /// - [`EpubLink::href_lang`] for the language of the linked resource.
     ///   `<link>` elements do not formally support the `xml:lang` attribute.
+    /// - [`EpubMetaEntryMut::set_xml_language`] to modify the language.
     pub fn xml_language(&self) -> Option<LanguageTag<'ebook>> {
         self.data
             .language()
@@ -1142,6 +1168,9 @@ impl<'ebook> EpubMetaEntry<'ebook> {
     /// - The `<package>` and specified element contains no `dir` attribute.
     /// - [`Self::kind`] is [`EpubMetaEntryKind::Link`], as `<link>`
     ///   elements do not formally support the `dir` attribute.
+    ///
+    /// # See Also
+    /// - [`EpubMetaEntryMut::set_text_direction`] to modify the text direction.
     pub fn text_direction(&self) -> TextDirection {
         match self.data.text_direction {
             TextDirection::Auto => self.ctx.package_text_direction(),
@@ -1160,6 +1189,9 @@ impl<'ebook> EpubMetaEntry<'ebook> {
     /// - [`refines`](Self::refines)
     /// - [`name`](Self::property) (EPUB 2; legacy)
     /// - [`content`](Self::value) (EPUB 2; legacy)
+    ///
+    /// # See Also
+    /// - [`EpubMetaEntryMut::attributes_mut`] to modify the attributes.
     pub fn attributes(&self) -> &'ebook Attributes {
         &self.data.attributes
     }
@@ -1168,6 +1200,7 @@ impl<'ebook> EpubMetaEntry<'ebook> {
     ///
     /// # See Also
     /// - [`Self::refines`] to inspect which entry (by `id`) a metadata entry refines.
+    /// - [`EpubMetaEntryMut::refinements_mut`] to modify the refinements.
     /// - [`EpubManifestEntry::refinements`](super::manifest::EpubManifestEntry::refinements)
     ///   for manifest entry refinements.
     /// - [`EpubSpineEntry::refinements`](super::spine::EpubSpineEntry::refinements)
@@ -2111,6 +2144,8 @@ mod macros {
 
                 /// The plain text value of an entry.
                 #[doc = doc::inherent!(MetaEntry, value)]
+                /// # See Also
+                /// - [`EpubMetaEntryMut::set_value`] to modify the value.
                 pub fn value(&self) -> &'ebook str {
                     &self.data().value
                 }

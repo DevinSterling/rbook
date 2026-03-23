@@ -184,6 +184,9 @@ impl<'ebook> EpubManifest<'ebook> {
     /// Returns the [`EpubManifestEntry`] matching the given `id`, or [`None`] if not found.
     ///
     /// This is a constant (`O(1)`) operation.
+    ///
+    /// # See Also
+    /// - [`EpubManifestMut::by_id_mut`] to get a mutable entry.
     pub fn by_id(&self, id: &str) -> Option<EpubManifestEntry<'ebook>> {
         self.manifest
             .by_id(id)
@@ -234,6 +237,9 @@ impl<'ebook> EpubManifest<'ebook> {
 
     /// Returns an iterator over all [entries](EpubManifestEntry) in the manifest.
     #[doc = doc::inherent!(Manifest, iter)]
+    ///
+    /// # See Also
+    /// - [`EpubManifestMut::iter_mut`] to iterate over mutable entries.
     pub fn iter(&self) -> EpubManifestIter<'ebook> {
         EpubManifestIter {
             ctx: self.ctx,
@@ -246,6 +252,9 @@ impl<'ebook> EpubManifest<'ebook> {
     /// This method returns the entry with the `cover-image` property,
     /// falling back to EPUB 2 cover metadata for lookup.
     #[doc = doc::inherent!(Manifest, cover_image)]
+    ///
+    /// # See Also
+    /// - [`EpubManifestMut::cover_image_mut`] to get a mutable entry.
     pub fn cover_image(&self) -> Option<EpubManifestEntry<'ebook>> {
         self.by_property(opf::COVER_IMAGE).next().or_else(|| {
             // Fallback to EPUB 2 cover image, if present
@@ -466,6 +475,9 @@ pub struct EpubManifestEntry<'ebook> {
 
 impl<'ebook> EpubManifestEntry<'ebook> {
     /// The unique `id` of an entry within the [`EpubManifest`].
+    ///
+    /// # See Also
+    /// - [`EpubManifestEntryMut::set_id`] to modify the `id`.
     pub fn id(&self) -> &'ebook str {
         self.id
     }
@@ -490,6 +502,9 @@ impl<'ebook> EpubManifestEntry<'ebook> {
     ///
     /// # See Also
     /// - [`Self::resource`] as the primary means for retrieving ebook content.
+    ///
+    /// # See Also
+    /// - [`EpubManifestEntryMut::set_href`] to modify the `href`.
     pub fn href(&self) -> Href<'ebook> {
         Href::new(&self.data.href)
     }
@@ -514,6 +529,7 @@ impl<'ebook> EpubManifestEntry<'ebook> {
     ///
     /// # See Also
     /// - [`Epub`](super::Epub) documentation of `copy_resource` for normalization details.
+    /// - [`EpubManifestEntryMut::set_href`] to modify the `href`.
     pub fn href_raw(&self) -> Href<'ebook> {
         Href::new(&self.data.href_raw)
     }
@@ -522,6 +538,9 @@ impl<'ebook> EpubManifestEntry<'ebook> {
     /// the resource referenced by [`Self::href`].
     ///
     /// This method is a lower-level call than [`Self::kind`].
+    ///
+    /// # See Also
+    /// - [`EpubManifestEntryMut::set_media_type`] to modify the media type.
     pub fn media_type(&self) -> &'ebook str {
         &self.data.media_type
     }
@@ -529,6 +548,9 @@ impl<'ebook> EpubManifestEntry<'ebook> {
     /// The SMIL media overlay of an entry providing pre-recorded narration
     /// for the associated content.
     /// Returns [`None`] if there is no media overlay available.
+    ///
+    /// # See Also
+    /// - [`EpubManifestEntryMut::set_media_overlay`] to modify the media overlay.
     pub fn media_overlay(&self) -> Option<Self> {
         self.data
             .media_overlay
@@ -543,6 +565,9 @@ impl<'ebook> EpubManifestEntry<'ebook> {
     /// # Note
     /// **This method does *not* protect against cycles in malformed EPUBs,
     /// [`Self::fallbacks`] provides protection and is recommended when chaining.**
+    ///
+    /// # See Also
+    /// - [`EpubManifestEntryMut::set_fallback`] to modify the fallback.
     ///
     /// # Examples
     /// - Falling back on a potentially incompatible image format:
@@ -622,6 +647,9 @@ impl<'ebook> EpubManifestEntry<'ebook> {
     ///
     /// See the specification for more details regarding properties:
     /// <https://www.w3.org/TR/epub/#app-item-properties-vocab>
+    ///
+    /// # See Also
+    /// - [`EpubManifestEntryMut::properties_mut`] to modify the properties.
     pub fn properties(&self) -> &'ebook Properties {
         &self.data.properties
     }
@@ -636,11 +664,17 @@ impl<'ebook> EpubManifestEntry<'ebook> {
     /// - [`media-overlay`](Self::media_overlay)
     /// - [`fallback`](Self::fallbacks)
     /// - [`properties`](Self::properties)
+    ///
+    /// # See Also
+    /// - [`EpubManifestEntryMut::attributes_mut`] to modify the attributes.
     pub fn attributes(&self) -> &'ebook Attributes {
         &self.data.attributes
     }
 
     /// Complementary refinement metadata entries.
+    ///
+    /// # See Also
+    /// - [`EpubManifestEntryMut::refinements_mut`] to modify the refinements.
     pub fn refinements(&self) -> EpubRefinements<'ebook> {
         self.ctx
             .meta_ctx
@@ -663,18 +697,24 @@ impl<'ebook> EpubManifestEntry<'ebook> {
     /// Copies the associated content into the given `writer`,
     /// returning the total number of bytes written on success.
     #[doc = doc::inherent!(ManifestEntry, copy_bytes)]
+    /// # See Also
+    /// - [`EpubManifestEntryMut::set_content`] to modify the content.
     pub fn copy_bytes(&self, writer: &mut impl Write) -> ArchiveResult<u64> {
         self.ctx.resource.copy_bytes(&self.resource(), writer)
     }
 
     /// Returns the associated content as a [`String`].
     #[doc = doc::inherent!(ManifestEntry, read_str)]
+    /// # See Also
+    /// - [`EpubManifestEntryMut::set_content`] to modify the content.
     pub fn read_str(&self) -> ArchiveResult<String> {
         ManifestEntry::read_str(self)
     }
 
     /// Returns the associated content as bytes.
     #[doc = doc::inherent!(ManifestEntry, read_bytes)]
+    /// # See Also
+    /// - [`EpubManifestEntryMut::set_content`] to modify the content.
     pub fn read_bytes(&self) -> ArchiveResult<Vec<u8>> {
         ManifestEntry::read_bytes(self)
     }

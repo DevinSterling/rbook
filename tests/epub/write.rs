@@ -1,4 +1,5 @@
 mod editor;
+mod metadata;
 
 use crate::epub::manifest::EXPECTED_MANIFEST;
 use crate::epub::util::TestEpub::{Epub3Dir, Epub3File};

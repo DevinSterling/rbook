@@ -26,7 +26,10 @@ fn test_epub2_editor_author() {
     let epub = round_trip_epub(&built_epub);
     let metadata = epub.metadata();
 
+    // "aut" is implicitly added as the primary role
     let expected_authors = ["John Doe", "Jane Doe", "Hanako Yamada", "Taro Yamada"];
+
+    assert_eq!(expected_authors.len(), metadata.creators().count());
 
     for (name, author) in expected_authors.into_iter().zip(metadata.creators()) {
         assert_eq!(name, author.value());
@@ -43,6 +46,7 @@ fn test_epub3_editor_author() {
     let epub = round_trip_epub(&built_epub);
     let metadata = epub.metadata();
 
+    // "aut" is implicitly added as the primary role
     let expected_authors = [
         // (name, roles, opf:role)
         ("John Doe", vec!["aut"], None),
@@ -51,7 +55,7 @@ fn test_epub3_editor_author() {
         ("Taro Yamada", vec!["aut", "edt"], Some("aut")),
     ];
 
-    assert_eq!(4, metadata.creators().count());
+    assert_eq!(expected_authors.len(), metadata.creators().count());
 
     for ((name, roles, opf_role), author) in expected_authors.into_iter().zip(metadata.creators()) {
         assert_eq!(name, author.value());

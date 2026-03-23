@@ -805,6 +805,16 @@ impl<'ebook> EpubManifestMut<'ebook> {
     // PUBLIC API
     //////////////////////////////////
 
+    /// Returns a read-only view, useful for inspecting state before applying modifications.
+    pub fn as_view(&self) -> EpubManifest<'_> {
+        EpubManifest::new(
+            ResourceProvider::Archive(self.archive),
+            self.meta_ctx,
+            self.manifest,
+            self.metadata,
+        )
+    }
+
     /// Inserts one or more entries via the [`Many`] trait.
     ///
     /// # Replacements
@@ -840,6 +850,7 @@ impl<'ebook> EpubManifestMut<'ebook> {
     /// # See Also
     /// - [`EpubEditor::cover_image`](crate::epub::EpubEditor::cover_image)
     ///   to conveniently create or set a new cover image resource.
+    /// - [`EpubManifestEntryMut::set_content`] to change the cover image contents.
     pub fn cover_image_mut(&mut self) -> Option<EpubManifestEntryMut<'_>> {
         for (i, data) in self.manifest.entries.values().enumerate() {
             if data.properties.has_property(opf::COVER_IMAGE) {
@@ -1033,16 +1044,6 @@ impl<'ebook> EpubManifestMut<'ebook> {
             self.archive.remove(&removed.href);
         }
     }
-
-    /// Returns a read-only view, useful for inspecting state before applying modifications.
-    pub fn as_view(&self) -> EpubManifest<'_> {
-        EpubManifest::new(
-            ResourceProvider::Archive(self.archive),
-            self.meta_ctx,
-            self.manifest,
-            self.metadata,
-        )
-    }
 }
 
 impl Debug for EpubManifestMut<'_> {
@@ -1142,6 +1143,23 @@ impl<'ebook> EpubManifestEntryMut<'ebook> {
         Self { meta_ctx, data }
     }
 
+    /// Returns a read-only view, useful for inspecting state before applying modifications.
+    pub fn as_view(&self) -> EpubManifestEntry<'_> {
+        let (id, data) = self.data.get_with_id();
+
+        match &self.data {
+            ManifestEntryDataHandle::Attached(ctx) => EpubManifestContext::new(
+                ResourceProvider::Archive(ctx.archive),
+                self.meta_ctx,
+                Some(ctx.manifest),
+            )
+            .create_entry(id, data),
+            ManifestEntryDataHandle::Detached { content, .. } => {
+                EpubManifestContext::detached(content.as_ref()).create_entry(id, data)
+            }
+        }
+    }
+
     /// Sets the raw byte content of a resource (e.g., XHTML, images, fonts) and returns
     /// the previous content.
     ///
@@ -1159,6 +1177,35 @@ impl<'ebook> EpubManifestEntryMut<'ebook> {
     /// - [`DetachedEpubManifestEntry::content`] for more details.
     /// - [`ResourceContent`] for details on providing data from memory (bytes/strings)
     ///   or the OS file system (paths).
+    ///
+    /// # Examples
+    /// - Changing the contents of the cover image.
+    /// ```
+    /// # use rbook::epub::Epub;
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
+    /// let mut epub = Epub::open("tests/ebooks/example_epub")?;
+    /// let mut manifest = epub.manifest_mut();
+    /// let mut cover = manifest.cover_image_mut().unwrap();
+    ///
+    /// // Change the cover image from `webm` to `png`
+    /// let webm_bytes = cover.as_view().read_bytes()?;
+    /// let png_bytes = image_libz::webm_to_png(webm_bytes);
+    ///
+    /// let old_type = cover.set_media_type("image/png");
+    /// assert_eq!("image/webm", old_type);
+    /// assert_eq!("image/png", cover.as_view().media_type());
+    ///
+    /// // Replace the content and check for PNG magic bytes
+    /// cover.set_content(png_bytes);
+    /// assert!(cover.as_view().read_bytes()?.starts_with(b"\x89PNG\r\n\x1a\n"));
+    /// # Ok(())
+    /// # }
+    /// # mod image_libz {
+    /// #     pub fn webm_to_png(_webm: Vec<u8>) -> &'static [u8] {
+    /// #         b"\x89PNG\r\n\x1a\n;just a stub...!"
+    /// #     }
+    /// # }
+    /// ```
     pub fn set_content(&mut self, content: impl Into<ResourceContent>) -> Option<ResourceContent> {
         match &mut self.data {
             ManifestEntryDataHandle::Attached(ctx) => {
@@ -1187,8 +1234,8 @@ impl<'ebook> EpubManifestEntryMut<'ebook> {
     /// Cascading updates can be disabled via [`IdOptions::cascade`] (`true` by default).
     ///
     /// # See Also
-    /// - [`Self::as_view`] to inspect the resolved ID with [`EpubManifestEntry::id`].
-    /// - [`Self::try_set_id`] to retrieve an error if an ID collision occurs.
+    /// - [`EpubManifestEntry::id`] to get the resolved ID (Accessible via [`Self::as_view`]).
+    /// - [`Self::try_set_id`] to get an error if an ID collision occurs.
     ///
     /// # Examples
     /// - Updating the ID of an entry:
@@ -1246,6 +1293,7 @@ impl<'ebook> EpubManifestEntryMut<'ebook> {
     ///   If another manifest entry already has the given `id`.
     ///
     /// # See Also
+    /// - [`EpubManifestEntry::id`] to get the given `id` (Accessible via [`Self::as_view`]).
     /// - [`Self::set_id`] to automatically suffix the given `id` if it is not unique.
     ///
     /// # Examples
@@ -1304,7 +1352,9 @@ impl<'ebook> EpubManifestEntryMut<'ebook> {
     ///
     /// # See Also
     /// - [`DetachedEpubManifestEntry::href`] for important details.
-    /// - [`EpubManifestEntry::href_raw`] to retrieve the href given here.
+    /// - [`EpubManifestEntry::href`] to get the resolved href
+    ///   (Accessible via [`Self::as_view`]).
+    /// - [`EpubManifestEntry::href_raw`] to get the raw href given here.
     /// - [`EpubEditor::resource`](crate::epub::EpubEditor::resource) for path details.
     ///   The same path resolution rules apply to this method.
     ///
@@ -1349,22 +1399,28 @@ impl<'ebook> EpubManifestEntryMut<'ebook> {
     ///
     /// # See Also
     /// - [`DetachedEpubManifestEntry::media_type`] for more details.
+    /// - [`EpubManifestEntry::media_type`] to get the media type
+    ///   (Accessible via [`Self::as_view`]).
     pub fn set_media_type(&mut self, media_type: impl Into<String>) -> String {
         std::mem::replace(&mut self.data.get_mut().media_type, media_type.into())
     }
 
-    /// Sets the fallback and returns the previous fallback, if any.
+    /// Sets the fallback and returns the previous fallback ID, if any.
     ///
     /// # See Also
     /// - [`DetachedEpubManifestEntry::fallback`] for more details.
+    /// - [`EpubManifestEntry::fallback`] to get the fallback
+    ///   (Accessible via [`Self::as_view`]).
     pub fn set_fallback(&mut self, idref: impl IntoOption<String>) -> Option<String> {
         std::mem::replace(&mut self.data.get_mut().fallback, idref.into_option())
     }
 
-    /// Sets the media overlay and returns the previous overlay, if any.
+    /// Sets the media overlay and returns the previous overlay ID, if any.
     ///
     /// # See Also
     /// - [`DetachedEpubManifestEntry::media_overlay`] for more details.
+    /// - [`EpubManifestEntry::media_overlay`] to get the media overlay
+    ///   (Accessible via [`Self::as_view`]).
     pub fn set_media_overlay(&mut self, idref: impl IntoOption<String>) -> Option<String> {
         std::mem::replace(&mut self.data.get_mut().media_overlay, idref.into_option())
     }
@@ -1390,23 +1446,6 @@ impl<'ebook> EpubManifestEntryMut<'ebook> {
         let (id, data) = self.data.get_mut_with_id();
 
         EpubRefinementsMut::new(self.meta_ctx, Some(id), &mut data.refinements)
-    }
-
-    /// Returns a read-only view, useful for inspecting state before applying modifications.
-    pub fn as_view(&self) -> EpubManifestEntry<'_> {
-        let (id, data) = self.data.get_with_id();
-
-        match &self.data {
-            ManifestEntryDataHandle::Attached(ctx) => EpubManifestContext::new(
-                ResourceProvider::Archive(ctx.archive),
-                self.meta_ctx,
-                Some(ctx.manifest),
-            )
-            .create_entry(id, data),
-            ManifestEntryDataHandle::Detached { content, .. } => {
-                EpubManifestContext::detached(content.as_ref()).create_entry(id, data)
-            }
-        }
     }
 }
 

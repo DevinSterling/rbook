@@ -7,7 +7,6 @@ use crate::epub::spine::{
     EpubSpine, EpubSpineContext, EpubSpineData, EpubSpineEntry, EpubSpineEntryData,
 };
 use crate::input::{IntoOption, Many};
-use crate::util::iter::{IteratorExt, OneOrMany};
 use std::fmt::Debug;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -297,20 +296,19 @@ impl<'ebook> EpubSpineMut<'ebook> {
         index: usize,
         detached: impl Iterator<Item = DetachedEpubSpineEntry>,
     ) {
-        match detached.one_or_many() {
-            OneOrMany::None => { /* no-op */ }
-            OneOrMany::One(entry) => {
-                self.spine.entries.insert(index, entry.0);
-            }
-            OneOrMany::Many(many) => {
-                self.spine.entries.splice(index..index, many.map(|e| e.0));
-            }
-        }
+        self.spine
+            .entries
+            .splice(index..index, detached.map(|e| e.0));
     }
 
     //////////////////////////////////
     // PUBLIC API
     //////////////////////////////////
+
+    /// Returns a read-only view, useful for inspecting state before applying modifications.
+    pub fn as_view(&self) -> EpubSpine<'_> {
+        self.ctx.create(self.spine)
+    }
 
     /// Sets the global page direction hint (e.g., `rtl` for Manga) and returns the previous value.
     ///
@@ -319,11 +317,16 @@ impl<'ebook> EpubSpineMut<'ebook> {
     /// # Note
     /// This is an EPUB 3 feature.
     /// When [writing](crate::Epub::write) an EPUB 2 ebook, this field is ignored.
+    ///
+    /// # See Also
+    /// - [`EpubSpine::page_direction`] to get the page direction
+    ///   (Accessible via [`Self::as_view`]).
     pub fn set_page_direction(&mut self, page_direction: PageDirection) -> PageDirection {
         std::mem::replace(&mut self.spine.page_direction, page_direction)
     }
 
-    /// Appends one or more entries to the end via the [`Many`] trait.
+    /// Appends one or more [detached entries](DetachedEpubSpineEntry)
+    /// to the end via the [`Many`] trait.
     ///
     /// # Examples
     /// - Appending spine entries:
@@ -358,7 +361,8 @@ impl<'ebook> EpubSpineMut<'ebook> {
         self.insert(self.spine.entries.len(), detached);
     }
 
-    /// Inserts one or more entries at the given `index` via the [`Many`] trait.
+    /// Inserts one or more [detached entries](DetachedEpubSpineEntry)
+    /// at the given `index` via the [`Many`] trait.
     ///
     /// # Panics
     /// Panics if the given `index` to insert at is greater than
@@ -367,7 +371,7 @@ impl<'ebook> EpubSpineMut<'ebook> {
         self.insert_detached(index, detached.iter_many());
     }
 
-    /// Returns the associated entry if the given `index`
+    /// Returns the associated [entry](EpubSpineEntryMut) if the given `index`
     /// is less than [`Spine::len`](crate::ebook::spine::Spine::len), otherwise [`None`].
     pub fn get_mut(&mut self, index: usize) -> Option<EpubSpineEntryMut<'_>> {
         self.spine
@@ -376,14 +380,15 @@ impl<'ebook> EpubSpineMut<'ebook> {
             .map(|entry| self.ctx.create_entry_mut(entry, index))
     }
 
-    /// Returns the associated entry matching the given `id`, or [`None`] if not found.
+    /// Returns the associated [entry](EpubSpineEntryMut)
+    /// matching the given `id`, or [`None`] if not found.
     pub fn by_id_mut(&mut self, id: &str) -> Option<EpubSpineEntryMut<'_>> {
         self.iter_mut()
             .find(|entry| entry.data.id.as_deref() == Some(id))
     }
 
-    /// Returns an iterator over **all** mutable entries matching the given
-    /// [`idref`](EpubSpineEntry::idref).
+    /// Returns an iterator over **all** mutable [entries](EpubSpineEntryMut)
+    /// matching the given [`idref`](EpubSpineEntry::idref).
     ///
     /// Albeit uncommon, more than one spine entry can reference the same manifest entry.
     pub fn by_idref_mut(&mut self, idref: &str) -> impl Iterator<Item = EpubSpineEntryMut<'_>> {
@@ -391,7 +396,7 @@ impl<'ebook> EpubSpineMut<'ebook> {
             .filter(move |entry| entry.data.idref == idref)
     }
 
-    /// Returns an iterator over **all** spine entries.
+    /// Returns an iterator over **all** spine [entries](EpubSpineEntryMut).
     pub fn iter_mut(&mut self) -> EpubSpineIterMut<'_> {
         EpubSpineIterMut {
             ctx: self.ctx,
@@ -503,11 +508,6 @@ impl<'ebook> EpubSpineMut<'ebook> {
     pub fn clear(&mut self) {
         self.spine.entries.clear();
     }
-
-    /// Returns a read-only view, useful for inspecting state before applying modifications.
-    pub fn as_view(&self) -> EpubSpine<'_> {
-        self.ctx.create(self.spine)
-    }
 }
 
 impl Debug for EpubSpineMut<'_> {
@@ -597,10 +597,16 @@ impl<'ebook> EpubSpineEntryMut<'ebook> {
         Self { ctx, data, index }
     }
 
+    /// Returns a read-only view, useful for inspecting state before applying modifications.
+    pub fn as_view(&self) -> EpubSpineEntry<'_> {
+        self.ctx.create_entry(self.data, self.index)
+    }
+
     /// Sets the unique `id` and returns the previous value.
     ///
     /// # See Also
     /// - [`DetachedEpubSpineEntry::id`] for important details.
+    /// - [`EpubSpineEntry::id`] to get the `id` (Accessible via [`Self::as_view`]).
     pub fn set_id(&mut self, id: impl IntoOption<String>) -> Option<String> {
         std::mem::replace(&mut self.data.id, id.into_option())
     }
@@ -614,6 +620,7 @@ impl<'ebook> EpubSpineEntryMut<'ebook> {
     ///
     /// # See Also
     /// - [`DetachedEpubSpineEntry::idref`] for important details.
+    /// - [`EpubSpineEntry::idref`] to get the `idref` (Accessible via [`Self::as_view`]).
     pub fn set_idref(&mut self, idref: impl Into<String>) -> String {
         std::mem::replace(&mut self.data.idref, idref.into())
     }
@@ -622,6 +629,7 @@ impl<'ebook> EpubSpineEntryMut<'ebook> {
     ///
     /// # See Also
     /// - [`DetachedEpubSpineEntry::linear`] for more details.
+    /// - [`EpubSpineEntry::is_linear`] to get the linearity (Accessible via [`Self::as_view`]).
     pub fn set_linear(&mut self, linear: bool) -> bool {
         std::mem::replace(&mut self.data.linear, linear)
     }
@@ -662,11 +670,6 @@ impl<'ebook> EpubSpineEntryMut<'ebook> {
             self.data.id.as_deref(),
             &mut self.data.refinements,
         )
-    }
-
-    /// Returns a read-only view, useful for inspecting state before applying modifications.
-    pub fn as_view(&self) -> EpubSpineEntry<'_> {
-        self.ctx.create_entry(self.data, self.index)
     }
 }
 
