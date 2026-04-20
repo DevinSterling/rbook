@@ -8,7 +8,7 @@ use crate::epub::parser::package::{
     EpubParserContext, EpubParserValidator, PackageParser, TocLocation,
 };
 use crate::parser::ParserResult;
-use crate::parser::xml::{XmlReader, XmlStartElement};
+use crate::parser::xml::{XmlReader, XmlStartElement, extract_attributes};
 use crate::util::uri::UriResolver;
 use indexmap::IndexMap;
 
@@ -48,36 +48,36 @@ impl<'package, 'a> ManifestParser<'package, 'a> {
         &mut self,
         item: &XmlStartElement<'_>,
     ) -> ParserResult<(String, EpubManifestEntryData)> {
-        let mut attributes = item.attributes()?;
-
-        // Required fields
-        let id = self.require_id(attributes.remove(xml::ID)?)?;
-        let href_raw =
-            self.require_attribute(attributes.remove(opf::HREF)?, "manifest > item[*href]")?;
+        extract_attributes! {
+            item.attributes(),
+            xml::bytes::ID       => id,
+            bytes::HREF          => href_raw,
+            bytes::MEDIA_TYPE    => media_type,
+            // Optional
+            bytes::MEDIA_OVERLAY => media_overlay,
+            bytes::FALLBACK      => fallback,
+            bytes::PROPERTIES    => properties,
+           ..remaining,
+        }
+        // Validate
+        let id = self.require_id(id)?;
+        let href_raw = self.require_attribute(href_raw, "manifest > item[*href]")?;
         let href = self.require_href(self.resolver.resolve(&href_raw))?;
-        let mut media_type = self.require_attribute(
-            attributes.remove(opf::MEDIA_TYPE)?,
-            "manifest > item[*media_type]",
-        )?;
-
-        // Optional fields
-        let media_overlay = attributes.remove(opf::MEDIA_OVERLAY)?;
-        let fallback = attributes.remove(opf::FALLBACK)?;
-        let properties = attributes.remove(opf::PROPERTIES)?.into();
-        let refinements = self.refinements.take_refinements(&id).unwrap_or_default();
-
+        let mut media_type = self.require_attribute(media_type, "manifest > item[*media_type]")?;
         // Set media_type to lowercase to enforce uniformity.
         media_type.make_ascii_lowercase();
 
+        let refinements = self.refinements.take_refinements(&id).unwrap_or_default();
+
         let entry = EpubManifestEntryData {
-            attributes: attributes.try_into()?,
+            properties: properties.into(),
+            attributes: remaining.into(),
             refinements,
             href,
             href_raw,
             media_type,
             fallback,
             media_overlay,
-            properties,
         };
         Ok((id, entry))
     }

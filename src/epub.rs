@@ -178,7 +178,7 @@
 //!
 //! - **Read-Only Views** (e.g., [`EpubMetaEntry`](metadata::EpubMetaEntry)):
 //!   These borrow data from an [`Epub`] and support cross-struct lookup.
-//!   They are lightweight, implement `Copy` and `Clone`, and allow
+//!   They are lightweight, implement [`Copy`] and [`Clone`], and allow
 //!   applications to read data concurrently without exclusive borrows.
 //!   ```
 //!   # use rbook::epub::Epub;
@@ -195,7 +195,7 @@
 //!   # }
 //!   ```
 //!
-//! - **Mutable Views** (e.g.,[`EpubMetaEntryMut`](metadata::EpubMetaEntryMut)):
+//! - **Mutable Views** (e.g., [`EpubMetaEntryMut`](metadata::EpubMetaEntryMut)):
 //!   These provide exclusive access to specific portions of an [`Epub`].
 //!   They are lightweight, allow in-place modifications,
 //!   and can trigger [cascading updates](#cascading-updates).
@@ -223,7 +223,7 @@
 //!   # }
 //!   ```
 //!
-//! - **Detached** (e.g.,[`DetachedEpubMetaEntry`](metadata::DetachedEpubMetaEntry)):
+//! - **Detached** (e.g., [`DetachedEpubMetaEntry`](metadata::DetachedEpubMetaEntry)):
 //!   Owned data detached from an [`Epub`].
 //!   These are used to build new components or inspect data independently.
 //!   ```
@@ -253,7 +253,10 @@
 //!   # }
 //!   ```
 //!
-//! Separating these states enables greater flexibility by circumventing Rust's borrowing
+//! Detached and mutable views are only accessible through the `write` crate feature
+//! (enabled by default).
+//!
+//! Separating these states enables greater flexibility by circumventing borrowing
 //! constraints that make cross-struct lookup and updates difficult.
 
 mod archive;
@@ -342,12 +345,9 @@ pub use write::{EpubChapter, EpubEditor, EpubWriteOptions, OrphanFilter};
 /// # #[cfg(feature = "write")]
 /// # {
 /// # use rbook::Epub;
-/// use rbook::ebook::spine::PageDirection;
 /// # const NEW_JPEG_IMAGE: &[u8] = &[];
-///
 /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
-/// let mut epub = Epub::open("tests/ebooks/example_epub")?;
-///
+/// # let mut epub = Epub::open("tests/ebooks/example_epub")?;
 /// // Edit using the higher-level API
 /// epub.edit()
 ///     // Append an author and description
@@ -875,7 +875,7 @@ impl EpubOpenOptions {
     /// If any of the conditions are not met,
     /// an error will be returned.
     ///
-    /// **This setting does not validate that an EPUB conforms entirely to the spec.
+    /// **This option does not validate that an EPUB conforms entirely to the spec.
     /// However, it will refuse further processing if malformations are found.**
     ///
     /// # See Also

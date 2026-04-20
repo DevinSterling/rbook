@@ -223,9 +223,15 @@ pub trait Reader<'ebook>: Sealed {
 
     /// The position of the reader’s cursor (current entry).
     ///
-    /// Returns [`None`] if the cursor is **before** the first entry
-    /// (such as on a newly created reader or after invoking [`Self::reset`].
+    /// Returns [`None`] if the cursor is positioned **before** the first entry
+    /// (such as on a newly created reader or after invoking [`Self::reset`]).
     /// Otherwise, `Some(i)` where `0 <= i < len`.
+    ///
+    /// ```text
+    ///          Before First Entry   Entry(0)   Entry(1)  ...  Entry(len-1)
+    ///  cursor:         ^               ^          ^                ^
+    ///                 None             0          1              len-1
+    /// ```
     ///
     /// # Examples
     /// - Retrieving the position upon navigating:

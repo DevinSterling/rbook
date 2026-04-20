@@ -1,4 +1,4 @@
-use crate::ebook::element::TextDirection;
+use crate::ebook::element::{Attribute, TextDirection};
 use crate::epub::consts::{dc, opf, opf::bytes, xml};
 use crate::epub::errors::EpubError;
 use crate::epub::metadata::{
@@ -9,7 +9,7 @@ use crate::epub::package::EpubPackageData;
 use crate::epub::parser::package::PackageParser;
 use crate::epub::parser::{EpubParseConfig, EpubParserContext, EpubParserValidator};
 use crate::parser::ParserResult;
-use crate::parser::xml::{XmlAttributes, XmlEvent, XmlReader, XmlStartElement};
+use crate::parser::xml::{XmlEvent, XmlReader, XmlStartElement, extract_attributes};
 use indexmap::IndexMap;
 use std::cell::Cell;
 use std::collections::HashMap;
@@ -43,6 +43,27 @@ impl TempEpubMetaEntry {
                 ..EpubMetaEntryData::default()
             },
         }
+    }
+
+    pub fn set_common_fields(
+        &mut self,
+        id: Option<String>,
+        language: Option<String>,
+        refines: Option<String>,
+        text_dir: Option<TextDirection>,
+        attributes: Vec<Attribute>,
+    ) {
+        self.id = id;
+        self.language = language;
+        self.text_direction = text_dir.unwrap_or(TextDirection::Auto);
+        self.attributes = attributes.into();
+        self.refines = refines.map(|mut refines| {
+            // Normalize refines
+            if refines.starts_with('#') {
+                refines.remove(0);
+            }
+            refines
+        });
     }
 
     fn finish(self) -> EpubMetaEntryData {
@@ -135,11 +156,12 @@ impl<'package, 'a> MetadataParser<'package, 'a> {
         let mut natural_order = 0;
 
         while let Some((kind, el)) = self.next_entry()? {
-            let (id, mut entry) = self.parse_metadata_entry(kind, &el)?;
+            let mut entry = self.parse_metadata_entry(kind, &el)?;
             entry.natural_order = natural_order;
             natural_order += 1;
 
-            if let Some(id) = id {
+            // Temporarily take the `id` of an entry for grouping
+            if let Some(id) = entry.id.take() {
                 id_meta.insert(id, entry);
             } else if entry.refines.is_some() {
                 no_id_refinements.push(entry);
@@ -161,41 +183,32 @@ impl<'package, 'a> MetadataParser<'package, 'a> {
         &mut self,
         kind: EpubMetaEntryKind,
         el: &XmlStartElement<'_>,
-    ) -> ParserResult<(Option<String>, TempEpubMetaEntry)> {
-        let mut attributes = el.attributes()?;
+    ) -> ParserResult<TempEpubMetaEntry> {
         let mut entry = TempEpubMetaEntry::new(kind);
 
-        // Parse the specific kind of entry
         match kind {
             EpubMetaEntryKind::DublinCore {} => self.parse_dublin_core(el, &mut entry)?,
-            EpubMetaEntryKind::Meta { version } => {
-                self.parse_meta(version, el, &mut attributes, &mut entry)?;
+            EpubMetaEntryKind::Link {} => self.parse_link(el, &mut entry)?,
+            EpubMetaEntryKind::Meta {
+                version: EpubVersion::EPUB2,
+            } => {
+                self.parse_meta2(el, &mut entry)?;
             }
-            EpubMetaEntryKind::Link {} => {
-                // No specialized parsing required
+            EpubMetaEntryKind::Meta { .. } => {
+                self.parse_meta3(el, &mut entry)?;
             }
         }
-
-        let id = attributes.remove(xml::ID)?;
-
-        entry.language = attributes.remove(xml::LANG)?;
-        entry.refines = attributes
-            .remove(opf::REFINES)?
-            .map(Self::normalize_refines);
-        entry.text_direction = attributes
-            .remove(opf::TEXT_DIR)?
-            .map_or(TextDirection::Auto, TextDirection::from);
-        entry.attributes = attributes.try_into()?;
-
-        Ok((id, entry))
+        Ok(entry)
     }
 
-    // Handle `<dc:*>` elements
+    /// Handle `<dc:*>` elements
     fn parse_dublin_core(
         &mut self,
         el: &XmlStartElement<'_>,
         entry: &mut TempEpubMetaEntry,
     ) -> ParserResult<()> {
+        Self::parse_common_attributes(el, entry)?;
+
         let property = el.name_decoded()?.into_owned();
         let value = if !el.is_self_closing() {
             self.reader.get_element_text(el)?
@@ -208,53 +221,96 @@ impl<'package, 'a> MetadataParser<'package, 'a> {
 
         entry.property = property;
         entry.value = value;
-
         Ok(())
     }
 
-    // Handle `<meta>` elements
-    fn parse_meta(
-        &mut self,
-        structural_version: EpubVersion,
+    fn parse_link(
+        &self,
         el: &XmlStartElement<'_>,
-        attributes: &mut XmlAttributes<'_>,
         entry: &mut TempEpubMetaEntry,
     ) -> ParserResult<()> {
-        let is_epub2 = structural_version.is_epub2();
+        // Links have no specialized parsing here, so only the common attributes are parsed
+        Self::parse_common_attributes(el, entry)
+    }
 
-        // Retrieve the `<meta>` property
-        let (key, err_msg) = if is_epub2 {
-            (opf::NAME, "metadata > meta[*name]")
-        } else {
-            (opf::PROPERTY, "metadata > meta[*property]")
-        };
-        let property = self.require_attribute(attributes.remove(key)?, err_msg)?;
+    /// Parses the common attributes for `<dc:*>` and `<link>` elements.
+    fn parse_common_attributes(
+        el: &XmlStartElement<'_>,
+        entry: &mut TempEpubMetaEntry,
+    ) -> ParserResult<()> {
+        extract_attributes! {
+            el.attributes(),
+            xml::bytes::ID   => id,
+            xml::bytes::LANG => language,
+            bytes::REFINES   => refines,
+            bytes::TEXT_DIR  => text_dir as |attr| TextDirection::from_bytes(attr.value()),
+            ..remaining,
+        }
 
-        // Retrieve the `<meta>` value
-        let value = if is_epub2 {
-            //////////////////////////////////
-            // Epub 2 meta value extraction //
-            //////////////////////////////////
-            self.require_attribute(
-                attributes.remove(opf::CONTENT)?,
-                "metadata > meta[*content]",
-            )?
-        } else if !el.is_self_closing() {
-            //////////////////////////////////
-            // Epub 3 meta value extraction //
-            //////////////////////////////////
+        entry.set_common_fields(id, language, refines, text_dir, remaining);
+        Ok(())
+    }
+
+    /// Handle EPUB 2 `<meta>` elements
+    fn parse_meta2(
+        &mut self,
+        el: &XmlStartElement<'_>,
+        entry: &mut TempEpubMetaEntry,
+    ) -> ParserResult<()> {
+        extract_attributes! {
+            el.attributes(),
+            bytes::NAME    => name,
+            bytes::CONTENT => content,
+            // Optional
+            xml::bytes::ID   => id,
+            xml::bytes::LANG => language,
+            // Technically not supported for EPUB 2 meta entries, although mapped if present.
+            bytes::REFINES   => refines,
+            bytes::TEXT_DIR  => text_dir as |attr| TextDirection::from_bytes(attr.value()),
+            ..remaining,
+        }
+        // Validate
+        let name = self.require_attribute(name, "metadata > meta[*name]")?;
+        let content = self.require_attribute(content, "metadata > meta[*content]")?;
+
+        entry.property = name;
+        entry.value = content;
+        entry.set_common_fields(id, language, refines, text_dir, remaining);
+        Ok(())
+    }
+
+    /// Handle EPUB 3 `<meta>` elements
+    fn parse_meta3(
+        &mut self,
+        el: &XmlStartElement<'_>,
+        entry: &mut TempEpubMetaEntry,
+    ) -> ParserResult<()> {
+        extract_attributes! {
+            el.attributes(),
+            bytes::PROPERTY  => property,
+            bytes::CONTENT   => content, // fallback for malformed meta entries
+            // Optional
+            xml::bytes::ID   => id,
+            xml::bytes::LANG => language,
+            bytes::REFINES   => refines,
+            bytes::TEXT_DIR  => text_dir as |attr| TextDirection::from_bytes(attr.value()),
+            ..remaining,
+        }
+        // Validate
+        let property = self.require_attribute(property, "metadata > meta[*property]")?;
+
+        entry.value = if !el.is_self_closing() {
             self.reader.get_element_text(el)?
         } else if !self.is_strict() {
-            // Rare but can happen, attempt to recover if the epub is non-standard:
+            // Rare but can happen, attempt to recover if non-standard:
             // `<meta property="a" content="b" />`
-            attributes.remove(opf::CONTENT)?.unwrap_or_default()
+            content.unwrap_or_default()
         } else {
             return Err(EpubError::MissingValue(property).into());
         };
 
         entry.property = property;
-        entry.value = value;
-
+        entry.set_common_fields(id, language, refines, text_dir, remaining);
         Ok(())
     }
 
@@ -333,13 +389,6 @@ impl<'package, 'a> MetadataParser<'package, 'a> {
             return Err(EpubError::InvalidUniqueIdentifier(uid.to_owned()).into());
         }
         Ok(())
-    }
-
-    fn normalize_refines(mut refines: String) -> String {
-        if refines.starts_with('#') {
-            refines.remove(0);
-        }
-        refines
     }
 
     ////////////////////////////////////////////////////////////////////////////////

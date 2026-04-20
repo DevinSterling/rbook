@@ -926,7 +926,7 @@ impl EpubEditor<'_> {
     ///     .creator(DetachedEpubMetaEntry::creator("Taro Yamada").role("aut"));
     /// ```
     pub fn author(self, input: impl Many<DetachedEpubMetaEntry<marker::Contributor>>) -> Self {
-        self.meta(Batch(input.iter_many().map(|mut author| {
+        self.creator(Batch(input.iter_many().map(|mut author| {
             // NOTE: If the current version is EPUB 2, refinements are downgraded on write.
             let mut entry = author.as_mut();
 
@@ -958,8 +958,7 @@ impl EpubEditor<'_> {
                 entry.attributes_mut().insert((opf::OPF_ROLE, marc::AUTHOR));
             }
 
-            // Ensure the property is `dc:creator`
-            author.force_property(dc::CREATOR)
+            author
         })))
     }
 
@@ -2174,20 +2173,20 @@ impl EpubChapter {
 /// `EpubWriteOptions` supports two usage patterns:
 /// 1. **Attached**:
 ///    Created via [`Epub::write`] or [`EpubEditor::write`].
-///    The options are bound to a specific [`Epub`] and terminal methods
-///    operate on it directly.
+///    The options are bound to a specific [`Epub`].
 /// 2. **Detached**:
 ///    Created via [`EpubWriteOptions::default`].
 ///    The options are standalone and terminal methods take a reference to an [`Epub`],
-///    allowing the same configuration to be reused across multiple instances.
+///    allowing configuration reuse.
 ///
 /// # Renditions
-/// Currently, writing multi-rendition EPUBs is not supported.
+/// Writing multi-rendition EPUBs are not currently supported.
 /// This is a feature that will be introduced in the future.
 ///
 /// If the source EPUB contains multiple renditions
 /// (multiple `rootfile` entries in `META-INF/container.xml`),
 /// **only the currently loaded rendition in [`Epub`] is preserved**.
+///
 /// The `container.xml` file is recreated to reference only the loaded rendition,
 /// and resources specific to other renditions may be removed depending on [`Self::keep_orphans`].
 ///

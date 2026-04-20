@@ -1,13 +1,13 @@
 use crate::ebook::toc::TocEntryKind;
-use crate::epub::consts::{ncx, ncx::bytes};
+use crate::epub::consts::{ncx, ncx::bytes, xml};
 use crate::epub::metadata::EpubVersion;
 use crate::epub::parser::EpubParserValidator;
 use crate::epub::parser::toc::TocParser;
-use crate::epub::toc::TocGroups;
+use crate::epub::toc::{EpubTocEntryData, TocGroups};
 use crate::parser::ParserResult;
-use crate::parser::xml::{XmlEvent, XmlStartElement};
+use crate::parser::xml::{XmlEvent, XmlStartElement, extract_attributes};
 
-impl TocParser<'_> {
+impl TocParser<'_, '_> {
     pub(super) fn parse_epub2_ncx(mut self) -> ParserResult<TocGroups> {
         let mut doc_title = String::new();
 
@@ -45,37 +45,53 @@ impl TocParser<'_> {
     }
 
     fn push_ncx_root(&mut self, el: &XmlStartElement<'_>) -> ParserResult<()> {
-        let mut attributes = el.attributes()?;
-        let mut root = Self::new_toc_entry(&mut attributes)?;
+        extract_attributes! {
+            el.attributes(),
+            xml::bytes::ID => id,
+            ..remaining,
+        }
 
         // For NCX, rbook supports `navMap` and `pageList`.
         // If the current element is not `navMap`, then it is `pageList`
-        root.kind = Some(
+        let kind = Some(
             match el.local_name() {
                 bytes::NAV_MAP => TocEntryKind::Toc,
                 _ => TocEntryKind::PageList,
             }
             .to_string(),
         );
-        root.attributes = attributes.try_into()?;
-        self.stack.push(root);
+
+        self.stack.push(EpubTocEntryData {
+            attributes: remaining.into(),
+            id,
+            kind,
+            ..EpubTocEntryData::default()
+        });
         Ok(())
     }
 
     fn push_ncx_child(&mut self, el: &XmlStartElement<'_>) -> ParserResult<()> {
-        let mut attributes = el.attributes()?;
-        let mut child = Self::new_toc_entry(&mut attributes)?;
+        let is_page_target = el.is_local_name(bytes::PAGE_TARGET);
 
-        // PageTarget elements require a `type` attribute.
-        // - Kinds: "front" | "normal" | "special"
-        if el.is_local_name(bytes::PAGE_TARGET) {
-            let kind = attributes.remove(ncx::TYPE)?;
-            self.require_attribute(kind.as_deref(), "pageTarget[*type]")?;
-            child.kind = kind;
+        extract_attributes! {
+            el.attributes(),
+            xml::bytes::ID => id,
+            // PageTarget elements require a `type` attribute.
+            // - Kinds: "front" | "normal" | "special"
+            bytes::TYPE where is_page_target => kind,
+            ..remaining,
         }
 
-        child.attributes = attributes.try_into()?;
-        self.stack.push(child);
+        if is_page_target {
+            kind = Some(self.require_attribute(kind, "pageTarget[*type]")?);
+        }
+
+        self.stack.push(EpubTocEntryData {
+            attributes: remaining.into(),
+            id,
+            kind,
+            ..EpubTocEntryData::default()
+        });
         Ok(())
     }
 
@@ -89,13 +105,17 @@ impl TocParser<'_> {
 
     fn handle_ncx_src(&mut self, el: &XmlStartElement<'_>) -> ParserResult<()> {
         if let Some(nav_entry) = self.stack.last_mut() {
-            // NCX documents require content elements to have the src attribute
-            let href_raw = self
-                .ctx
-                .require_attribute(el.get_attribute(ncx::SRC)?, "content[*src]")?;
+            let href_raw = el.get_attribute(ncx::SRC)?;
 
-            nav_entry.href = Some(self.ctx.require_href(self.resolver.resolve(&href_raw))?);
-            nav_entry.href_raw = Some(href_raw);
+            // NCX documents require content elements to have the src attribute
+            self.ctx.check_attribute(&href_raw, "content[*src]")?;
+            let href = href_raw
+                .as_deref()
+                .map(|raw| self.ctx.require_href(self.resolver.resolve(raw)))
+                .transpose()?;
+
+            nav_entry.href = href;
+            nav_entry.href_raw = href_raw;
         }
         Ok(())
     }

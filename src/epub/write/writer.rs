@@ -45,6 +45,7 @@ impl Debug for EpubWriteConfig {
         f.debug_struct("EpubWriteConfig")
             .field("targets", &self.targets)
             .field("generate_toc", &self.generate_toc)
+            .field("generated_toc_stylesheets", &self.generated_toc_stylesheets)
             .field("compression", &self.compression)
             .finish_non_exhaustive()
     }

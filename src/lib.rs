@@ -51,7 +51,7 @@
 //! For example, only retaining the `threadsafe` default feature:
 //! ```toml
 //! [dependencies]
-//! rbook = { version = "0.7.5", default-features = false, features = ["threadsafe"] }
+//! rbook = { version = "0.7.6", default-features = false, features = ["threadsafe"] }
 //! ```
 //!
 //! # Opening an [`Ebook`]
@@ -123,12 +123,13 @@
 //! All files such as text, images, and video are accessible within an ebook programmatically.
 //!
 //! The simplest way to access and retrieve resources from an ebook is through the
-//! [`Manifest`](ebook::manifest::Manifest), specifically through its entries via:
-//! - [`ManifestEntry::copy_bytes`](ebook::manifest::ManifestEntry::copy_bytes)
+//! [`Manifest`](ebook::manifest::Manifest),
+//! specifically through its [entries](ebook::manifest::ManifestEntry) via:
+//! - [`copy_bytes`](ebook::manifest::ManifestEntry::copy_bytes)
 //!   to copy the content directly into any [`Write`](std::io::Write) implementation.
-//! - [`ManifestEntry::read_bytes`](ebook::manifest::ManifestEntry::read_bytes)
+//! - [`read_bytes`](ebook::manifest::ManifestEntry::read_bytes)
 //!   to retrieve the content as bytes ([`Vec<u8>`](Vec)).
-//! - [`ManifestEntry::read_str`](ebook::manifest::ManifestEntry::read_str)
+//! - [`read_str`](ebook::manifest::ManifestEntry::read_str)
 //!   to retrieve the content as a [`String`].
 //! ```
 //! # use rbook::Epub;
@@ -144,9 +145,9 @@
 //!
 //! For finer grain control, the [`Ebook`] trait provides two methods
 //! that accept a [`Resource`](ebook::resource::Resource) as an argument:
-//! - [`Ebook::copy_resource`]
-//! - [`Ebook::read_resource_bytes`]
-//! - [`Ebook::read_resource_str`]
+//! - [`copy_resource`](Ebook::copy_resource)
+//! - [`read_resource_bytes`](Ebook::read_resource_bytes)
+//! - [`read_resource_str`](Ebook::read_resource_str)
 //! ```
 //! # use rbook::Epub;
 //! # fn main() -> rbook::ebook::errors::EbookResult<()> {
@@ -168,7 +169,7 @@
 //! - [`Epub::copy_resource`] for normalization details.
 //!
 //! # Examples
-//! ## Accessing [`Metadata`](ebook::metadata::Metadata): Retrieving the main title
+//! ## Accessing [metadata](ebook::metadata::Metadata): Retrieving the main title
 //! ```
 //! # use rbook::Epub;
 //! # use rbook::ebook::metadata::{TitleKind, LanguageKind};
@@ -184,7 +185,7 @@
 //! assert_eq!("ja", alternate_script.language().scheme().code());
 //! assert_eq!(LanguageKind::Bcp47, alternate_script.language().kind());
 //! ```
-//! ## Accessing [`Metadata`](ebook::metadata::Metadata): Retrieving the date and first creator
+//! ## Accessing [metadata](ebook::metadata::Metadata): Retrieving the date and first creator
 //! ```
 //! # use rbook::Epub;
 //! # use rbook::ebook::metadata::LanguageKind;
@@ -213,7 +214,7 @@
 //! assert_eq!("ja", alternate_script.language().scheme().code());
 //! assert_eq!(LanguageKind::Bcp47, alternate_script.language().kind());
 //! ```
-//! ## Extracting images from the [`Manifest`](ebook::manifest::Manifest)
+//! ## Extracting images from the [manifest](ebook::manifest::Manifest)
 //! ```no_run
 //! use std::fs::{self, File};
 //! use std::path::Path;
@@ -233,7 +234,7 @@
 //!     image.copy_bytes(&mut file).unwrap();
 //! }
 //! ```
-//! ## Accessing [`EpubManifest`](epub::manifest::EpubManifest) fallbacks
+//! ## Accessing [epub manifest](epub::manifest::EpubManifest) fallbacks
 //! ```
 //! # use rbook::Epub;
 //! # let epub = Epub::open("tests/ebooks/example_epub").unwrap();
@@ -253,7 +254,7 @@
 //! // No fallbacks remaining
 //! assert_eq!(None, png_cover.fallback());
 //! ```
-//! ## [Editing](Epub::edit) an [`Epub`]
+//! ## [Editing](Epub::edit) an [Epub]
 //! ```no_run
 //! # #[cfg(feature = "write")]
 //! # {
@@ -384,7 +385,7 @@ pub use {ebook::Ebook, epub::Epub};
 /// For example, omitting the `prelude` while retaining the `threadsafe` and `write` feature:
 /// ```toml
 /// [dependencies]
-/// rbook = { version = "0.7.5", default-features = false, features = ["threadsafe", "write"] }
+/// rbook = { version = "0.7.6", default-features = false, features = ["threadsafe", "write"] }
 /// ```
 #[cfg(feature = "prelude")]
 pub mod prelude {

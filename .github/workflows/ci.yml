@@ -1,6 +1,11 @@
 name: CI
 
-on: [push, pull_request]
+on:
+  push:
+    # Run on all branches and not for tags
+    branches:
+      - '**'
+  pull_request:
 
 jobs:
   find_typos:

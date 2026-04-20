@@ -3,14 +3,13 @@ mod xhtml;
 
 use crate::ebook::errors::EbookResult;
 use crate::ebook::toc::TocEntryKind;
-use crate::epub::consts::xml;
 use crate::epub::errors::EpubError;
 use crate::epub::metadata::EpubVersion;
 use crate::epub::parser::{EpubParseConfig, EpubParser};
 use crate::epub::parser::{EpubParserContext, EpubParserValidator};
 use crate::epub::toc::{EpubTocData, EpubTocEntryData, EpubTocKey, TocGroups};
 use crate::parser::ParserResult;
-use crate::parser::xml::{XmlAttributes, XmlReader};
+use crate::parser::xml::XmlReader;
 use crate::util::uri::UriResolver;
 
 pub(super) struct TocLocation {
@@ -28,8 +27,8 @@ impl TocLocation {
     }
 }
 
-struct TocParser<'a> {
-    ctx: EpubParserContext<'a>,
+struct TocParser<'parser, 'a> {
+    ctx: &'parser EpubParserContext<'a>,
     reader: XmlReader<'a>,
     /// Resolver to turn HREFs within the toc file from relative to absolute
     resolver: UriResolver<'a>,
@@ -39,22 +38,19 @@ struct TocParser<'a> {
     groups: TocGroups,
 }
 
-impl<'a> TocParser<'a> {
-    pub(super) fn new(ctx: EpubParserContext<'a>, data: &'a [u8], toc_location: &'a str) -> Self {
+impl<'parser, 'a> TocParser<'parser, 'a> {
+    pub(super) fn new(
+        ctx: &'parser EpubParserContext<'a>,
+        data: &'a [u8],
+        toc_location: &'a str,
+    ) -> Self {
         Self {
-            reader: XmlReader::from_bytes(ctx.is_strict(), data),
+            reader: XmlReader::from_bytes(ctx.xml_config(), data),
             resolver: UriResolver::parent_of(toc_location),
             stack: Vec::new(),
             groups: indexmap::IndexMap::new(),
             ctx,
         }
-    }
-
-    fn new_toc_entry(attributes: &mut XmlAttributes<'_>) -> ParserResult<EpubTocEntryData> {
-        Ok(EpubTocEntryData {
-            id: attributes.remove(xml::ID)?,
-            ..EpubTocEntryData::default()
-        })
     }
 
     fn handle_pop(&mut self, version: EpubVersion) {
@@ -74,7 +70,7 @@ impl<'a> TocParser<'a> {
     }
 }
 
-impl EpubParserValidator for TocParser<'_> {
+impl EpubParserValidator for TocParser<'_, '_> {
     fn config(&self) -> &EpubParseConfig {
         self.ctx.config
     }
@@ -107,7 +103,7 @@ impl EpubParser<'_> {
         toc_location: &str,
         data: &[u8],
     ) -> ParserResult<EpubTocData> {
-        let parser = TocParser::new(self.ctx, data, toc_location);
+        let parser = TocParser::new(&self.ctx, data, toc_location);
         let toc_groups = match version {
             EpubVersion::Epub2(_) => parser.parse_epub2_ncx()?,
             _ => parser.parse_epub3_nav()?,

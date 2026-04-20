@@ -687,9 +687,11 @@ pub enum TextDirection {
 }
 
 impl TextDirection {
+    const AUTO: &'static str = "auto";
     const LEFT_TO_RIGHT: &'static str = "ltr";
     const RIGHT_TO_LEFT: &'static str = "rtl";
-    const AUTO: &'static str = "auto";
+    const LEFT_TO_RIGHT_BYTES: &'static [u8] = Self::LEFT_TO_RIGHT.as_bytes();
+    const RIGHT_TO_LEFT_BYTES: &'static [u8] = Self::RIGHT_TO_LEFT.as_bytes();
 
     /// Returns `true` if the text direction is [`TextDirection::LeftToRight`].
     pub fn is_ltr(&self) -> bool {
@@ -723,6 +725,14 @@ impl TextDirection {
             Self::Auto => Self::AUTO,
         }
     }
+
+    pub(crate) fn from_bytes(bytes: &[u8]) -> Self {
+        match bytes {
+            Self::LEFT_TO_RIGHT_BYTES => Self::LeftToRight,
+            Self::RIGHT_TO_LEFT_BYTES => Self::RightToLeft,
+            _ => Self::Auto,
+        }
+    }
 }
 
 impl Display for TextDirection {
@@ -733,11 +743,7 @@ impl Display for TextDirection {
 
 impl<A: AsRef<str>> From<A> for TextDirection {
     fn from(value: A) -> Self {
-        match value.as_ref() {
-            Self::LEFT_TO_RIGHT => Self::LeftToRight,
-            Self::RIGHT_TO_LEFT => Self::RightToLeft,
-            _ => Self::Auto,
-        }
+        Self::from_bytes(value.as_ref().as_bytes())
     }
 }
 

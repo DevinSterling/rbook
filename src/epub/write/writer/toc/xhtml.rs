@@ -5,7 +5,7 @@ use crate::epub::consts::{epub, ncx, opf, xhtml, xml};
 use crate::epub::toc::EpubTocEntryData;
 use crate::epub::write::writer::EpubWriterContext;
 use crate::epub::write::writer::toc::{self, EPUB3_TOC_FALLBACKS, TocData};
-use crate::parser::xml::{XmlEvent, XmlReader};
+use crate::parser::xml::{XmlConfig, XmlEvent, XmlReader};
 use crate::util::uri::{self, UriResolver};
 use crate::writer::WriterResult;
 use crate::writer::xml::{XmlWriter, write_element};
@@ -264,7 +264,7 @@ struct StylesheetExtractor<'ebook> {
 impl<'ebook> StylesheetExtractor<'ebook> {
     fn new(data: &'ebook [u8]) -> Self {
         Self {
-            reader: XmlReader::from_bytes(false, data),
+            reader: XmlReader::from_bytes(XmlConfig { strict: false }, data),
         }
     }
 

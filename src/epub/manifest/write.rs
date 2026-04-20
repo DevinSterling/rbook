@@ -757,7 +757,7 @@ impl<'ebook> EpubManifestMut<'ebook> {
         }
     }
 
-    fn get(&mut self, index: usize) -> EpubManifestEntryMut<'_> {
+    fn entry_at(&mut self, index: usize) -> EpubManifestEntryMut<'_> {
         EpubManifestEntryMut::new(
             self.meta_ctx,
             ManifestEntryDataHandle::Attached(AttachedEntryContext {
@@ -815,7 +815,7 @@ impl<'ebook> EpubManifestMut<'ebook> {
         )
     }
 
-    /// Inserts one or more entries via the [`Many`] trait.
+    /// Appends one or more entries via the [`Many`] trait.
     ///
     /// # Replacements
     /// Duplicate IDs are overridden.
@@ -834,12 +834,24 @@ impl<'ebook> EpubManifestMut<'ebook> {
         }
     }
 
+    /// Returns the associated [entry](EpubManifestEntryMut) if the given `index` is less than
+    /// [`EpubManifest::len`], otherwise [`None`].
+    ///
+    /// # See Also
+    /// - [`Self::by_id_mut`] to get an entry by [`id`](EpubManifestEntry::id).
+    pub fn get_mut(&mut self, index: usize) -> Option<EpubManifestEntryMut<'_>> {
+        (index < self.manifest.entries.len()).then(|| self.entry_at(index))
+    }
+
     /// Returns a mutable view of the entry with the given `id`, if present.
+    ///
+    /// # See Also
+    /// - [`Self::get_mut`] to get an entry by `index`.
     pub fn by_id_mut(&mut self, id: &str) -> Option<EpubManifestEntryMut<'_>> {
         self.manifest
             .entries
             .get_index_of(id)
-            .map(|index| self.get(index))
+            .map(|index| self.entry_at(index))
     }
 
     /// The mutable cover image entry in the manifest, if present.
@@ -854,7 +866,7 @@ impl<'ebook> EpubManifestMut<'ebook> {
     pub fn cover_image_mut(&mut self) -> Option<EpubManifestEntryMut<'_>> {
         for (i, data) in self.manifest.entries.values().enumerate() {
             if data.properties.has_property(opf::COVER_IMAGE) {
-                return Some(self.get(i));
+                return Some(self.entry_at(i));
             }
         }
         // Fallback to EPUB 2
@@ -863,7 +875,7 @@ impl<'ebook> EpubManifestMut<'ebook> {
                 .manifest
                 .entries
                 .get_index_of(cover_id)
-                .map(|i| self.get(i));
+                .map(|i| self.entry_at(i));
         }
         None
     }
@@ -938,6 +950,29 @@ impl<'ebook> EpubManifestMut<'ebook> {
         }
     }
 
+    /// Removes and returns the entry at the given `index`.
+    ///
+    /// # Panics
+    /// Panics if `index` is out of bounds.
+    ///
+    /// # See Also
+    /// - [`Epub::cleanup`](crate::epub::Epub::cleanup) to remove orphaned entries.
+    pub fn remove(&mut self, index: usize) -> DetachedEpubManifestEntry {
+        let (id, data) = match self.manifest.entries.shift_remove_index(index) {
+            Some(entry) => entry,
+            None => panic!(
+                "removal index (is {index}) should be < len (is {})",
+                self.manifest.entries.len(),
+            ),
+        };
+
+        DetachedEpubManifestEntry {
+            content: self.archive.remove(&data.href),
+            id,
+            data,
+        }
+    }
+
     /// Removes and returns the entry matching the given `id`, if present.
     ///
     /// # See Also
@@ -997,7 +1032,7 @@ impl<'ebook> EpubManifestMut<'ebook> {
     /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
     /// let mut epub = Epub::open("tests/ebooks/example_epub")?;
     ///
-    /// let non_linear: Vec<_> = epub.manifest_mut()
+    /// let images: Vec<_> = epub.manifest_mut()
     ///     .extract_if(|entry| entry.kind().is_image())
     ///     .collect();
     /// # Ok(())

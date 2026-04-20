@@ -45,8 +45,8 @@ enabled by default in a project's `Cargo.toml` file:
 `rbook` can be used by adding it as a dependency in a project's `Cargo.toml` file:
 ```toml
 [dependencies]
-rbook = "0.7.5"                                           # With default features
-# rbook = { version = "0.7.5", default-features = false } # Excluding default features
+rbook = "0.7.6"                                           # With default features
+# rbook = { version = "0.7.6", default-features = false } # Excluding default features
 ```
 
 ## WebAssembly
@@ -81,6 +81,7 @@ use rbook::Epub;
 use rbook::ebook::metadata::{LanguageKind, TitleKind};
 
 fn main() {
+    // Configure EPUB parser behavior via options
     let epub = Epub::options()
         .strict(true) // Enable strict checks (`false` by default)
         .skip_toc(true) // Skips ToC-related parsing, such as toc.ncx (`false` by default)
@@ -183,7 +184,81 @@ fn main() -> EbookResult<()> {
 
 > This example uses the [high-level builder API](https://docs.rs/rbook/latest/rbook/epub/struct.EpubEditor.html).  
 > See the [epub module](https://docs.rs/rbook/latest/rbook/epub)
-> for lower-level control over the manifest, spine, etc.
+> for lower-level control over the package, manifest, metadata, spine, etc.
+
+<details>
+<summary>Click to view a minimal lower-level example</summary>
+
+```rust
+use rbook::epub::Epub;
+use rbook::epub::manifest::DetachedEpubManifestEntry;
+use rbook::epub::metadata::{DetachedEpubMetaEntry, EpubVersion};
+use rbook::epub::toc::DetachedEpubTocEntry;
+use rbook::ebook::errors::EbookResult;
+use rbook::ebook::toc::TocEntryKind;
+
+const XHTML: &[u8] = b"<xhtml>...</xhtml>"; // Example data
+
+fn main() -> EbookResult<()> {
+    let mut epub = Epub::new();
+
+    // Access the high-level builder API via `edit` at any time
+    epub.edit()
+        .rights("Apache License 2.0")
+        .generator("Example App");
+
+    // Metadata
+    let mut metadata = epub.metadata_mut();
+    metadata.push(DetachedEpubMetaEntry::identifier("urn:example"));
+    metadata.push(
+        DetachedEpubMetaEntry::title("The Doe Story")
+            .file_as("Doe Story, The")
+    );
+    metadata.push([
+        DetachedEpubMetaEntry::creator("Jane Doe")
+            .role("aut"),
+        DetachedEpubMetaEntry::creator("Hanako Yamada")
+            .role("ill")
+            .role("trl") // Subsequent roles are secondary
+            .file_as("Yamada, Hanako")
+            .alternate_script("ja", "山田花子"),
+    ]);
+    // Simple metadata entries can also be added using tuples
+    metadata.push(("dc:language", "en"));
+
+    // Manifest
+    let mut manifest = epub.manifest_mut();
+    manifest.push(
+        DetachedEpubManifestEntry::new("chapter_1")
+            .href("c1.xhtml")
+            // Reference a file stored on disk or provide in-memory bytes
+            .content(XHTML)
+    );
+
+    // Spine
+    let mut spine = epub.spine_mut();
+    // `DetachedEpubSpineEntry` can be passed alternatively as well
+    spine.push("chapter_1");
+
+    // Toc
+    let mut toc = epub.toc_mut();
+    let contents = DetachedEpubTocEntry::new("Table of Contents")
+        .children([
+            DetachedEpubTocEntry::new("Chapter 1")
+                .kind(TocEntryKind::Chapter)
+                .href("c1.xhtml"),
+            DetachedEpubTocEntry::new("Chapter 1.a")
+                .href("c1.xhtml#section-a"),
+        ]);
+    toc.insert_root(TocEntryKind::Toc, EpubVersion::EPUB3, contents);
+
+    epub.write()
+        .compression(9)
+        .save("doe_story.epub")
+}
+```
+
+</details>
 
 ```rust
 use rbook::epub::{Epub, EpubChapter};
@@ -196,7 +271,7 @@ const XHTML: &[u8] = b"<xhtml>...</xhtml>"; // Example data
 fn main() -> EbookResult<()> {
     Epub::builder()
         .identifier("urn:example")
-        .title("Doe Story")
+        .title("The Doe Story")
         .author(["John Doe", "Jane Doe"])
         .language("en")
         // Reference a file stored on disk or provide in-memory bytes

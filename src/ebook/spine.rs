@@ -115,17 +115,17 @@ pub trait SpineEntry<'ebook>: Sealed {
     /// The canonical order of an entry (`0 = first entry`).
     fn order(&self) -> usize;
 
-    /// The [`ManifestEntry`] associated with a [`SpineEntry`].
+    /// The associated [`ManifestEntry`].
     ///
     /// Returns [`None`] if the spine entry references a non-existent
-    /// [`ManifestEntry`] within the [`Manifest`](super::Manifest),
+    /// [entry](ManifestEntry) within the [`Manifest`](super::manifest::Manifest),
     /// indicating a malformed ebook file.
     fn manifest_entry(&self) -> Option<impl ManifestEntry<'ebook> + 'ebook>;
 
     /// The textual [`Resource`] intended for end-user reading an entry points to.
     ///
     /// Returns [`None`] if the spine entry references a non-existent
-    /// [`ManifestEntry`] within the [`Manifest`](super::Manifest),
+    /// [entry](Self::manifest_entry) within the [`Manifest`](super::manifest::Manifest),
     /// preventing resource retrieval and indicating a malformed ebook file.
     fn resource(&self) -> Option<Resource<'ebook>> {
         self.manifest_entry().map(|entry| entry.resource())

@@ -88,8 +88,7 @@ impl<'ebook> EpubSpineContext<'ebook> {
 // PUBLIC API
 ////////////////////////////////////////////////////////////////////////////////
 
-/// The EPUB spine, accessible via [`Epub::spine`](super::Epub::spine).
-/// See [`Spine`] for more details.
+/// The [`Spine`] of an [`Epub`](crate::Epub), accessible via [`Epub::spine`](super::Epub::spine).
 ///
 /// # See Also
 /// - [`EpubSpineMut`] for a mutable view.
@@ -318,7 +317,7 @@ impl<'ebook> Iterator for EpubSpineIter<'ebook> {
     }
 }
 
-/// An entry contained within an [`EpubSpine`], encompassing associated metadata.
+/// A [`SpineEntry`] contained within an [`EpubSpine`], encompassing associated metadata.
 ///
 /// # See Also
 /// - [`EpubSpineEntryMut`] for a mutable view.

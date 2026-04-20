@@ -5,7 +5,7 @@ mod spine;
 
 use crate::ebook::element::TextDirection;
 use crate::ebook::metadata::Version;
-use crate::epub::consts::{opf, opf::bytes, xml};
+use crate::epub::consts::{opf::bytes, xml};
 use crate::epub::errors::EpubError;
 use crate::epub::manifest::EpubManifestData;
 use crate::epub::metadata::{EpubMetadataData, EpubVersion};
@@ -17,7 +17,7 @@ use crate::epub::parser::{EpubParseConfig, EpubParser, EpubParserContext, EpubPa
 use crate::epub::spine::EpubSpineData;
 use crate::epub::toc::EpubTocData;
 use crate::parser::ParserResult;
-use crate::parser::xml::{XmlEvent, XmlReader, XmlStartElement};
+use crate::parser::xml::{XmlEvent, XmlReader, XmlStartElement, extract_attributes};
 use crate::util::uri::UriResolver;
 
 pub(super) struct ProcessedPackageData {
@@ -48,7 +48,7 @@ impl<'parser, 'a> PackageParser<'parser, 'a> {
         location: &'parser str,
     ) -> Self {
         Self {
-            reader: XmlReader::from_bytes(ctx.is_strict(), data),
+            reader: XmlReader::from_bytes(ctx.xml_config(), data),
             resolver: UriResolver::parent_of(location),
             refinements: PendingRefinements::new(),
             package: None,
@@ -170,28 +170,28 @@ impl<'parser, 'a> PackageParser<'parser, 'a> {
     }
 
     fn parse_package(&mut self, package: &XmlStartElement) -> ParserResult<EpubPackageData> {
-        let mut attributes = package.attributes()?;
+        extract_attributes! {
+            package.attributes(),
+            bytes::VERSION   => raw_version,
+            bytes::UNIQUE_ID => unique_id,
+            // Optional
+            xml::bytes::LANG => language,
+            bytes::PREFIX    => prefix,
+            bytes::TEXT_DIR  => text_dir as |attr| TextDirection::from_bytes(attr.value()),
+            ..remaining,
+        }
+        // Validate
+        let raw_version = self.require_attribute(raw_version, "package[*version]")?;
+        let unique_identifier = self.require_attribute(unique_id, "package[*unique-identifier]")?;
 
-        // Required attributes
-        let raw_version =
-            self.require_attribute(attributes.remove(opf::VERSION)?, "package[*version]")?;
-        let unique_identifier = self.require_attribute(
-            attributes.remove(opf::UNIQUE_ID)?,
-            "package[*unique-identifier]",
-        )?;
         let version = self.handle_epub_version(raw_version)?;
-
-        // Optional attributes
-        let language = attributes.remove(xml::LANG)?;
-        let prefix = attributes.remove(opf::PREFIX)?;
-        let text_direction = attributes
-            .remove(opf::TEXT_DIR)?
-            .map_or(TextDirection::Auto, TextDirection::from);
+        let prefixes = self.parse_prefix(prefix)?;
+        let text_direction = text_dir.unwrap_or(TextDirection::Auto);
 
         Ok(EpubPackageData {
-            attributes: attributes.try_into()?,
-            prefixes: self.parse_prefix(prefix)?,
             location: String::new(), // Temporary placeholder
+            attributes: remaining.into(),
+            prefixes,
             version,
             unique_identifier,
             language,

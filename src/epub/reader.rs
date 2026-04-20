@@ -439,7 +439,7 @@ impl Default for EpubReaderConfig {
 ///    The options are standalone.
 ///    Terminal methods take `&self`
 ///    (e.g., [`create`](EpubReaderOptions::create)),
-///    and a reference to an [`Epub`], allowing the same configuration to be reused multiple times.
+///    and a reference to an [`Epub`], allowing configuration reuse.
 ///
 /// # Options
 /// ## Ordering

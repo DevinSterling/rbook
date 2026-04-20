@@ -1,4 +1,22 @@
 # Changelog
+## 0.7.6 (2026-04-21)
+### Additions **＋**
+- New methods:
+  - `EpubManifest::get` to get an entry by index.
+  - `EpubManifestMut::get_mut` to get a mutable entry by index.
+  - `EpubManifestMut::remove` to remove an entry by index.
+
+### Changes　**⟳**
+- Optimize EPUB parser performance.
+- Update `zip` dependency: 8.4.0 → 8.5.1
+- Update `indexmap` dependency: 2.13.0 → 2.14.0
+- Update `wasm-bindgen-test` dev dependency: 0.3.64 → 0.3.68
+- Refine documentation for enhanced clarity.
+
+### Fixes　**✓**
+- Fix handling of missing hrefs in malformed EPUBs during parsing.
+  Missing values are now resolved as `None` instead of defaulting to an empty string.
+
 ## 0.7.5 (2026-03-24)
 ### Fixes　**✓**
 - Fix `README.md` to reference the `rbook::epub` module instead of the deprecated `rbook::ebook::epub` module.

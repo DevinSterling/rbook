@@ -13,6 +13,7 @@ use crate::epub::package::EpubPackageData;
 use crate::epub::spine::EpubSpineData;
 use crate::epub::toc::EpubTocData;
 use crate::parser::ParserResult;
+use crate::parser::xml::XmlConfig;
 use crate::util::borrow::CowExt;
 use crate::util::uri;
 use std::borrow::Cow;
@@ -53,6 +54,12 @@ impl Default for EpubParseConfig {
 trait EpubParserValidator {
     fn config(&self) -> &EpubParseConfig;
 
+    fn xml_config(&self) -> XmlConfig {
+        XmlConfig {
+            strict: self.is_strict(),
+        }
+    }
+
     fn is_strict(&self) -> bool {
         self.config().strict
     }
@@ -65,7 +72,7 @@ trait EpubParserValidator {
         parent.ok_or_else(|| if_missing().into())
     }
 
-    /// Required attribute value.
+    /// Extracts and returns the required attribute value.
     ///
     /// If `value` is [`None`],
     /// its [`Default`] is returned if `strict` mode is disabled.
@@ -79,6 +86,19 @@ trait EpubParserValidator {
             Err(EpubError::MissingAttribute(error_message.to_owned()).into())
         } else {
             Ok(value.unwrap_or_default())
+        }
+    }
+
+    /// Check if the required attribute value is [`Some`].
+    fn check_attribute<T>(
+        &self,
+        value: &Option<T>,
+        error_message: &'static str,
+    ) -> ParserResult<()> {
+        if self.is_strict() && value.is_none() {
+            Err(EpubError::MissingAttribute(error_message.to_owned()).into())
+        } else {
+            Ok(())
         }
     }
 
@@ -102,7 +122,6 @@ pub(super) struct ParsedComponents {
 }
 
 /// The context shared among all EPUB-related parsers.
-#[derive(Copy, Clone)]
 pub(super) struct EpubParserContext<'a> {
     config: &'a EpubParseConfig,
     /// The version of the EPUB being parsed.

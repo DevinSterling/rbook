@@ -2,11 +2,11 @@ use crate::epub::consts::{epub, xhtml, xhtml::bytes, xml};
 use crate::epub::metadata::EpubVersion;
 use crate::epub::parser::EpubParserValidator;
 use crate::epub::parser::toc::TocParser;
-use crate::epub::toc::TocGroups;
+use crate::epub::toc::{EpubTocEntryData, TocGroups};
 use crate::parser::ParserResult;
-use crate::parser::xml::{XmlEvent, XmlStartElement};
+use crate::parser::xml::{XmlEvent, XmlStartElement, extract_attributes};
 
-impl<'a> TocParser<'a> {
+impl<'a> TocParser<'_, 'a> {
     pub(super) fn parse_epub3_nav(mut self) -> ParserResult<TocGroups> {
         // Reading text may consume an important event, so
         // temporarily store consumed events to continue from.
@@ -36,34 +36,42 @@ impl<'a> TocParser<'a> {
     }
 
     fn push_nav_root(&mut self, el: &XmlStartElement<'_>) -> ParserResult<()> {
-        let mut attributes = el.attributes()?;
-        let mut root = Self::new_toc_entry(&mut attributes)?;
-
-        // Extract root kind
-        let mut epub_type =
-            self.require_attribute(attributes.remove(epub::TYPE)?, "nav[*epub:type]")?;
+        extract_attributes! {
+            el.attributes(),
+            // Extract root kind
+            epub::bytes::TYPE => epub_type,
+            // Optional
+            xml::bytes::ID    => id,
+            ..remaining,
+        }
+        // Validate
+        let mut epub_type = self.require_attribute(epub_type, "nav[*epub:type]")?;
         // Although rare, `epub:type` allows several properties
         // separated by whitespace for toc elements. As a result,
         // get the first value as it is the most relevant and ignore the rest.
         epub_type.shrink_to(epub_type.find(' ').unwrap_or(epub_type.len()));
 
         // Extracts the title of the root toc entry.
-        let (_, nav_title) = self
+        let (_, label) = self
             .reader
             .get_text_till_either(el.name(), xhtml::ORDERED_LIST.as_bytes())?;
 
-        root.kind = epub_type.into();
-        root.attributes = attributes.try_into()?;
-        root.label = nav_title;
-        self.stack.push(root);
-
+        self.stack.push(EpubTocEntryData {
+            attributes: remaining.into(),
+            kind: Some(epub_type),
+            id,
+            label,
+            ..EpubTocEntryData::default()
+        });
         Ok(())
     }
 
     fn push_nav_child(&mut self, el: &XmlStartElement<'_>) -> ParserResult<Option<XmlEvent<'a>>> {
-        let mut attributes = el.attributes()?;
-        let mut child = Self::new_toc_entry(&mut attributes)?;
-
+        extract_attributes! {
+            el.attributes(),
+            xml::bytes::ID => id,
+            ..remaining,
+        }
         // For EPUB 3, <li> elements may act as a grouping header
         // if there's no direct <a> element containing an href & label.
         //
@@ -73,24 +81,35 @@ impl<'a> TocParser<'a> {
             .reader
             .get_text_till_either(el.name(), xhtml::ANCHOR.as_bytes())?;
 
-        child.label = label;
-        child.attributes = attributes.try_into()?;
-        self.stack.push(child);
-
+        self.stack.push(EpubTocEntryData {
+            attributes: remaining.into(),
+            id,
+            label,
+            ..EpubTocEntryData::default()
+        });
         Ok(consumed_event)
     }
 
     fn handle_nav_anchor(&mut self, el: &XmlStartElement) -> ParserResult<()> {
         if let Some(nav_entry) = self.stack.last_mut() {
-            let href_raw = self
-                .ctx
-                .require_attribute(el.get_attribute(xhtml::HREF)?, "a[*href]")?;
+            extract_attributes! {
+                el.attributes(),
+                bytes::HREF       => href_raw,
+                xml::bytes::ID    => id,
+                epub::bytes::TYPE => epub_type,
+            }
+            // Validate
+            self.ctx.check_attribute(&href_raw, "a[*href]")?;
+            let href = href_raw
+                .as_deref()
+                .map(|raw| self.ctx.require_href(self.resolver.resolve(raw)))
+                .transpose()?;
 
-            nav_entry.id = el.get_attribute(xml::ID)?;
-            nav_entry.href = Some(self.ctx.require_href(self.resolver.resolve(&href_raw))?);
-            nav_entry.href_raw = Some(href_raw);
+            nav_entry.id = id;
+            nav_entry.href = href;
+            nav_entry.href_raw = href_raw;
+            nav_entry.kind = epub_type;
             nav_entry.label = self.reader.get_element_text(el)?;
-            nav_entry.kind = el.get_attribute(epub::TYPE)?;
         }
         Ok(())
     }

@@ -8,6 +8,7 @@ use crate::epub::spine::{
 };
 use crate::input::{IntoOption, Many};
 use std::fmt::Debug;
+use std::ops::RangeBounds;
 
 ////////////////////////////////////////////////////////////////////////////////
 // PRIVATE API
@@ -365,8 +366,7 @@ impl<'ebook> EpubSpineMut<'ebook> {
     /// at the given `index` via the [`Many`] trait.
     ///
     /// # Panics
-    /// Panics if the given `index` to insert at is greater than
-    /// [`Spine::len`](crate::ebook::spine::Spine::len).
+    /// Panics if `index > len`.
     pub fn insert(&mut self, index: usize, detached: impl Many<DetachedEpubSpineEntry>) {
         self.insert_detached(index, detached.iter_many());
     }
@@ -407,8 +407,7 @@ impl<'ebook> EpubSpineMut<'ebook> {
     /// Removes and returns the entry at the given `index`.
     ///
     /// # Panics
-    /// Panics if the given `index` is out of bounds
-    /// (has a value greater than or equal to [`Spine::len`](crate::ebook::spine::Spine::len))
+    /// Panics if `index` is out of bounds.
     pub fn remove(&mut self, index: usize) -> DetachedEpubSpineEntry {
         DetachedEpubSpineEntry(self.spine.entries.remove(index))
     }
@@ -488,15 +487,14 @@ impl<'ebook> EpubSpineMut<'ebook> {
             .map(DetachedEpubSpineEntry)
     }
 
-    /// Removes and returns all spine entries within the given `range`.
+    /// Removes and returns all spine entries within the given [`range`](RangeBounds).
     ///
     /// # Panics
-    /// For the given `range`, this method panics if:
-    /// - The starting point is greater than the end point.
-    /// - The end point is greater than [`Spine::len`](crate::ebook::spine::Spine::len).
+    /// Panics if the range has `start_bound > end_bound`, or,
+    /// if the range is bounded on either end and past the [length](EpubSpine::len) of the spine.
     pub fn drain(
         &mut self,
-        range: impl std::ops::RangeBounds<usize>,
+        range: impl RangeBounds<usize>,
     ) -> impl Iterator<Item = DetachedEpubSpineEntry> {
         self.spine.entries.drain(range).map(DetachedEpubSpineEntry)
     }

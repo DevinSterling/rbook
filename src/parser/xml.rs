@@ -1,6 +1,6 @@
 //! UTF-8 XML parsing
 
-use crate::ebook::element::{Attribute, AttributesData};
+use crate::ebook::element::Attribute;
 use crate::ebook::errors::FormatError;
 use crate::parser::ParserResult;
 use crate::util::str::StringExt;
@@ -38,7 +38,7 @@ pub(crate) enum XmlEvent<'a> {
 }
 
 impl<'a> XmlEvent<'a> {
-    fn new(ctx: XmlReaderContext, event: Event<'a>) -> Self {
+    fn new(ctx: XmlContext, event: Event<'a>) -> Self {
         match event {
             // `Start` and `Empty` are merged for convenience.
             // - `XmlStartElement::is_self_closing` indicates if the element is empty.
@@ -55,40 +55,45 @@ impl<'a> XmlEvent<'a> {
 }
 
 #[derive(Copy, Clone, Debug)]
-pub(crate) struct XmlReaderContext {
+pub(crate) struct XmlContext {
     decoder: Decoder,
-    strict: bool,
+    config: XmlConfig,
 }
 
-impl XmlReaderContext {
+impl XmlContext {
     fn unescape_value(&self, bytes: &[u8]) -> ParserResult<String> {
         let decoded = self.decoder.decode(bytes)?;
 
         match escape::unescape(&decoded) {
             Ok(unescaped) => Ok(unescaped.into_owned()),
-            Err(error) if self.strict => Err(FormatError::Unparsable(Box::new(error))),
+            Err(error) if self.config.strict => Err(FormatError::Unparsable(Box::new(error))),
             Err(_) => Ok(decoded.into_owned()),
         }
     }
 }
 
+#[derive(Copy, Clone, Debug)]
+pub(crate) struct XmlConfig {
+    pub(crate) strict: bool,
+}
+
 pub(crate) struct XmlReader<'a> {
     reader: quick_xml::Reader<&'a [u8]>,
-    strict: bool,
+    config: XmlConfig,
 }
 
 impl<'a> XmlReader<'a> {
-    pub(crate) fn from_bytes(strict: bool, reader: &'a [u8]) -> Self {
+    pub(crate) fn from_bytes(config: XmlConfig, reader: &'a [u8]) -> Self {
         Self {
             reader: quick_xml::Reader::from_reader(reader),
-            strict,
+            config,
         }
     }
 
-    fn ctx(&self) -> XmlReaderContext {
-        XmlReaderContext {
+    fn ctx(&self) -> XmlContext {
+        XmlContext {
             decoder: self.reader.decoder(),
-            strict: self.strict,
+            config: self.config,
         }
     }
 
@@ -189,7 +194,7 @@ impl<'a> XmlReader<'a> {
                 // `is_char_ref` was called before resolving
                 Ok(None) => (),
                 // An invalid char ref is given
-                Err(quick_xml::Error::Escape(_)) if !self.strict => {
+                Err(quick_xml::Error::Escape(_)) if !self.config.strict => {
                     push_unsupported(value, &general_ref.decode()?);
                 }
                 Err(error) => return Err(FormatError::Unparsable(Box::new(error))),
@@ -245,13 +250,13 @@ impl<'a> XmlReader<'a> {
 }
 
 pub(crate) struct XmlStartElement<'a> {
-    ctx: XmlReaderContext,
+    ctx: XmlContext,
     element: BytesStart<'a>,
     is_self_closing: bool,
 }
 
 impl<'a> XmlStartElement<'a> {
-    fn new(ctx: XmlReaderContext, element: BytesStart<'a>, is_self_closing: bool) -> Self {
+    fn new(ctx: XmlContext, element: BytesStart<'a>, is_self_closing: bool) -> Self {
         Self {
             ctx,
             element,
@@ -296,7 +301,7 @@ impl<'a> XmlStartElement<'a> {
     ) -> ParserResult<Option<Cow<'_, [u8]>>> {
         match self.element.try_get_attribute(key) {
             Ok(option) => Ok(option.map(|attribute| attribute.value)),
-            Err(error) if self.ctx.strict => Err(FormatError::Unparsable(Box::new(error))),
+            Err(error) if self.ctx.config.strict => Err(FormatError::Unparsable(Box::new(error))),
             Err(_) => Ok(None),
         }
     }
@@ -311,68 +316,58 @@ impl<'a> XmlStartElement<'a> {
     pub(crate) fn has_attribute(&self, key: impl AsRef<[u8]>) -> ParserResult<bool> {
         match self.element.try_get_attribute(key) {
             Ok(attribute) => Ok(attribute.is_some()),
-            Err(error) if self.ctx.strict => Err(FormatError::Unparsable(Box::new(error))),
+            Err(error) if self.ctx.config.strict => Err(FormatError::Unparsable(Box::new(error))),
             Err(_) => Ok(false),
         }
     }
 
-    pub(crate) fn attributes(&self) -> ParserResult<XmlAttributes<'_>> {
-        let attributes = self
-            .element
-            .attributes()
-            .filter_map(|result| match result {
-                Ok(_) => Some(result),
-                Err(_) if self.ctx.strict => Some(result),
-                // Skip the attribute if not `strict`
-                Err(_) => None,
-            })
-            .collect::<Result<Vec<_>, _>>()
-            .map_err(|error| FormatError::Unparsable(Box::new(error)))?;
+    pub(crate) fn attributes(&self) -> impl Iterator<Item = ParserResult<XmlAttribute<'_>>> {
+        let mut attributes = self.element.attributes();
+        attributes.with_checks(self.ctx.config.strict);
 
-        Ok(XmlAttributes {
-            ctx: self.ctx,
-            attributes,
+        attributes.map(|result| {
+            result
+                .map(|attribute| XmlAttribute {
+                    ctx: self.ctx,
+                    attribute,
+                })
+                .map_err(|error| FormatError::Unparsable(Box::new(error)))
         })
     }
 }
 
-pub(crate) struct XmlAttributes<'a> {
-    ctx: XmlReaderContext,
-    attributes: Vec<QuickXmlAttribute<'a>>,
+pub(crate) struct XmlAttribute<'a> {
+    ctx: XmlContext,
+    attribute: QuickXmlAttribute<'a>,
 }
 
-impl XmlAttributes<'_> {
-    /// Removes and returns the value of the attribute by `name`.
-    pub(crate) fn remove(&mut self, name: impl AsRef<[u8]>) -> ParserResult<Option<String>> {
-        let name = name.as_ref();
+impl<'a> XmlAttribute<'a> {
+    pub(crate) fn name(&self) -> &[u8] {
+        self.attribute.key.as_ref()
+    }
 
-        self.attributes
-            .iter()
-            .position(|attribute| attribute.key.as_ref() == name)
-            .map(|i| {
-                let raw = &self.attributes.swap_remove(i).value;
-                self.ctx.unescape_value(raw)
-            })
-            .transpose()
+    pub(crate) fn value_decoded(&self) -> ParserResult<String> {
+        self.ctx.unescape_value(self.value())
+    }
+
+    pub(crate) fn value(&self) -> &[u8] {
+        &self.attribute.value
+    }
+
+    pub(crate) fn into_value(self) -> Cow<'a, [u8]> {
+        self.attribute.value
     }
 }
 
-impl TryFrom<XmlAttributes<'_>> for AttributesData {
+impl TryFrom<XmlAttribute<'_>> for Attribute {
     type Error = FormatError;
 
-    fn try_from(attributes: XmlAttributes<'_>) -> Result<Self, Self::Error> {
-        attributes
-            .attributes
-            .iter()
-            .map(|attribute| {
-                let name = str::from_utf8(attribute.key.as_ref())
-                    .map_err(|err| FormatError::Unparsable(Box::new(err)))?
-                    .to_owned();
-                let value = attributes.ctx.unescape_value(&attribute.value)?;
-                Ok(Attribute::create(name, value))
-            })
-            .collect::<Result<Vec<_>, _>>()
-            .map(Self::from)
+    fn try_from(attribute: XmlAttribute) -> Result<Self, Self::Error> {
+        let name = str::from_utf8(attribute.name())
+            .map_err(|err| FormatError::Unparsable(Box::new(err)))?
+            .to_owned();
+        let value = attribute.value_decoded()?;
+        Ok(Attribute::create(name, value))
     }
 }
 
@@ -397,6 +392,41 @@ impl XmlText for BytesText<'_> {
         self.len() != before
     }
 }
+
+macro_rules! extract_attributes {
+    {
+        $attributes:expr,
+        $($mapping:path $(where $cond:expr)? => $var:ident $(as |$attr:ident| $map:expr)?,)*
+        $(..$remaining:ident,)?
+    } => {
+        $(let mut $remaining = Vec::new();)?
+        $(let mut $var = None;)*
+
+        for result in $attributes {
+            let attribute = result?;
+
+            match attribute.name() {
+                $(
+                $mapping $(if $cond)? => $var = Some(
+                    extract_attributes!(@value_helper attribute $( $attr $map )?)
+                ),
+                )*
+                _ => {
+                    $($remaining.push(attribute.try_into()?);)?
+                }
+            }
+        }
+    };
+    (@value_helper $attribute:ident $attr:ident $map:expr) => {{
+        let $attr = $attribute;
+        $map
+    }};
+    (@value_helper $attribute:ident) => {{
+        $attribute.value_decoded()?
+    }};
+}
+
+pub(crate) use extract_attributes;
 
 #[cfg(test)]
 mod tests {

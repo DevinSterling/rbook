@@ -1,8 +1,6 @@
-//! Core format-agnostic [`Ebook`] module and implementations.
+//! Core format-agnostic [`Ebook`] module.
 //!
-//! # Overview
-//! This module defines [`Ebook`] (the common interface for ebook formats),
-//! associated traits, and supporting modules.
+//! This module defines the common interface for ebook formats and shared types.
 //!
 //! ## Supported Formats
 //! - [`epub`](crate::epub): EPUB 2 and 3

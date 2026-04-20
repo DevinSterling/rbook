@@ -9,6 +9,7 @@ use crate::epub::toc::{
 use crate::input::{IntoOption, Many};
 use crate::util::uri::{self, UriResolver};
 use std::fmt::Debug;
+use std::ops::RangeBounds;
 
 ////////////////////////////////////////////////////////////////////////////////
 // PRIVATE API
@@ -917,17 +918,13 @@ impl<'ebook> EpubTocEntryMut<'ebook> {
     /// Inserts one or more children at the given `index` via the [`Many`] trait.
     ///
     /// # Panics
-    /// Panics if the given `index` to insert at is greater than
-    /// [`TocEntry::len`](crate::ebook::toc::TocEntry::len).
+    /// Panics if `index > len`.
     pub fn insert(&mut self, index: usize, detached: impl Many<DetachedEpubTocEntry>) {
         self.insert_detached(index, detached.iter_many());
     }
 
-    /// Removes and returns the entry at the given `index`.
-    ///
-    /// # Panics
-    /// Panics if the given `index` is out of bounds
-    /// (has a value greater than or equal to [`TocEntry::len`](crate::ebook::toc::TocEntry::len))
+    /// Returns the associated [entry](EpubTocEntryMut) if the given `index` is less than
+    /// [`EpubTocEntry::len`], otherwise [`None`].
     pub fn get_mut(&mut self, index: usize) -> Option<EpubTocEntryMut<'_>> {
         self.data.children.get_mut(index).map(|data| {
             self.ctx
@@ -953,8 +950,7 @@ impl<'ebook> EpubTocEntryMut<'ebook> {
     /// Removes and returns the entry at the given `index`.
     ///
     /// # Panics
-    /// Panics if the given `index` is out of bounds
-    /// (has a value greater than or equal to [`TocEntry::len`](crate::ebook::toc::TocEntry::len)).
+    /// Panics if `index` is out of bounds.
     pub fn remove(&mut self, index: usize) -> DetachedEpubTocEntry {
         DetachedEpubTocEntry::detached(self.version, self.data.children.remove(index))
     }
@@ -1001,15 +997,14 @@ impl<'ebook> EpubTocEntryMut<'ebook> {
             .map(|data| DetachedEpubTocEntry::detached(self.version, data))
     }
 
-    /// Removes and returns all direct children within the given `range`.
+    /// Removes and returns all direct children within the given [`range`](RangeBounds).
     ///
     /// # Panics
-    /// For the given `range`, this method panics if:
-    /// - The starting point is greater than the end point.
-    /// - The end point is greater than [`TocEntry::len`](crate::ebook::toc::TocEntry::len).
+    /// Panics if the range has `start_bound > end_bound`, or,
+    /// if the range is bounded on either end and past the [length](EpubTocEntry::len) of children.
     pub fn drain(
         &mut self,
-        range: impl std::ops::RangeBounds<usize>,
+        range: impl RangeBounds<usize>,
     ) -> impl Iterator<Item = DetachedEpubTocEntry> {
         self.data
             .children

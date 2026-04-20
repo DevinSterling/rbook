@@ -20,6 +20,11 @@ pub(crate) mod xml {
     pub(crate) const ID: &str = "id";
     pub(crate) const LANG: &str = "xml:lang";
 
+    pub(crate) mod bytes {
+        pub(crate) const ID: &[u8] = super::ID.as_bytes();
+        pub(crate) const LANG: &[u8] = super::LANG.as_bytes();
+    }
+
     #[cfg(feature = "write")]
     pub(crate) mod write {
         pub(crate) const XMLNS: &str = "xmlns";
@@ -32,6 +37,10 @@ pub(crate) mod epub {
 
     // Attribute keys
     pub(crate) const TYPE: &str = "epub:type";
+
+    pub(crate) mod bytes {
+        pub(crate) const TYPE: &[u8] = super::TYPE.as_bytes();
+    }
 
     #[cfg(feature = "write")]
     mod write {
@@ -95,6 +104,11 @@ pub(crate) mod ocf {
     // Rootfile attribute keys
     pub(crate) const FULL_PATH: &str = "full-path";
     pub(crate) const MEDIA_TYPE: &str = super::_MEDIA_TYPE;
+
+    pub(crate) mod bytes {
+        pub(crate) const FULL_PATH: &[u8] = super::FULL_PATH.as_bytes();
+        pub(crate) const MEDIA_TYPE: &[u8] = super::MEDIA_TYPE.as_bytes();
+    }
 
     #[cfg(feature = "write")]
     mod write {
@@ -176,7 +190,7 @@ pub(crate) mod opf {
 
     // Spine attribute keys
     pub(crate) const TOC: &str = "toc";
-    pub(crate) const PAGE_PROGRESSION_DIRECTION: &str = "page-progression-direction";
+    pub(crate) const PAGE_DIRECTION: &str = "page-progression-direction";
     pub(crate) const IDREF: &str = "idref";
     pub(crate) const LINEAR: &str = "linear";
 
@@ -211,6 +225,27 @@ pub(crate) mod opf {
         pub(crate) const ITEM: &[u8] = super::ITEM.as_bytes();
         pub(crate) const ITEMREF: &[u8] = super::ITEMREF.as_bytes();
         pub(crate) const REFERENCE: &[u8] = super::REFERENCE.as_bytes();
+
+        pub(crate) const VERSION: &[u8] = super::VERSION.as_bytes();
+        pub(crate) const UNIQUE_ID: &[u8] = super::UNIQUE_ID.as_bytes();
+        pub(crate) const PREFIX: &[u8] = super::PREFIX.as_bytes();
+        pub(crate) const NAME: &[u8] = super::NAME.as_bytes();
+        pub(crate) const CONTENT: &[u8] = super::CONTENT.as_bytes();
+        pub(crate) const PROPERTY: &[u8] = super::PROPERTY.as_bytes();
+        pub(crate) const REFINES: &[u8] = super::REFINES.as_bytes();
+        pub(crate) const TEXT_DIR: &[u8] = super::TEXT_DIR.as_bytes();
+        pub(crate) const TITLE: &[u8] = super::TITLE.as_bytes();
+        pub(crate) const TYPE: &[u8] = super::TYPE.as_bytes();
+        pub(crate) const FALLBACK: &[u8] = super::FALLBACK.as_bytes();
+        pub(crate) const MEDIA_OVERLAY: &[u8] = super::MEDIA_OVERLAY.as_bytes();
+        pub(crate) const TOC: &[u8] = super::TOC.as_bytes();
+        pub(crate) const PAGE_DIRECTION: &[u8] = super::PAGE_DIRECTION.as_bytes();
+        pub(crate) const IDREF: &[u8] = super::IDREF.as_bytes();
+        pub(crate) const LINEAR: &[u8] = super::LINEAR.as_bytes();
+        pub(crate) const YES: &[u8] = super::YES.as_bytes();
+        pub(crate) const MEDIA_TYPE: &[u8] = super::MEDIA_TYPE.as_bytes();
+        pub(crate) const PROPERTIES: &[u8] = super::PROPERTIES.as_bytes();
+        pub(crate) const HREF: &[u8] = super::HREF.as_bytes();
     }
 
     #[cfg(feature = "write")]
@@ -240,6 +275,7 @@ pub(crate) mod xhtml {
         pub(crate) const ANCHOR: &[u8] = super::ANCHOR.as_bytes();
         pub(crate) const LIST_ITEM: &[u8] = super::LIST_ITEM.as_bytes();
         pub(crate) const NAV: &[u8] = super::NAV.as_bytes();
+        pub(crate) const HREF: &[u8] = super::HREF.as_bytes();
     }
 
     #[cfg(feature = "write")]
@@ -292,6 +328,8 @@ pub(crate) mod ncx {
         pub(crate) const PAGE_TARGET: &[u8] = super::PAGE_TARGET.as_bytes();
         pub(crate) const NAV_LABEL: &[u8] = super::NAV_LABEL.as_bytes();
         pub(crate) const CONTENT: &[u8] = super::CONTENT.as_bytes();
+
+        pub(crate) const TYPE: &[u8] = super::TYPE.as_bytes();
     }
 
     #[cfg(feature = "write")]

@@ -3,8 +3,8 @@
         <meta property="media:duration" refines="#c1_audio">0:32:29</meta>
         <meta property="media:duration" refines="#c2_audio">0:29:49</meta>
 
-        <meta property="authority" refines="#tag">LCSH</meta>
-        <meta property="term" refines="#tag">sh2008110314</meta>
+        <meta property="authority" refines="#tag2">LCSH</meta>
+        <meta property="term" refines="#tag2">sh2008110314</meta>
 
         <meta refines="#author" property="alternate-script" xml:lang="ja">山田太郎</meta>
         <meta property="role" refines="#author" scheme="marc:relators">aut</meta>
@@ -29,7 +29,7 @@
         <dc:title id="title" opf:alt-rep="サンプルEPUB" opf:alt-rep-lang="ja">Example EPUB</dc:title>
 
         <dc:creator id="author" opf:role="aut" opf:file-as="Doe, John">John Doe</dc:creator>
-        <dc:source extra="&nbsp;esc&lt;aped&amp;attr&gt;ibute&quot;value&apos;">rbook</dc:source>
+        <dc:rights extra="&nbsp;esc&lt;aped&amp;attr&gt;ibute&quot;value&apos;">Apache License 2.0</dc:rights>
         <dc:date>2023-01-25</dc:date>
         <meta property="dcterms:modified">2023-01-25T10:11:35Z</meta>
         <dc:language>en</dc:language>
@@ -40,10 +40,13 @@
             <![CDATA[ CData 2. ]]>   An<![CDATA[other]]> <!-- comment -->
             <!-- comment 123 --> statement  <!--comment--> !
         </dc:description>
-        <dc:subject opf:authority="BISAC" opf:term="FIC024000">
+
+        <dc:subject id="tag2">Quests (Expeditions) -- Fiction</dc:subject>
+        <meta property="display-seq" refines="#tag2">2</meta>
+        <dc:subject id="tag1" opf:authority="BISAC" opf:term="FIC024000">
             FICTION / Occult &amp; Supernatural
         </dc:subject>
-        <dc:subject id="tag">Quests (Expeditions) -- Fiction</dc:subject>
+        <meta property="display-seq" refines="#tag1">1</meta>
         <dc:subject>Fantasy</dc:subject>
 
         <meta name="cover" content="cover-image1"></meta>

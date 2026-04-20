@@ -124,13 +124,13 @@ pub trait TocEntry<'ebook>: Sealed {
     /// The semantic kind of content associated with an entry.
     ///
     /// For example, an entry may point to the
-    /// [`appendix`](TocEntryKind::Appendix) or [`cover page`](TocEntryKind::Cover).
+    /// [appendix](TocEntryKind::Appendix) or [cover page](TocEntryKind::Cover).
     fn kind(&self) -> TocEntryKind<'ebook>;
 
-    /// The [`ManifestEntry`] associated with a [`TocEntry`].
+    /// The associated [`ManifestEntry`].
     ///
     /// Returns [`None`] if the toc entry references a non-existent
-    /// [`ManifestEntry`] within the [`Manifest`](super::Manifest).
+    /// [entry](ManifestEntry) within the [`Manifest`](super::Manifest).
     fn manifest_entry(&self) -> Option<impl ManifestEntry<'ebook> + 'ebook>;
 
     /// The [`Resource`] intended to navigate to from an entry.

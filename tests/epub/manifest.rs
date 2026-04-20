@@ -7,14 +7,10 @@ use wasm_bindgen_test::wasm_bindgen_test;
 fn test_manifest() {
     let epub = Epub3File.open_strict();
     let manifest = epub.manifest();
-    let mut entries = manifest.iter().collect::<Vec<_>>();
-    // sort by `id` as entries are in arbitrary order
-    entries.sort_by_key(|entry| entry.id());
-
-    assert_eq!(EXPECTED_MANIFEST.len(), entries.len());
+    assert_eq!(EXPECTED_MANIFEST.len(), manifest.len());
     assert!(!manifest.is_empty());
 
-    for (entry, expected) in entries.into_iter().zip(EXPECTED_MANIFEST) {
+    for (entry, expected) in manifest.into_iter().zip(EXPECTED_MANIFEST) {
         assert_eq!(expected.id, entry.id());
         assert_eq!(expected.href, entry.href().as_str());
         assert_eq!(expected.href_raw, entry.href_raw().as_str());
@@ -57,26 +53,26 @@ fn test_manifest() {
 fn test_manifest_entry_refinements() {
     let epub = Epub3File.open_strict();
     let manifest = epub.manifest();
-    let mut entries = manifest.iter().collect::<Vec<_>>();
-    // sort by `id` as entries are in arbitrary order
-    entries.sort_by_key(|entry| entry.id());
 
     #[rustfmt::skip]
     let expected = [
         vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
+        vec![],
         vec![("c1_audio", "media:duration", "0:32:29")],
-        vec![],
-        vec![],
         vec![("c2_audio", "media:duration", "0:29:49")],
-        vec![],
-        vec![],
-        vec![],
-        vec![],
-        vec![],
         vec![],
     ];
 
-    for (entry, expected) in entries.into_iter().zip(expected) {
+    assert_eq!(expected.len(), manifest.len());
+
+    for (entry, expected) in manifest.into_iter().zip(expected) {
         assert_eq!(expected.len(), entry.refinements().iter().count());
 
         for (parent_id, property, value) in expected {
@@ -310,16 +306,16 @@ impl<'a> ManifestTestData<'a> {
 // Reference: example.epub / example_epub
 #[rustfmt::skip]
 pub const EXPECTED_MANIFEST: &[ManifestTestData] = &[
+    ManifestTestData::new("cover", "/EPUB/cover.xhtml", "cover.xhtml", "application/xhtml+xml", None, None, &[]),
     ManifestTestData::new("c1", "/EPUB/c1.xhtml", "c1.xhtml", "application/xhtml+xml", Some("c1_audio"), None, &[]),
-    ManifestTestData::new("c1_audio", "/EPUB/overlay/chapter1_audio.smil", "overlay/chapter1_audio.smil", "application/smil+xml", None, None, &[]),
     ManifestTestData::new("c1a", "/EPUB/c1a.xhtml", "c1a.xhtml", "application/xhtml+xml", None, None, &[]),
     ManifestTestData::new("c2", "/EPUB/c2.xhtml", "c2.xhtml", "application/xhtml+xml", Some("c2_audio"), None, &[]),
-    ManifestTestData::new("c2_audio", "/EPUB/overlay/chapter2_audio.smil", "overlay/chapter2_audio.smil", "application/smil+xml", None, None, &[]),
-    ManifestTestData::new("cover", "/EPUB/cover.xhtml", "cover.xhtml", "application/xhtml+xml", None, None, &[]),
+    ManifestTestData::new("toc", "/toc.xhtml", "../toc.xhtml", "application/xhtml+xml", None, None, &["scripted", "nav"]),
+    ManifestTestData::new("toc-ncx", "/toc.ncx", "../toc.ncx", "application/x-dtbncx+xml", None, None, &[]),
     ManifestTestData::new("cover-image1", "/EPUB/img/cover.webm", "img/cover.webm", "image/webm", None, Some("cover-image2"), &["cover-image"]),
     ManifestTestData::new("cover-image2", "/EPUB/img/cover.avif", "img/cover.avif", "image/avif", None, Some("cover-image3"), &[]),
     ManifestTestData::new("cover-image3", "/EPUB/img/cover.png", "img/cover.png", "image/png", None, None, &[]),
+    ManifestTestData::new("c1_audio", "/EPUB/overlay/chapter1_audio.smil", "overlay/chapter1_audio.smil", "application/smil+xml", None, None, &[]),
+    ManifestTestData::new("c2_audio", "/EPUB/overlay/chapter2_audio.smil", "overlay/chapter2_audio.smil", "application/smil+xml", None, None, &[]),
     ManifestTestData::new("style", "/file%20name%20with%20spaces.css", "../file%20name%20with%20spaces.css", "text/css", None, None, &[]),
-    ManifestTestData::new("toc", "/toc.xhtml", "../toc.xhtml", "application/xhtml+xml", None, None, &["scripted", "nav"]),
-    ManifestTestData::new("toc-ncx", "/toc.ncx", "../toc.ncx", "application/x-dtbncx+xml", None, None, &[]),
 ];

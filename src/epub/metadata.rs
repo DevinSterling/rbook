@@ -869,7 +869,7 @@ impl<'ebook> EpubRefinements<'ebook> {
             .map(move |(i, data)| ctx.create_refining_entry(parent_id, data, i))
     }
 
-    /// Returns `true` if the `property` is present.
+    /// Returns `true` if the given [`property`](EpubMetaEntry::property) is present.
     ///
     /// # Examples
     /// - Checking if a refinement exists:
@@ -924,7 +924,7 @@ impl<'ebook> IntoIterator for EpubRefinements<'ebook> {
 /// # use rbook::Epub;
 /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
 /// let epub = Epub::open("tests/ebooks/example_epub")?;
-/// let source = epub.metadata().by_property("dc:source").next().unwrap();
+/// let source = epub.metadata().by_property("dc:rights").next().unwrap();
 ///
 /// for refinement in source.refinements() {
 ///     // process refinement //
@@ -1395,7 +1395,7 @@ pub enum EpubMetaEntryKind {
     /// # use rbook::epub::metadata::{EpubMetaEntryKind, EpubVersion};
     /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
     /// let epub = Epub::open("tests/ebooks/example_epub")?;
-    /// let source = epub.metadata().by_property("dc:source").next().unwrap();
+    /// let source = epub.metadata().by_property("cover").next().unwrap();
     ///
     /// match source.kind() {
     ///     EpubMetaEntryKind::Meta { version: EpubVersion::EPUB3, ..} => {},

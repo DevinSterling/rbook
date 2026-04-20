@@ -61,7 +61,7 @@ pub trait Manifest<'ebook>: Sealed {
     /// (e.g., `PNG`, `JPEG`, `CSS`).
     fn iter(&self) -> impl Iterator<Item = impl ManifestEntry<'ebook> + 'ebook> + 'ebook;
 
-    /// The [`ManifestEntry`] of an ebook’s cover image, if present.
+    /// The ebook’s cover image [entry](ManifestEntry), if present.
     ///
     /// # See Also
     /// - [`ManifestEntry::kind`] to inspect the kind of image format.

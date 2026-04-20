@@ -10,6 +10,7 @@ use crate::epub::package::{EpubPackageData, EpubPackageMetaContext};
 use crate::input::{IntoOption, Many};
 use crate::util::iter::{IteratorExt, OneOrMany};
 use std::fmt::Debug;
+use std::ops::RangeBounds;
 use std::slice::IterMut as SliceIterMut;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -1228,10 +1229,8 @@ impl<'ebook> EpubMetadataMut<'ebook> {
     /// Searches the metadata hierarchy, including refinements, and returns the
     /// [`EpubMetaEntryMut`] matching the given `id`, or [`None`] if not found.
     ///
-    /// # Note
-    /// This method has the same limitations mentioned in [`EpubMetadata::by_id`].
-    ///
     /// # See Also
+    /// - [`EpubMetadata::by_id`] (immutable equivalent) for more details.
     /// - [`Self::by_property_mut`] to retrieve entries by their
     ///   [`property`](EpubMetaEntry::property) (e.g. all titles).
     ///
@@ -1352,7 +1351,7 @@ impl<'ebook> EpubMetadataMut<'ebook> {
             .filter(|entry| entry.as_view().kind().is_link())
     }
 
-    /// Returns an iterator over non-refining metadata entries.
+    /// Returns an iterator over top-level (non-refining) metadata entries.
     ///
     /// # Note
     /// - This method has the same restrictions as [`EpubMetadata::iter`].
@@ -1422,7 +1421,7 @@ impl<'ebook> EpubMetadataMut<'ebook> {
             .find_map(|entries| dfs_remove_by_id(id, entries))
     }
 
-    /// Removes and returns **all** non-refining entries matching the given `property`.
+    /// Removes and returns **all** top-level (non-refining) entries matching the given `property`.
     ///
     /// # Examples
     /// - Clearing all creators:
@@ -1457,7 +1456,7 @@ impl<'ebook> EpubMetadataMut<'ebook> {
             .map(DetachedEpubMetaEntry::from)
     }
 
-    /// Retains only the non-refining entries specified by the predicate.
+    /// Retains only top-level (non-refining) entries specified by the predicate.
     ///
     /// If the closure returns `false`, the entry is retained.
     /// Otherwise, the entry is removed.
@@ -1508,7 +1507,7 @@ impl<'ebook> EpubMetadataMut<'ebook> {
         });
     }
 
-    /// Removes and returns only the non-refining entries specified by the predicate.
+    /// Removes and returns only top-level (non-refining) entries specified by the predicate.
     ///
     /// If the closure returns `true`, the entry is removed and yielded.
     /// Otherwise, the entry is retained.
@@ -1578,7 +1577,7 @@ impl<'ebook> EpubMetadataMut<'ebook> {
         })
     }
 
-    /// Removes and returns all non-refining metadata entries.
+    /// Removes and returns all top-level (non-refining)
     pub fn drain(&mut self) -> impl Iterator<Item = DetachedEpubMetaEntry> {
         self.metadata
             .entries
@@ -1887,7 +1886,7 @@ impl<'ebook> EpubRefinementsMut<'ebook> {
     /// Inserts one or more refinements at the given `index` via the [`Many`] trait.
     ///
     /// # Panics
-    /// Panics if the given `index` to insert at is greater than [`EpubRefinements::len`].
+    /// Panics if `index > len`.
     pub fn insert(&mut self, index: usize, detached: impl Many<DetachedEpubMetaEntry>) {
         self.insert_detached(index, detached.iter_many());
     }
@@ -1933,8 +1932,7 @@ impl<'ebook> EpubRefinementsMut<'ebook> {
     /// Removes and returns the refinement at the given `index`.
     ///
     /// # Panics
-    /// Panics if the given `index` is out of bounds
-    /// (has a value greater than or equal to [`EpubRefinements::len`]).
+    /// Panics if `index` is out of bounds.
     pub fn remove(&mut self, index: usize) -> DetachedEpubMetaEntry {
         DetachedEpubMetaEntry::from(self.data.remove(index))
     }
@@ -1985,15 +1983,15 @@ impl<'ebook> EpubRefinementsMut<'ebook> {
             .map(DetachedEpubMetaEntry::from)
     }
 
-    /// Removes and returns all direct refinements within the given `range`.
+    /// Removes and returns all direct refinements within the given [`range`](RangeBounds).
     ///
     /// # Panics
-    /// For the given `range`, this method panics if:
-    /// - The starting point is greater than the end point.
-    /// - The end point is greater than [`EpubRefinements::len`].
+    /// Panics if the range has `start_bound > end_bound`, or,
+    /// if the range is bounded on either end and past the
+    /// [length](EpubRefinements::len) of refinements.
     pub fn drain(
         &mut self,
-        range: impl std::ops::RangeBounds<usize>,
+        range: impl RangeBounds<usize>,
     ) -> impl Iterator<Item = DetachedEpubMetaEntry> {
         self.data.drain(range).map(DetachedEpubMetaEntry::from)
     }

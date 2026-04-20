@@ -145,8 +145,8 @@ impl<'ebook> From<EpubManifest<'ebook>> for EpubManifestContext<'ebook> {
 // PUBLIC API
 ////////////////////////////////////////////////////////////////////////////////
 
-/// The EPUB manifest accessible via [`Epub::manifest`](super::Epub::manifest).
-/// See [`Manifest`] for more details.
+/// The [`Manifest`] of an [`Epub`](crate::Epub) accessible via
+/// [`Epub::manifest`](super::Epub::manifest).
 ///
 /// Retrieving entries from the manifest using methods such as [`EpubManifest::by_href`]
 /// is generally a linear (`O(N)`) operation except for [`EpubManifest::by_id`],
@@ -181,11 +181,46 @@ impl<'ebook> EpubManifest<'ebook> {
         }
     }
 
-    /// Returns the [`EpubManifestEntry`] matching the given `id`, or [`None`] if not found.
+    /// Returns the associated [entry](EpubManifestEntry) if the given `index` is less than
+    /// [`Self::len`], otherwise [`None`].
     ///
-    /// This is a constant (`O(1)`) operation.
+    /// Computes in **O(1)** time.
     ///
     /// # See Also
+    /// - [`Self::by_id`] to get an entry by [`id`](EpubManifestEntry::id).
+    /// - [`EpubManifestMut::get_mut`] to get a mutable entry.
+    ///
+    /// # Examples
+    /// - Retrieving the same entries by `index` and `id`:
+    /// ```
+    /// # use rbook::Epub;
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
+    /// let epub = Epub::open("tests/ebooks/example_epub")?;
+    /// let manifest = epub.manifest();
+    ///
+    /// let chapter_2_by_index = manifest.get(3).unwrap();
+    /// let chapter_2_by_id = manifest.by_id("c2").unwrap();
+    /// assert_eq!(chapter_2_by_index, chapter_2_by_id);
+    ///
+    /// let c2_audio_by_index = manifest.get(10).unwrap();
+    /// let c2_audio_by_id = manifest.by_id("c2_audio").unwrap();
+    /// assert_eq!(c2_audio_by_index, c2_audio_by_id);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn get(&self, index: usize) -> Option<EpubManifestEntry<'ebook>> {
+        self.manifest
+            .entries
+            .get_index(index)
+            .map(|(id, data)| self.ctx.create_entry(id, data))
+    }
+
+    /// Returns the [entry](EpubManifestEntry) matching the given `id`, or [`None`] if not found.
+    ///
+    /// Computes in **O(1)** time.
+    ///
+    /// # See Also
+    /// - [`Self::get`] to get an entry by index.
     /// - [`EpubManifestMut::by_id_mut`] to get a mutable entry.
     pub fn by_id(&self, id: &str) -> Option<EpubManifestEntry<'ebook>> {
         self.manifest
@@ -193,7 +228,7 @@ impl<'ebook> EpubManifest<'ebook> {
             .map(|(id, data)| self.ctx.create_entry(id, data))
     }
 
-    /// Returns the [`EpubManifestEntry`] matching the given `href`, or [`None`] if not found.
+    /// Returns the [entry](EpubManifestEntry) matching the given `href`, or [`None`] if not found.
     ///
     /// # Note
     /// The given `href` is ***not*** normalized or percent-decoded.
@@ -209,7 +244,7 @@ impl<'ebook> EpubManifest<'ebook> {
     }
 
     /// Returns an iterator over all [entries](EpubManifestEntry) in the
-    /// [`manifest`](EpubManifest) whose [`properties`](EpubManifestEntry::properties)
+    /// [manifest](EpubManifest) whose [`properties`](EpubManifestEntry::properties)
     /// contains the specified `property`.
     pub fn by_property(
         &self,
@@ -247,7 +282,7 @@ impl<'ebook> EpubManifest<'ebook> {
         }
     }
 
-    /// The [`EpubManifestEntry`] of an ebook’s cover image, if present.
+    /// The cover image [entry](EpubManifestEntry), if present.
     ///
     /// This method returns the entry with the `cover-image` property,
     /// falling back to EPUB 2 cover metadata for lookup.
@@ -325,7 +360,7 @@ impl<'ebook> EpubManifest<'ebook> {
         self.manifest
             .iter()
             .filter(move |(_, data)| {
-                let kind = ResourceKind::from(data.media_type.as_str());
+                let kind = ResourceKind::from(&*data.media_type);
 
                 targets.repeat_once().any(|target| {
                     if target.is_unspecified() {

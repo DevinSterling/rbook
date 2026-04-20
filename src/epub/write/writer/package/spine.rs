@@ -51,7 +51,7 @@ impl<W: Write> PackageWriter<'_, W> {
                     self.ctx.toc.epub2_ncx.as_ref().map(|ncx| &*ncx.id)
                 },
                 // Page progression direction is an EPUB 3 feature
-                opf::PAGE_PROGRESSION_DIRECTION => {
+                opf::PAGE_DIRECTION => {
                     (self.ctx.supports_epub3() && !spine.page_direction.is_default())
                         .then_some(spine.page_direction.as_str())
                 },

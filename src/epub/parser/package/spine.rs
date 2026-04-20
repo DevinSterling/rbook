@@ -1,5 +1,5 @@
 use crate::ebook::spine::PageDirection;
-use crate::epub::consts::{opf, opf::bytes, xml};
+use crate::epub::consts::{opf::bytes, xml};
 use crate::epub::errors::EpubError;
 use crate::epub::manifest::EpubManifestData;
 use crate::epub::parser::package::PackageParser;
@@ -7,7 +7,7 @@ use crate::epub::parser::package::metadata::PendingRefinements;
 use crate::epub::parser::{EpubParseConfig, EpubParserContext, EpubParserValidator};
 use crate::epub::spine::{EpubSpineData, EpubSpineEntryData};
 use crate::parser::ParserResult;
-use crate::parser::xml::{XmlReader, XmlStartElement};
+use crate::parser::xml::{XmlReader, XmlStartElement, extract_attributes};
 
 /// Stores additional information required during parsing-time.
 pub(super) struct TempEpubSpine {
@@ -43,14 +43,14 @@ impl<'package, 'a> SpineParser<'package, 'a> {
     }
 
     fn parse_spine(mut self) -> ParserResult<TempEpubSpine> {
-        let page_direction = self
-            .spine_el
-            .get_attribute_raw(opf::PAGE_PROGRESSION_DIRECTION)?
-            .map(PageDirection::from_bytes)
-            .unwrap_or_default();
-
-        // Attempt to get NCX id
-        let ncx_id = self.require_toc(self.spine_el.get_attribute(opf::TOC)?)?;
+        extract_attributes! {
+            self.spine_el.attributes(),
+            bytes::PAGE_DIRECTION => direction as |attr| PageDirection::from_bytes(attr.value()),
+            bytes::TOC            => ncx_id,
+        }
+        // Validate
+        let page_direction = direction.unwrap_or_default();
+        let ncx_id = self.require_toc(ncx_id)?;
 
         while let Some(itemref) = self.next_itemref()? {
             let entry = self.parse_itemref(&itemref)?;
@@ -64,28 +64,29 @@ impl<'package, 'a> SpineParser<'package, 'a> {
     }
 
     fn parse_itemref(&mut self, itemref: &XmlStartElement<'_>) -> ParserResult<EpubSpineEntryData> {
-        let mut attributes = itemref.attributes()?;
+        extract_attributes! {
+            itemref.attributes(),
+            bytes::IDREF      => idref,
+            // Optional
+            xml::bytes::ID    => id,
+            bytes::PROPERTIES => properties,
+            bytes::LINEAR     => linear as |attr| attr.value() == bytes::YES,
+            ..remaining,
+        }
+        // Validate
+        let idref = self.require_idref(idref)?;
 
-        // Required fields
-        let idref = self.require_idref(attributes.remove(opf::IDREF)?)?;
-
-        // Optional fields
-        let id = attributes.remove(xml::ID)?;
-        let properties = attributes.remove(opf::PROPERTIES)?.into();
-        let linear = attributes
-            .remove(opf::LINEAR)?
-            .is_none_or(|linear| linear == opf::YES);
         let refinements = id
             .as_deref()
             .and_then(|id| self.refinements.take_refinements(id))
             .unwrap_or_default();
 
         Ok(EpubSpineEntryData {
-            attributes: attributes.try_into()?,
+            linear: linear.unwrap_or(true),
+            properties: properties.into(),
+            attributes: remaining.into(),
             id,
             idref,
-            linear,
-            properties,
             refinements,
         })
     }
