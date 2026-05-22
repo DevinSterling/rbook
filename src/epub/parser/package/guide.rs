@@ -30,14 +30,9 @@ impl<'package, 'a> GuideParser<'package, 'a> {
     }
 
     fn parse_guide(mut self, guide: &XmlStartElement<'_>) -> ParserResult<EpubTocData> {
-        extract_attributes! {
-            guide.attributes(),
-            // In nearly all cases, the `guide` element has no attributes
-            ..attributes,
-        }
-
         self.root.kind = Some(TocEntryKind::Landmarks.to_string());
-        self.root.attributes = attributes.into();
+        // In nearly all cases, the `guide` element has no attributes
+        self.root.attributes = guide.attributes().try_into()?;
 
         while let Some(reference) = self.next_reference()? {
             let entry = self.parse_reference(&reference)?;
