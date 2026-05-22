@@ -9,6 +9,7 @@ use crate::reader::{Reader, ReaderContent, ReaderKey};
 use crate::util::iter::IndexCursor;
 use crate::util::{Sealed, doc};
 use std::cmp::PartialEq;
+use std::iter::FusedIterator;
 
 /// A [`Reader`] for an [`Epub`].
 ///
@@ -301,6 +302,8 @@ impl<'ebook> Iterator for EpubReader<'ebook> {
         (remaining, Some(remaining))
     }
 }
+
+impl FusedIterator for EpubReader<'_> {}
 
 /// [`ReaderContent`] implementation for an [`EpubReader`].
 #[derive(Clone, Debug, PartialEq)]

@@ -10,6 +10,7 @@ use crate::util::uri;
 use std::borrow::Cow;
 use std::fmt::{Debug, Display};
 use std::hash::Hash;
+use std::iter::FusedIterator;
 use std::ops::{Deref, DerefMut};
 use std::str::SplitWhitespace;
 
@@ -433,6 +434,14 @@ impl<'a> Iterator for PropertiesIter<'a> {
     }
 }
 
+impl<'a> DoubleEndedIterator for PropertiesIter<'a> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.0.next_back()
+    }
+}
+
+impl FusedIterator for PropertiesIter<'_> {}
+
 /// A collection of [`Attribute`] entries associated with an element.
 #[derive(Clone, Debug, PartialEq)]
 pub struct Attributes(KeyedVec<Attribute>);
@@ -522,6 +531,20 @@ impl<'a> Iterator for AttributesIter<'a> {
         self.0.size_hint()
     }
 }
+
+impl DoubleEndedIterator for AttributesIter<'_> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.0.next_back()
+    }
+}
+
+impl ExactSizeIterator for AttributesIter<'_> {
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+}
+
+impl FusedIterator for AttributesIter<'_> {}
 
 /// An attribute, containing details about an element.
 ///

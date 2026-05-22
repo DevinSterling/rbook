@@ -10,6 +10,7 @@ use crate::epub::package::{EpubPackageData, EpubPackageMetaContext};
 use crate::input::{IntoOption, Many};
 use crate::util::iter::{IteratorExt, OneOrMany};
 use std::fmt::Debug;
+use std::iter::FusedIterator;
 use std::ops::RangeBounds;
 use std::slice::IterMut as SliceIterMut;
 
@@ -1670,6 +1671,16 @@ impl<'ebook> Iterator for EpubMetadataIterMut<'ebook> {
     }
 }
 
+impl DoubleEndedIterator for EpubMetadataIterMut<'_> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.iter
+            .next_back()
+            .map(|(i, entry)| EpubMetaEntryMut::new(self.meta_ctx, entry, None, i))
+    }
+}
+
+impl FusedIterator for EpubMetadataIterMut<'_> {}
+
 /// Mutable view of [`EpubMetaEntry`], allowing modification of metadata fields,
 /// attributes, and [refinements](Self::refinements_mut).
 ///
@@ -2053,15 +2064,6 @@ pub struct EpubRefinementsIterMut<'ebook> {
     iter: std::iter::Enumerate<std::slice::IterMut<'ebook, EpubMetaEntryData>>,
 }
 
-impl Debug for EpubRefinementsIterMut<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        f.debug_struct("EpubRefinementsIterMut")
-            .field("parent_id", &self.parent_id)
-            .field("iter", &self.iter)
-            .finish_non_exhaustive()
-    }
-}
-
 impl<'ebook> Iterator for EpubRefinementsIterMut<'ebook> {
     type Item = EpubMetaEntryMut<'ebook>;
 
@@ -2073,5 +2075,30 @@ impl<'ebook> Iterator for EpubRefinementsIterMut<'ebook> {
 
     fn size_hint(&self) -> (usize, Option<usize>) {
         self.iter.size_hint()
+    }
+}
+
+impl DoubleEndedIterator for EpubRefinementsIterMut<'_> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.iter
+            .next_back()
+            .map(|(i, entry)| EpubMetaEntryMut::new(self.meta_ctx, entry, self.parent_id, i))
+    }
+}
+
+impl ExactSizeIterator for EpubRefinementsIterMut<'_> {
+    fn len(&self) -> usize {
+        self.iter.len()
+    }
+}
+
+impl FusedIterator for EpubRefinementsIterMut<'_> {}
+
+impl Debug for EpubRefinementsIterMut<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
+        f.debug_struct("EpubRefinementsIterMut")
+            .field("parent_id", &self.parent_id)
+            .field("iter", &self.iter)
+            .finish_non_exhaustive()
     }
 }

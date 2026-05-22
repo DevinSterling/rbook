@@ -9,6 +9,7 @@ use crate::epub::metadata::{
 };
 use crate::util::collection::{Keyed, KeyedVec};
 use crate::util::uri;
+use std::iter::FusedIterator;
 
 #[cfg(feature = "write")]
 pub use write::{EpubPackageMut, PrefixesMutIter};
@@ -359,6 +360,20 @@ impl<'ebook> Iterator for PrefixesIter<'ebook> {
         self.0.size_hint()
     }
 }
+
+impl DoubleEndedIterator for PrefixesIter<'_> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.0.next_back()
+    }
+}
+
+impl ExactSizeIterator for PrefixesIter<'_> {
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+}
+
+impl FusedIterator for PrefixesIter<'_> {}
 
 /// A prefix, defining a mapping for use in [`property`](EpubMetaEntry::property) values.
 ///

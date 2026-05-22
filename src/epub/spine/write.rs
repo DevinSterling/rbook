@@ -8,6 +8,7 @@ use crate::epub::spine::{
 };
 use crate::input::{IntoOption, Many};
 use std::fmt::Debug;
+use std::iter::FusedIterator;
 use std::ops::RangeBounds;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -574,6 +575,22 @@ impl<'ebook> Iterator for EpubSpineIterMut<'ebook> {
         self.iter.size_hint()
     }
 }
+
+impl DoubleEndedIterator for EpubSpineIterMut<'_> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.iter
+            .next_back()
+            .map(|(i, entry)| self.ctx.create_entry_mut(entry, i))
+    }
+}
+
+impl ExactSizeIterator for EpubSpineIterMut<'_> {
+    fn len(&self) -> usize {
+        self.iter.len()
+    }
+}
+
+impl FusedIterator for EpubSpineIterMut<'_> {}
 
 /// Mutable view of [`EpubSpineEntry`], allowing modification of spine entry (`itemref`) fields,
 /// attributes, and [refinements](Self::refinements_mut).

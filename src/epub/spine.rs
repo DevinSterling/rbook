@@ -14,6 +14,7 @@ use crate::epub::metadata::{EpubRefinements, EpubRefinementsData};
 use crate::epub::package::EpubPackageMetaContext;
 use crate::util::{Sealed, doc};
 use std::fmt::Debug;
+use std::iter::FusedIterator;
 
 #[cfg(feature = "write")]
 pub use write::{DetachedEpubSpineEntry, EpubSpineEntryMut, EpubSpineIterMut, EpubSpineMut};
@@ -316,6 +317,22 @@ impl<'ebook> Iterator for EpubSpineIter<'ebook> {
         self.iter.size_hint()
     }
 }
+
+impl DoubleEndedIterator for EpubSpineIter<'_> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.iter
+            .next_back()
+            .map(|(i, data)| self.ctx.create_entry(data, i))
+    }
+}
+
+impl ExactSizeIterator for EpubSpineIter<'_> {
+    fn len(&self) -> usize {
+        self.iter.len()
+    }
+}
+
+impl FusedIterator for EpubSpineIter<'_> {}
 
 /// A [`SpineEntry`] contained within an [`EpubSpine`], encompassing associated metadata.
 ///

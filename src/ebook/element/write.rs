@@ -1,5 +1,6 @@
 use crate::ebook::element::{Attribute, Attributes, Properties};
 use crate::util::str::StringExt;
+use std::iter::FusedIterator;
 
 impl Properties {
     /// Returns [`Some`] if populated, otherwise [`None`].
@@ -317,3 +318,17 @@ impl<'a> Iterator for AttributesIterMut<'a> {
         self.0.size_hint()
     }
 }
+
+impl DoubleEndedIterator for AttributesIterMut<'_> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.0.next_back()
+    }
+}
+
+impl ExactSizeIterator for AttributesIterMut<'_> {
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+}
+
+impl FusedIterator for AttributesIterMut<'_> {}

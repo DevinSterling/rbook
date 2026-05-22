@@ -21,7 +21,7 @@ use crate::epub::package::{EpubPackageData, EpubPackageMetaContext};
 use crate::util::{Sealed, doc};
 use indexmap::IndexMap;
 use std::fmt::Display;
-use std::iter::{Enumerate, FlatMap};
+use std::iter::{Enumerate, FlatMap, FusedIterator};
 use std::slice::Iter as SliceIter;
 
 #[cfg(feature = "write")]
@@ -768,6 +768,16 @@ impl<'ebook> Iterator for EpubMetadataIter<'ebook> {
     }
 }
 
+impl DoubleEndedIterator for EpubMetadataIter<'_> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.iter
+            .next_back()
+            .map(|(i, data)| self.ctx.create_entry(data, i))
+    }
+}
+
+impl FusedIterator for EpubMetadataIter<'_> {}
+
 /// A collection of [`EpubMetaEntry`] refinements providing further clarifying detail.
 ///
 /// Refinements, such as `alternate-script`, `title-type`, and `media:duration`,
@@ -951,6 +961,22 @@ impl<'ebook> Iterator for EpubRefinementsIter<'ebook> {
         self.iter.size_hint()
     }
 }
+
+impl DoubleEndedIterator for EpubRefinementsIter<'_> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.iter
+            .next_back()
+            .map(|(i, data)| self.ctx.create_refining_entry(self.parent_id, data, i))
+    }
+}
+
+impl ExactSizeIterator for EpubRefinementsIter<'_> {
+    fn len(&self) -> usize {
+        self.iter.len()
+    }
+}
+
+impl FusedIterator for EpubRefinementsIter<'_> {}
 
 /// A [`MetaEntry`] within [`EpubMetadata`].
 ///

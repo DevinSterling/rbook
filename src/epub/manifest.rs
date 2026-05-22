@@ -23,6 +23,7 @@ use indexmap::map::Iter as HashMapIter;
 use std::collections::HashSet;
 use std::fmt::Debug;
 use std::io::Write;
+use std::iter::FusedIterator;
 
 #[cfg(feature = "write")]
 pub use write::{
@@ -495,6 +496,21 @@ impl<'ebook> Iterator for EpubManifestIter<'ebook> {
         self.iter.size_hint()
     }
 }
+
+impl DoubleEndedIterator for EpubManifestIter<'_> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.iter
+            .next_back()
+            .map(|(id, data)| self.ctx.create_entry(id, data))
+    }
+}
+
+impl ExactSizeIterator for EpubManifestIter<'_> {
+    fn len(&self) -> usize {
+        self.iter.len()
+    }
+}
+impl FusedIterator for EpubManifestIter<'_> {}
 
 /// A [`ManifestEntry`] contained within an [`EpubManifest`], encompassing
 /// resource-related metadata.

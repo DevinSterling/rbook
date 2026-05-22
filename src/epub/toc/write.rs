@@ -9,6 +9,7 @@ use crate::epub::toc::{
 use crate::input::{IntoOption, Many};
 use crate::util::uri::{self, UriResolver};
 use std::fmt::Debug;
+use std::iter::FusedIterator;
 use std::ops::RangeBounds;
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -752,6 +753,23 @@ impl<'ebook> Iterator for EpubTocIterMut<'ebook> {
     }
 }
 
+impl DoubleEndedIterator for EpubTocIterMut<'_> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.iter.next_back().map(|(key, root)| {
+            self.ctx
+                .create_root_mut(key.version, Some(self.href_resolver), root)
+        })
+    }
+}
+
+impl ExactSizeIterator for EpubTocIterMut<'_> {
+    fn len(&self) -> usize {
+        self.iter.len()
+    }
+}
+
+impl FusedIterator for EpubTocIterMut<'_> {}
+
 /// Mutable view of [`EpubTocEntry`], allowing modification of ToC entry fields,
 /// attributes, and management of nested children.
 ///
@@ -1088,6 +1106,23 @@ impl<'ebook> Iterator for EpubTocEntryIterMut<'ebook> {
         self.iter.size_hint()
     }
 }
+
+impl DoubleEndedIterator for EpubTocEntryIterMut<'_> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.iter.next_back().map(|entry| {
+            self.ctx
+                .create_entry_mut(self.version, self.href_resolver, entry, self.next_depth)
+        })
+    }
+}
+
+impl ExactSizeIterator for EpubTocEntryIterMut<'_> {
+    fn len(&self) -> usize {
+        self.iter.len()
+    }
+}
+
+impl FusedIterator for EpubTocEntryIterMut<'_> {}
 
 impl Debug for EpubTocEntryIterMut<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

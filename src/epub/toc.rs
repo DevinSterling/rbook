@@ -15,6 +15,7 @@ use crate::util::{Sealed, doc};
 use indexmap::IndexMap;
 use indexmap::map::Iter as HashMapIter;
 use std::fmt::Debug;
+use std::iter::FusedIterator;
 use std::slice::Iter as SliceIter;
 
 #[cfg(feature = "write")]
@@ -283,7 +284,6 @@ impl<'ebook> EpubToc<'ebook> {
             //       Despite the redundancy, the cost is negligible.
             .chain(EpubVersion::VERSIONS);
 
-        // Mutable key for quick lookup & modification
         for version in attempts {
             if let Some(root) = self.by_toc_key(kind.as_str(), version) {
                 return Some(root);
@@ -391,6 +391,22 @@ impl<'ebook> Iterator for EpubTocIter<'ebook> {
         self.iter.size_hint()
     }
 }
+
+impl DoubleEndedIterator for EpubTocIter<'_> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.iter
+            .next_back()
+            .map(move |(key, data)| self.ctx.create_root(key.version, data))
+    }
+}
+
+impl ExactSizeIterator for EpubTocIter<'_> {
+    fn len(&self) -> usize {
+        self.iter.len()
+    }
+}
+
+impl FusedIterator for EpubTocIter<'_> {}
 
 /// A [`TocEntry`] contained within an [`EpubToc`], encompassing associated metadata.
 ///
@@ -684,6 +700,8 @@ impl<'ebook> EpubTocEntry<'ebook> {
             }
         }
 
+        impl FusedIterator for FlatEpubTocEntryIterator<'_> {}
+
         FlatEpubTocEntryIterator {
             ctx: self.ctx,
             version: self.version,
@@ -839,3 +857,19 @@ impl<'ebook> Iterator for EpubTocEntryIter<'ebook> {
         self.iter.size_hint()
     }
 }
+
+impl DoubleEndedIterator for EpubTocEntryIter<'_> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.iter
+            .next_back()
+            .map(|data| self.ctx.create_entry(self.version, data, self.next_depth))
+    }
+}
+
+impl ExactSizeIterator for EpubTocEntryIter<'_> {
+    fn len(&self) -> usize {
+        self.iter.len()
+    }
+}
+
+impl FusedIterator for EpubTocEntryIter<'_> {}

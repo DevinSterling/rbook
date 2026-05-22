@@ -5,6 +5,7 @@ use crate::epub::package::{EpubPackage, EpubPackageData, EpubVersionData, Prefix
 use crate::input::IntoOption;
 use crate::util::borrow::CowExt;
 use crate::util::uri;
+use std::iter::FusedIterator;
 
 impl EpubPackageData {
     pub(in crate::epub) fn new(location: String, version: EpubVersion) -> Self {
@@ -352,3 +353,17 @@ impl<'ebook> Iterator for PrefixesMutIter<'ebook> {
         self.0.size_hint()
     }
 }
+
+impl DoubleEndedIterator for PrefixesMutIter<'_> {
+    fn next_back(&mut self) -> Option<Self::Item> {
+        self.0.next_back()
+    }
+}
+
+impl ExactSizeIterator for PrefixesMutIter<'_> {
+    fn len(&self) -> usize {
+        self.0.len()
+    }
+}
+
+impl FusedIterator for PrefixesMutIter<'_> {}
