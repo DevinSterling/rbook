@@ -9,16 +9,18 @@ use crate::writer::xml::{XmlWriter, write_element};
 use std::io::Write;
 
 struct NavPointIdGenerator<'ebook> {
-    prefix: &'ebook str,
     nav_map: Option<&'ebook EpubTocEntryData>,
     count: Option<usize>,
+    buffer: Option<String>,
 }
 
 impl<'ebook> NavPointIdGenerator<'ebook> {
-    fn new(prefix: &'ebook str, nav_map: Option<&'ebook EpubTocEntryData>) -> Self {
+    const PREFIX: &'static str = "nav-point-";
+
+    fn new(nav_map: Option<&'ebook EpubTocEntryData>) -> Self {
         Self {
             count: None,
-            prefix,
+            buffer: None,
             nav_map,
         }
     }
@@ -37,20 +39,32 @@ impl<'ebook> NavPointIdGenerator<'ebook> {
         }
     }
 
-    fn generate_id(&mut self) -> String {
-        let prefix = self.prefix;
-        // Find the max to determine where the counter starts at.
+    fn generate_id(&mut self) -> &str {
+        use std::fmt::Write;
+        /// Allocate 5 extra bytes, supporting a `count` of 0-99999 without additional allocations.
+        const EXTRA_CAPACITY: usize = 5;
+
+        // Increment the count
         let count = self.count.get_or_insert_with(|| {
+            // Find the max to determine where the counter starts at.
             let mut max = 0;
             if let Some(nav_map) = self.nav_map {
-                Self::check_entry(self.prefix, &mut max, nav_map);
+                Self::check_entry(Self::PREFIX, &mut max, nav_map);
             }
             max
         });
-
         *count += 1;
 
-        format!("{prefix}{count}")
+        let id_buffer = self.buffer.get_or_insert_with(|| {
+            let mut buffer = String::with_capacity(Self::PREFIX.len() + EXTRA_CAPACITY);
+            buffer.push_str(Self::PREFIX);
+            buffer
+        });
+
+        // Write the generated id
+        id_buffer.truncate(Self::PREFIX.len());
+        let _ = write!(id_buffer, "{count}");
+        id_buffer
     }
 }
 
@@ -68,15 +82,14 @@ impl<'ebook, W: Write> NcxTocWriter<'ebook, W> {
         data: &'ebook TocData<'ebook>,
         writer: W,
     ) -> Self {
-        const NAV_POINT_ID_PREFIX: &str = "nav-point-";
-
         Self {
             resolver: UriResolver::parent_of(&data.location),
             writer: XmlWriter::new(writer),
-            id_generator: NavPointIdGenerator::new(
-                NAV_POINT_ID_PREFIX,
-                toc::get_toc_root(ctx, TocEntryKind::Toc, EPUB2_TOC_FALLBACKS),
-            ),
+            id_generator: NavPointIdGenerator::new(toc::get_toc_root(
+                ctx,
+                TocEntryKind::Toc,
+                EPUB2_TOC_FALLBACKS,
+            )),
             ctx,
         }
     }
@@ -225,7 +238,7 @@ impl<'ebook, W: Write> NcxTocWriter<'ebook, W> {
             writer: self.writer,
             tag: ncx::NAV_POINT,
             attributes: {
-                xml::ID         => data.id.as_deref().or(generated_id.as_deref()),
+                xml::ID         => data.id.as_deref().or(generated_id),
                 ncx::CLASS      => data.attributes.get_value(ncx::CLASS),
                 // The `playOrder` attribute is ignored as it is not required by the EPUB 2 spec:
                 // https://idpf.org/epub/20/spec/OPF_2.0_latest.htm#Section2.4.1.2

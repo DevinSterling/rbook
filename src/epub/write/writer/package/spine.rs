@@ -29,7 +29,7 @@ impl<'ebook> SpineIdGenerator<'ebook> {
     pub(super) fn generate_id(&mut self, entry: &EpubSpineEntryData) -> &str {
         self.generated
             .entry(std::ptr::from_ref(entry))
-            .or_insert_with(|| self.generator.generate_id())
+            .or_insert_with(|| self.generator.generate_id().to_owned())
     }
 
     fn get(&self, entry: &EpubSpineEntryData) -> Option<&str> {

@@ -18,12 +18,14 @@ pub(super) struct PackageIdGenerator<'ebook> {
     prefix: &'ebook str,
     epub: &'ebook Epub,
     count: Option<usize>,
+    buffer: Option<String>,
 }
 
 impl<'ebook> PackageIdGenerator<'ebook> {
     pub(super) fn new(prefix: &'ebook str, epub: &'ebook Epub) -> Self {
         Self {
             count: None,
+            buffer: None,
             prefix,
             epub,
         }
@@ -45,7 +47,11 @@ impl<'ebook> PackageIdGenerator<'ebook> {
     }
 
     /// Generates a unique ID within the package document.
-    fn generate_id(&mut self) -> String {
+    fn generate_id(&mut self) -> &str {
+        use std::fmt::Write;
+        /// Allocate 5 extra bytes, supporting a `count` of 0-99999 without additional allocations.
+        const EXTRA_CAPACITY: usize = 5;
+
         let prefix = self.prefix;
         // Find the max to determine where the counter starts at.
         let count = self.count.get_or_insert_with(|| {
@@ -77,7 +83,16 @@ impl<'ebook> PackageIdGenerator<'ebook> {
 
         *count += 1;
 
-        format!("{prefix}{count}")
+        let id_buffer = self.buffer.get_or_insert_with(|| {
+            let mut buffer = String::with_capacity(self.prefix.len() + EXTRA_CAPACITY);
+            buffer.push_str(self.prefix);
+            buffer
+        });
+
+        // Write the generated id
+        id_buffer.truncate(self.prefix.len());
+        let _ = write!(id_buffer, "{count}");
+        id_buffer
     }
 }
 

@@ -168,7 +168,10 @@ impl<'package, 'ebook, W: Write> MetadataWriter<'package, 'ebook, W> {
         let has_refinements = !meta.refinements.is_empty();
         let generated_id = (supports_epub3 && has_refinements && meta.id.is_none())
             .then(|| self.metadata_id_generator.generate_id());
-        let id = meta.id.as_deref().or(generated_id.as_deref());
+        let id = meta.id.as_deref().or(generated_id);
+        let idref = (has_refinements && supports_epub3)
+            .then(|| id.map(Self::refines_fragment))
+            .flatten();
 
         self.writer
             .start_element(tag)?
@@ -202,8 +205,8 @@ impl<'package, 'ebook, W: Write> MetadataWriter<'package, 'ebook, W> {
         };
 
         // Handle refinements
-        if supports_epub3 && let Some(id) = id {
-            self.write_refinements(&Self::refines_fragment(id), &meta.refinements)?;
+        if let Some(idref) = idref {
+            self.write_refinements(&idref, &meta.refinements)?;
         }
 
         Ok(())
@@ -214,9 +217,6 @@ impl<'package, 'ebook, W: Write> MetadataWriter<'package, 'ebook, W> {
         refines_fragment: &str,
         refinements: &'ebook EpubRefinementsData,
     ) -> WriterResult<()> {
-        if refinements.is_empty() {
-            return Ok(());
-        }
         for refinement in refinements.iter() {
             // Parent ID references must start with `#`
             self.write_metadata_entry(refinement, Some(refines_fragment))?;
