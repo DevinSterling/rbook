@@ -35,10 +35,10 @@
         <dc:language>en</dc:language>
         <dc:identifier id="uid" opf:scheme="URL">https://github.com/devinsterling/rbook</dc:identifier>
         <dc:description>
-            <a>Hello world!</a>
-            <![CDATA[ CData 1. ]]>   A <![CDATA[descriptive]]> statement.
-            <![CDATA[ CData 2. ]]>   An<![CDATA[other]]> <!-- comment -->
-            <!-- comment 123 --> statement  <!--comment--> !
+            <a>Hello!</a>
+            <![CDATA[ 1 > 2 ]]>   &amp; <![CDATA[3]]> &lt; 4&#10;&#9; <!-- new line & tab -->→
+            <![CDATA[ 'ABC' ]]>   !<![CDATA[=]]> &apos;X<!-- long
+            comment 123 -->YZ&apos; <!--comment--> ←
         </dc:description>
 
         <dc:subject id="tag2">Quests (Expeditions) -- Fiction</dc:subject>
