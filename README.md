@@ -156,8 +156,8 @@ fn main() {
         let filename = image.href().name().decode(); // Decode as EPUB hrefs are percent-encoded
 
         // Copy the raw image bytes
-        let file = File::create(out.join(&*filename)).unwrap();
-        image.copy_bytes(file).unwrap();
+        let mut file = File::create(out.join(&*filename)).unwrap();
+        image.copy_bytes(&mut file).unwrap();
     }
 }
 ```

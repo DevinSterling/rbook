@@ -143,7 +143,7 @@
 //! # }
 //! ```
 //!
-//! For finer grain control, the [`Ebook`] trait provides two methods
+//! For finer grain control, the [`Ebook`] trait provides methods
 //! that accept a [`Resource`](ebook::resource::Resource) as an argument:
 //! - [`copy_resource`](Ebook::copy_resource)
 //! - [`read_resource_bytes`](Ebook::read_resource_bytes)
@@ -256,8 +256,7 @@
 //! ```
 //! ## [Editing](Epub::edit) an [Epub]
 //! ```no_run
-//! # #[cfg(feature = "write")]
-//! # {
+//! # #[cfg(feature = "write")] {
 //! # use rbook::Epub;
 //! # fn main() -> rbook::ebook::errors::EbookResult<()> {
 //! use rbook::epub::EpubChapter;
@@ -282,8 +281,7 @@
 //! > See the [`epub`] module for lower-level control over the manifest, spine, etc.
 //!
 //! ```no_run
-//! # #[cfg(feature = "write")]
-//! # {
+//! # #[cfg(feature = "write")] {
 //! # use rbook::Epub;
 //! # use rbook::ebook::errors::EbookResult;
 //! use rbook::ebook::toc::TocEntryKind;

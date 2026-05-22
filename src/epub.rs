@@ -59,8 +59,7 @@
 //!   such as updating metadata, adding [authors](EpubEditor::author),
 //!   and inserting [resources](EpubEditor::resource) or [chapters](EpubEditor::chapter).
 //! ```
-//! # #[cfg(feature = "write")]
-//! # {
+//! # #[cfg(feature = "write")] {
 //! # use rbook::Epub;
 //! Epub::builder()
 //!     .author("John Doe")
@@ -75,8 +74,7 @@
 //! - [`EpubSpineMut`](spine::EpubSpineMut): Reorder the reading sequence.
 //! - [`EpubTocMut`](toc::EpubTocMut): Modify navigation hierarchy.
 //! ```
-//! # #[cfg(feature = "write")]
-//! # {
+//! # #[cfg(feature = "write")] {
 //! # use rbook::Epub;
 //! # use rbook::epub::manifest::DetachedEpubManifestEntry;
 //! # use rbook::epub::metadata::DetachedEpubMetaEntry;
@@ -200,8 +198,7 @@
 //!   They are lightweight, allow in-place modifications,
 //!   and can trigger [cascading updates](#cascading-updates).
 //!   ```
-//!   # #[cfg(feature = "write")]
-//!   # {
+//!   # #[cfg(feature = "write")] {
 //!   # use rbook::epub::Epub;
 //!   # fn main() -> rbook::ebook::errors::EbookResult<()> {
 //!   # let mut epub = Epub::open("tests/ebooks/example_epub")?;
@@ -227,8 +224,7 @@
 //!   Owned data detached from an [`Epub`].
 //!   These are used to build new components or inspect data independently.
 //!   ```
-//!   # #[cfg(feature = "write")]
-//!   # {
+//!   # #[cfg(feature = "write")] {
 //!   # use rbook::epub::Epub;
 //!   # use rbook::epub::metadata::DetachedEpubMetaEntry;
 //!   # fn main() -> rbook::ebook::errors::EbookResult<()> {
@@ -342,8 +338,7 @@ pub use write::{EpubChapter, EpubEditor, EpubWriteOptions, OrphanFilter};
 /// ```
 /// - [Modifying](Self::edit) an [`Epub`]:
 /// ```
-/// # #[cfg(feature = "write")]
-/// # {
+/// # #[cfg(feature = "write")] {
 /// # use rbook::Epub;
 /// # const NEW_JPEG_IMAGE: &[u8] = &[];
 /// # fn main() -> rbook::ebook::errors::EbookResult<()> {

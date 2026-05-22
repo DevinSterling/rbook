@@ -391,17 +391,21 @@ pub trait MetaEntry<'ebook>: Sealed {
     /// The plain text value of an entry.
     ///
     /// # Example
-    /// - Retrieving the value of a description:
+    /// - Retrieving the value of metadata entries:
     /// ```
     /// # use rbook::Epub;
     /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
     /// let epub = Epub::open("tests/ebooks/example_epub")?;
-    /// let description = epub.metadata().description().unwrap();
+    /// let metadata = epub.metadata();
     ///
-    /// assert_eq!(
-    ///     "Hello world! CData 1. A descriptive statement. CData 2. Another statement !",
-    ///     description.value(),
-    /// );
+    /// let title = metadata.title().unwrap();
+    /// assert_eq!("Example EPUB", title.value());
+    ///
+    /// let first_creator = metadata.creators().next().unwrap();
+    /// assert_eq!("John Doe", first_creator.value());
+    ///
+    /// let description = metadata.description().unwrap();
+    /// assert_eq!("Hello! 1 > 2 & 3 < 4\n\t → 'ABC' != 'XYZ' ←", description.value());
     /// # Ok(())
     /// # }
     /// ```

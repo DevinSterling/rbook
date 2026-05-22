@@ -15,8 +15,7 @@
 /// # Examples
 /// - Passing arguments to a method which accepts the `Many` trait:
 /// ```
-/// # #[cfg(feature = "write")]
-/// # {
+/// # #[cfg(feature = "write")] {
 /// # use rbook::Epub;
 /// use rbook::epub::spine::DetachedEpubSpineEntry;
 ///
@@ -43,8 +42,7 @@
 /// ```
 /// - `Many` supports types that implement [`Into`]:
 /// ```
-/// # #[cfg(feature = "write")]
-/// # {
+/// # #[cfg(feature = "write")] {
 /// # use rbook::epub::spine::DetachedEpubSpineEntry;
 /// # let mut epub = rbook::Epub::new();
 /// # let mut spine = epub.spine_mut();
@@ -150,8 +148,7 @@ impl_single_insertable! {
 /// However, if the iterator is passed through the [`Batch`] adapter,
 /// then the code compiles:
 /// ```
-/// # #[cfg(feature = "write")]
-/// # {
+/// # #[cfg(feature = "write")] {
 /// # use rbook::Epub;
 /// use rbook::input::Batch;
 ///
