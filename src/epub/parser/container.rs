@@ -9,9 +9,7 @@ use crate::util::uri;
 impl EpubParser<'_> {
     /// Parses `META-INF/container.xml` and retrieves the package `.opf` file location.
     pub(super) fn parse_container(&self, data: &[u8]) -> ParserResult<String> {
-        let mut reader = XmlReader::from_bytes(self.xml_config(), data);
-
-        while let Some(event) = reader.next() {
+        for event in XmlReader::from_bytes(self.xml_config(), data) {
             let el = match event? {
                 XmlEvent::Start(el) if el.is_local_name(ocf::ROOT_FILE) => el,
                 _ => continue,

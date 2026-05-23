@@ -269,7 +269,7 @@ impl<'ebook> StylesheetExtractor<'ebook> {
     }
 
     fn extract_stylesheet(&mut self) -> Option<String> {
-        while let Some(result) = self.reader.next() {
+        for result in &mut self.reader {
             let Ok(event) = result else {
                 return None;
             };

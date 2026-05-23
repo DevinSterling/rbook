@@ -140,7 +140,7 @@ impl<'a> XmlReader<'a> {
         let mut value = String::new();
         let mut consumed_event = None;
 
-        while let Some(result) = self.next() {
+        for result in self {
             let event = result?;
 
             if is_stop(&event) {

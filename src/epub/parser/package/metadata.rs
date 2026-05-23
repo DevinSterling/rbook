@@ -337,7 +337,7 @@ impl<'package, 'a> MetadataParser<'package, 'a> {
     }
 
     fn next_entry(&mut self) -> ParserResult<Option<(EpubMetaEntryKind, XmlStartElement<'a>)>> {
-        while let Some(event) = self.reader.next() {
+        for event in &mut self.reader {
             let el = match event? {
                 XmlEvent::Start(el) => el,
                 XmlEvent::End(el) if el.local_name().as_ref() == bytes::METADATA => break,

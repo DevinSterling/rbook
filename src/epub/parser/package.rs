@@ -256,7 +256,7 @@ impl<'parser, 'a> PackageParser<'parser, 'a> {
         parent: &[u8],
         child: &[u8],
     ) -> ParserResult<Option<XmlStartElement<'a>>> {
-        while let Some(event) = reader.next() {
+        for event in reader {
             return Ok(Some(match event? {
                 XmlEvent::Start(el) if el.is_local_name(child) => el,
                 XmlEvent::End(el) if el.local_name().as_ref() == parent => break,
