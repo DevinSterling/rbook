@@ -1,4 +1,16 @@
 # Changelog
+## 0.7.7 (2026-05-22)
+### Additions **＋**
+- Implement `DoubleEndedIterator`, `ExactSizeIterator`, and  `FusedIterator` for applicable iterators.
+
+### Changes　**⟳**
+- Optimize EPUB writer automatic ID generation.
+- Exclude `zopfli` transitive dependency from `zip`.
+- Update `quick-xml` dev dependency: 0.39.2 → 0.40.1
+- Update `zip` dependency: 8.5.1 → 8.6.0
+- Update `wasm-bindgen-test` dev dependency: 0.3.68 → 0.3.72
+- Refine documentation for enhanced clarity.
+
 ## 0.7.6 (2026-04-21)
 ### Additions **＋**
 - New methods:
