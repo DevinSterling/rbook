@@ -129,6 +129,9 @@ impl<'package, 'ebook, W: Write> MetadataWriter<'package, 'ebook, W> {
 
         // Write manifest refinements
         for (id, entry) in &epub.manifest.entries {
+            if entry.refinements.is_empty() {
+                continue;
+            }
             let refines = Self::refines_fragment(id);
             self.write_refinements(&refines, &entry.refinements)?;
         }
