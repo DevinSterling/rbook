@@ -620,7 +620,7 @@ impl<'ebook> EpubSpineEntryMut<'ebook> {
     /// Sets the unique `id` and returns the previous value.
     ///
     /// # See Also
-    /// - [`DetachedEpubSpineEntry::id`] for important details.
+    /// - ***[`DetachedEpubSpineEntry::id`] for important details.***
     /// - [`EpubSpineEntry::id`] to get the `id` (Accessible via [`Self::as_view`]).
     pub fn set_id(&mut self, id: impl IntoOption<String>) -> Option<String> {
         std::mem::replace(&mut self.data.id, id.into_option())
@@ -634,7 +634,7 @@ impl<'ebook> EpubSpineEntryMut<'ebook> {
     /// [`EpubManifestEntryMut::set_id`](crate::epub::manifest::EpubManifestEntryMut::set_id).
     ///
     /// # See Also
-    /// - [`DetachedEpubSpineEntry::idref`] for important details.
+    /// - ***[`DetachedEpubSpineEntry::idref`] for important details.***
     /// - [`EpubSpineEntry::idref`] to get the `idref` (Accessible via [`Self::as_view`]).
     pub fn set_idref(&mut self, idref: impl Into<String>) -> String {
         std::mem::replace(&mut self.data.idref, idref.into())
@@ -659,7 +659,7 @@ impl<'ebook> EpubSpineEntryMut<'ebook> {
     /// Used for attributes like `rendition:orientation` or custom namespaced attributes.
     ///
     /// # See Also
-    /// - [`DetachedEpubSpineEntry::attribute`] for important details.
+    /// - ***[`DetachedEpubSpineEntry::attribute`] for important details.***
     pub fn attributes_mut(&mut self) -> &mut Attributes {
         &mut self.data.attributes
     }

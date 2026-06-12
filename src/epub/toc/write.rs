@@ -457,7 +457,7 @@ impl<'ebook> EpubTocMut<'ebook> {
     /// with [`TocEntryKind::Toc`] as the argument.
     ///
     /// # See Also
-    /// - **[`Self::by_kind_mut`] to see selection and fallback behavior, which this method uses.*
+    /// - [`Self::by_kind_mut`] to see selection and fallback behavior, which this method uses.
     /// - [`Self::by_kind_version_mut`] to retrieve a specific format
     ///   (e.g. explicitly editing the NCX).
     pub fn contents_mut(&mut self) -> Option<EpubTocEntryMut<'_>> {
@@ -475,7 +475,7 @@ impl<'ebook> EpubTocMut<'ebook> {
     /// with [`TocEntryKind::Landmarks`] as the argument.
     ///
     /// # See Also
-    /// - **[`Self::by_kind_mut`] to see selection and fallback behavior, which this method uses.*
+    /// - [`Self::by_kind_mut`] to see selection and fallback behavior, which this method uses.
     pub fn landmarks_mut(&mut self) -> Option<EpubTocEntryMut<'_>> {
         self.by_kind_mut(TocEntryKind::Landmarks)
     }
@@ -491,7 +491,7 @@ impl<'ebook> EpubTocMut<'ebook> {
     /// with [`TocEntryKind::PageList`] as the argument.
     ///
     /// # See Also
-    /// - **[`Self::by_kind_mut`] to see selection and fallback behavior, which this method uses.*
+    /// - [`Self::by_kind_mut`] to see selection and fallback behavior, which this method uses.
     pub fn page_list_mut(&mut self) -> Option<EpubTocEntryMut<'_>> {
         self.by_kind_mut(TocEntryKind::PageList)
     }
@@ -825,7 +825,7 @@ impl<'ebook> EpubTocEntryMut<'ebook> {
     /// Sets the unique `id` and returns the previous value.
     ///
     /// # See Also
-    /// - [`DetachedEpubTocEntry::id`] for important details.
+    /// - ***[`DetachedEpubTocEntry::id`] for important details.***
     /// - [`EpubTocEntry::id`] to get the `id` (Accessible via [`Self::as_view`]).
     pub fn set_id(&mut self, id: impl IntoOption<String>) -> Option<String> {
         std::mem::replace(&mut self.data.id, id.into_option())
@@ -898,7 +898,7 @@ impl<'ebook> EpubTocEntryMut<'ebook> {
     /// The resolved href is computed once the entry is inserted into an [`Epub`](crate::epub::Epub).
     ///
     /// # See Also
-    /// - [`DetachedEpubTocEntry::href`] for important details.
+    /// - ***[`DetachedEpubTocEntry::href`] for important details.***
     /// - [`EpubEditor::resource`](crate::epub::EpubEditor::resource) for path details.
     ///   The same path resolution rules apply to this method.
     /// - [`EpubTocEntry::href`] to get the resolved href
@@ -923,7 +923,7 @@ impl<'ebook> EpubTocEntryMut<'ebook> {
     /// Used for attributes like `class`, `hidden`, or custom namespaced attributes.
     ///
     /// # See Also
-    /// - [`DetachedEpubTocEntry::attribute`] for important details.
+    /// - ***[`DetachedEpubTocEntry::attribute`] for important details.***
     pub fn attributes_mut(&mut self) -> &mut Attributes {
         &mut self.data.attributes
     }

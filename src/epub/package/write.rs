@@ -214,7 +214,7 @@ impl<'ebook> EpubPackageMut<'ebook> {
     /// Mutable view of all additional `XML` attributes of the `<package>` element.
     ///
     /// # See Also
-    /// - [`EpubPackage::attributes`] for important details.
+    /// - ***[`EpubPackage::attributes`] for important details.***
     pub fn attributes_mut(&mut self) -> &mut Attributes {
         &mut self.package.attributes
     }

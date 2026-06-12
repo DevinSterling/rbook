@@ -1717,7 +1717,7 @@ impl<'ebook> EpubMetaEntryMut<'ebook> {
     /// Sets the unique `id` and returns the previous value.
     ///
     /// # See Also
-    /// - [`DetachedEpubMetaEntry::id`] for important details.
+    /// - ***[`DetachedEpubMetaEntry::id`] for important details.***
     /// - [`EpubMetaEntry::id`] to get the `id` (Accessible via [`Self::as_view`]).
     pub fn set_id(&mut self, id: impl IntoOption<String>) -> Option<String> {
         std::mem::replace(&mut self.data.id, id.into_option())
@@ -1760,7 +1760,7 @@ impl<'ebook> EpubMetaEntryMut<'ebook> {
     /// Used for attributes like `scheme`, `media-type`, or custom namespaced attributes.
     ///
     /// # See Also
-    /// - [`DetachedEpubMetaEntry::attribute`] for important details.
+    /// - ***[`DetachedEpubMetaEntry::attribute`] for important details.***
     pub fn attributes_mut(&mut self) -> &mut Attributes {
         &mut self.data.attributes
     }

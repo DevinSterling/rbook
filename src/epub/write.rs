@@ -218,7 +218,7 @@ impl Epub {
     /// Cleans up the content of an [`Epub`], removing broken references.
     ///
     /// It is recommended to call this method after performing multiple removals from the
-    /// [manifest](Self::manifest_mut) to retain ebook structurally integrity.
+    /// [manifest](Self::manifest_mut) to retain ebook structural integrity.
     ///
     /// # Manifest
     /// All manifest entries that reference a non-existent fallback or media overlay
@@ -594,7 +594,7 @@ impl EpubEditor<'_> {
     /// Sets the location of the package file.
     ///
     /// # See Also
-    /// - [`EpubPackageMut::set_location`] for important details.
+    /// - ***[`EpubPackageMut::set_location`] for important details.***
     ///
     /// # Examples
     /// - Setting the package file location:
@@ -619,7 +619,7 @@ impl EpubEditor<'_> {
     ///
     /// # Note
     /// - This method is equivalent to calling [`EpubPackageMut::set_version`]
-    ///   *without* the previous version returned.
+    ///   *without* returning the previous version.
     /// - Setting the version of an existing EPUB does not perform a conversion
     ///   (e.g., Converting EPUB 3 to EPUB 2).
     ///
@@ -775,7 +775,7 @@ impl EpubEditor<'_> {
     /// # Note
     /// - This is primarily an EPUB 3 feature.
     ///   When [writing](Self::write) an EPUB 2 ebook, this field is ignored.
-    ///   However, If a legacy `dc:date` with `opf:event="modification"` exists,
+    ///   However, if a legacy `dc:date` with `opf:event="modification"` exists,
     ///   its value is updated to match the new date.
     ///
     /// # Examples
@@ -1214,7 +1214,7 @@ impl EpubEditor<'_> {
     ///
     /// # Note
     /// This method is equivalent to calling [`EpubMetadataMut::remove_by_property`]
-    /// *without* any of the removed entries returned.
+    /// *without* returning any of the removed entries.
     ///
     /// # Examples
     /// - Replacing the creator of an [`Epub`]:
@@ -1412,7 +1412,7 @@ impl EpubEditor<'_> {
     /// Sets the [`PageDirection`] hint of an [`Epub`], indicating how readable content flows.
     ///
     /// This method is equivalent to calling [`EpubSpineMut::set_page_direction`]
-    /// without the previous direction being returned.
+    /// without returning the previous direction.
     ///
     /// # Note
     /// This is an EPUB 3 feature.
@@ -2180,7 +2180,7 @@ impl EpubChapter {
 ///    allowing configuration reuse.
 ///
 /// # Renditions
-/// Writing multi-rendition EPUBs are not currently supported.
+/// Writing multi-rendition EPUBs is not currently supported.
 /// This is a feature that will be introduced in the future.
 ///
 /// If the source EPUB contains multiple renditions

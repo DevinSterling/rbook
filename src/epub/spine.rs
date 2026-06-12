@@ -441,6 +441,9 @@ impl<'ebook> EpubSpineEntry<'ebook> {
 
     /// The textual [`Resource`] intended for end-user reading an entry points to.
     #[doc = doc::inherent!(SpineEntry, resource)]
+    /// # See Also
+    /// - [`Self::manifest_entry`] for the underlying manifest entry
+    ///   (e.g., [`href`](EpubManifestEntry::href), [`media_type`](EpubManifestEntry::media_type)).
     pub fn resource(&self) -> Option<Resource<'ebook>> {
         SpineEntry::resource(self)
     }

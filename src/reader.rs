@@ -10,7 +10,8 @@ use crate::ebook::spine::SpineEntry;
 use crate::reader::errors::ReaderResult;
 use crate::util::Sealed;
 
-/// A sequential + random-access [`Ebook`](super::reader) reader.
+/// A sequential + random-access [`Ebook`](super::reader) reader over readable
+/// [content](ReaderContent).
 ///
 /// # Lifetime
 /// All returned [`ReaderContent<'ebook>`](ReaderContent) are tied to the lifetime of the
@@ -386,6 +387,9 @@ pub trait ReaderContent<'ebook>: Into<String> + Into<Vec<u8>> + Sealed {
     fn position(&self) -> usize;
 
     /// The readable content (e.g., `XHTML`, `HTML`, etc.).
+    ///
+    /// # See Also
+    /// - [`Self::into_string`] to take the contained owned string.
     fn content(&self) -> &str;
 
     /// The associated [`SpineEntry`] containing reading order details.
@@ -398,9 +402,10 @@ pub trait ReaderContent<'ebook>: Into<String> + Into<Vec<u8>> + Sealed {
     ///
     /// This method is equivalent to calling `into::<String>()`.
     ///
-    /// See [`Self::content`] to retrieve a reference without taking ownership.
+    /// # See Also
+    /// - [`Self::content`] to retrieve a reference without taking ownership.
     ///
-    /// # Examples:
+    /// # Examples
     /// - Extracting the contained content in the form of a [`String`]:
     /// ```
     /// # use rbook::Epub;
@@ -423,7 +428,7 @@ pub trait ReaderContent<'ebook>: Into<String> + Into<Vec<u8>> + Sealed {
     ///
     /// This method is equivalent to calling `into::<Vec<u8>()`.
     ///
-    /// # Examples:
+    /// # Examples
     /// - Extracting the contained content in the form of bytes:
     /// ```
     /// # use rbook::Epub;

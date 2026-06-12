@@ -146,7 +146,7 @@ impl<'ebook> EpubPackage<'ebook> {
         Href::new(&self.0.location)
     }
 
-    /// The absolute percent-encoded directory, the package [file](Self::location) resides in.
+    /// The absolute percent-encoded directory the package [file](Self::location) resides in.
     ///
     /// This is ***not*** a filesystem path.
     /// It always starts with `/` to indicate the EPUB container root,

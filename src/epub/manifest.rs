@@ -734,6 +734,8 @@ impl<'ebook> EpubManifestEntry<'ebook> {
 
     /// The underlying [`Resource`] a manifest entry points to.
     #[doc = doc::inherent!(ManifestEntry, resource)]
+    /// # See Also
+    /// - [`Self::href`] to get the resource location as a string.
     pub fn resource(&self) -> Resource<'ebook> {
         Resource::new(self.media_type(), self.data.href.as_str())
     }
@@ -741,6 +743,8 @@ impl<'ebook> EpubManifestEntry<'ebook> {
     /// The [`ResourceKind`] a manifest entry represents,
     /// such as `XHTML`, `PNG`, `CSS`, etc.
     #[doc = doc::inherent!(ManifestEntry, kind)]
+    /// # See Also
+    /// - [`Self::media_type`] to get the MIME type string.
     pub fn kind(&self) -> ResourceKind<'ebook> {
         self.media_type().into()
     }

@@ -106,7 +106,8 @@
 //!     println!("{}", data.content());
 //! }
 //! ```
-//! Prior to creation, a reader can receive options to control its behavior,
+//! Concrete [`Reader`](reader::Reader) implementations implement [`Iterator`].
+//! Moreover, prior to creation, a reader can receive options to control its behavior,
 //! such as [linearity](epub::reader::EpubReaderOptions::linear_behavior):
 //! ```
 //! # use rbook::Epub;
@@ -120,7 +121,7 @@
 //! ```
 //!
 //! # Resource retrieval from an [`Ebook`]
-//! All files such as text, images, and video are accessible within an ebook programmatically.
+//! All files such as text, images, and video are programmatically accessible within an ebook.
 //!
 //! The simplest way to access and retrieve resources from an ebook is through the
 //! [`Manifest`](ebook::manifest::Manifest),
@@ -143,7 +144,7 @@
 //! # }
 //! ```
 //!
-//! For finer grain control, the [`Ebook`] trait provides methods
+//! For finer-grained control, the [`Ebook`] trait provides methods
 //! that accept a [`Resource`](ebook::resource::Resource) as an argument:
 //! - [`copy_resource`](Ebook::copy_resource)
 //! - [`read_resource_bytes`](Ebook::read_resource_bytes)
@@ -227,7 +228,7 @@
 //!
 //! for image in epub.manifest().images() {
 //!     // Extract the filename from the href and write to disk
-//!     let filename = image.href().name().decode(); // Decode EPUB hrefs are percent-encoded
+//!     let filename = image.href().name().decode(); // Decode as EPUB hrefs are percent-encoded
 //!
 //!     // Copy the raw image bytes
 //!     let mut file = File::create(out.join(&*filename)).unwrap();

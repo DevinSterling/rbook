@@ -183,7 +183,7 @@ impl<'ebook> EpubToc<'ebook> {
     /// with [`TocEntryKind::PageList`] as the argument.
     ///
     /// # See Also
-    /// - **[`Self::by_kind`] to see selection and fallback behavior, which this method uses.*
+    /// - [`Self::by_kind`] to see selection and fallback behavior, which this method uses.
     /// - [`EpubTocMut::page_list_mut`] to get the mutable page list.
     pub fn page_list(&self) -> Option<EpubTocEntry<'ebook>> {
         self.by_kind(TocEntryKind::PageList)
@@ -203,7 +203,7 @@ impl<'ebook> EpubToc<'ebook> {
     /// with [`TocEntryKind::Landmarks`] as the argument.
     ///
     /// # See Also
-    /// - **[`Self::by_kind`] to see selection and fallback behavior, which this method uses.**
+    /// - [`Self::by_kind`] to see selection and fallback behavior, which this method uses.
     /// - [`EpubTocMut::landmarks_mut`] to get the mutable landmarks/guide.
     pub fn landmarks(&self) -> Option<EpubTocEntry<'ebook>> {
         self.by_kind(TocEntryKind::Landmarks)
@@ -246,7 +246,7 @@ impl<'ebook> EpubToc<'ebook> {
     ///
     #[doc = doc::inherent!(Toc, contents)]
     /// # See Also
-    /// - **[`Self::by_kind`] to see selection and fallback behavior, which this method uses.**
+    /// - [`Self::by_kind`] to see selection and fallback behavior, which this method uses.
     /// - [`Self::by_kind_version`] to retrieve a specific variant (e.g. EPUB 2 NCX).
     /// - [`EpubTocMut::contents_mut`] to get the mutable contents.
     pub fn contents(&self) -> Option<EpubTocEntry<'ebook>> {
@@ -626,6 +626,7 @@ impl<'ebook> EpubTocEntry<'ebook> {
     /// The semantic kind of content associated with an entry.
     #[doc = doc::inherent!(TocEntry, kind)]
     /// # See Also
+    /// - [`Self::kind_raw`] to get the original semantic kind string.
     /// - [`EpubTocEntryMut::set_kind`] to modify the semantic kind.
     pub fn kind(&self) -> TocEntryKind<'ebook> {
         self.data
@@ -644,6 +645,9 @@ impl<'ebook> EpubTocEntry<'ebook> {
 
     /// The [`Resource`] intended to navigate to from an entry.
     #[doc = doc::inherent!(TocEntry, resource)]
+    /// # See Also
+    /// - [`Self::manifest_entry`] for the underlying manifest entry
+    ///   (e.g., [`href`](EpubManifestEntry::href), [`media_type`](EpubManifestEntry::media_type)).
     pub fn resource(&self) -> Option<Resource<'ebook>> {
         TocEntry::resource(self)
     }

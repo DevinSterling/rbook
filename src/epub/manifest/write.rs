@@ -695,7 +695,7 @@ impl DetachedEpubManifestEntry {
 /// - For example: `images/art1.png` (href) -> `images_art1_png` (generated `id`)
 ///
 /// # See Also
-/// - [`Self::href`] for important href details.
+/// - ***[`Self::href`] for important href details.***
 /// - [`ResourceContent`] for details on providing data from memory (bytes/strings)
 ///   or the OS file system (paths).
 impl<H: Into<String>, C: Into<ResourceContent>> From<(H, C)> for DetachedEpubManifestEntry {
@@ -1386,7 +1386,7 @@ impl<'ebook> EpubManifestEntryMut<'ebook> {
     /// The resolved href is computed once the entry is inserted into an [`Epub`](crate::epub::Epub).
     ///
     /// # See Also
-    /// - [`DetachedEpubManifestEntry::href`] for important details.
+    /// - ***[`DetachedEpubManifestEntry::href`] for important details.***
     /// - [`EpubManifestEntry::href`] to get the resolved href
     ///   (Accessible via [`Self::as_view`]).
     /// - [`EpubManifestEntry::href_raw`] to get the raw href given here.
@@ -1468,7 +1468,7 @@ impl<'ebook> EpubManifestEntryMut<'ebook> {
     /// Mutable view of all additional `XML` attributes.
     ///
     /// # See Also
-    /// - [`DetachedEpubManifestEntry::attribute`] for important details.
+    /// - ***[`DetachedEpubManifestEntry::attribute`] for important details.***
     pub fn attributes_mut(&mut self) -> &mut Attributes {
         &mut self.data.get_mut().attributes
     }

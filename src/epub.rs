@@ -14,7 +14,7 @@
 //! - [`EpubToc`]: Table of Contents (e.g., guide, landmarks, page list)
 //!
 //! EPUBs can be opened using [`Epub::open`] or [`Epub::read`].
-//! For finer-grain control over parser behavior, such as strictness and skipping
+//! For finer-grained control over parser behavior, such as strictness and skipping
 //! specific components for performance, see [`EpubOpenOptions`].
 //!
 //! ## Renditions
@@ -307,13 +307,14 @@ pub use write::{EpubChapter, EpubEditor, EpubWriteOptions, OrphanFilter};
 /// [dependencies]
 /// rbook = { version = "…", features = ["threadsafe"] }
 /// ```
+///
 /// # Renditions
 /// Multi-rendition EPUBs are not fully supported,
 /// and the first OPF `rootfile` will always be selected.  
 ///
 /// # See Also
+/// - *[`epub`](self) module-level documentation for more information.*
 /// - [`EpubEditor`] to conveniently [create](Epub::builder) or [modify](Epub::edit) an [`Epub`].
-/// - [`epub`](self) module-level documentation for more information.
 ///
 /// # Examples
 /// - [Reading](Self::reader) the contents of an [`Epub`]:
@@ -446,6 +447,33 @@ impl Epub {
     /// - [`Self::options`] to specify options.
     /// - [`Self::open`] to open from a path (file or directory).
     /// - [`EpubOpenOptions::read`] to open an [`Epub`] with specific options applied.
+    ///
+    /// # Examples
+    /// - Opening from a [`Cursor`](std::io::Cursor) with an underlying [`Vec`] containing bytes:
+    /// ```no_run
+    /// # use rbook::epub::Epub;
+    /// use std::io::Cursor;
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
+    /// # let epub_bytes = Vec::new();
+    ///
+    /// let bytes: Vec<u8> = epub_bytes;
+    /// let cursor = Cursor::new(bytes);
+    /// let epub = Epub::read(cursor)?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    /// - Opening from a [`File`](std::fs::File) directly:
+    /// ```no_run
+    /// # use rbook::epub::Epub;
+    /// # use std::error::Error;
+    /// use std::fs::File;
+    /// # fn main() -> Result<(), Box<dyn Error>> {
+    ///
+    /// let epub_file = File::open("tests/ebooks/example.epub")?;
+    /// let epub = Epub::read(epub_file)?;
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn read<
         #[cfg(feature = "threadsafe")] R: 'static + Read + Seek + Send + Sync,
         #[cfg(not(feature = "threadsafe"))] R: 'static + Read + Seek,
@@ -777,29 +805,6 @@ impl EpubOpenOptions {
     /// # See Also
     /// - [`Self::open`] to open from a path (file or directory).
     /// - [`Epub::read`] to open an [`Epub`] with default options applied.
-    ///
-    /// # Examples
-    /// - Opening from a [`Cursor`](std::io::Cursor) with an underlying [`Vec`] containing bytes:
-    /// ```no_run
-    /// # use rbook::epub::Epub;
-    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
-    /// # let epub_bytes = b"";
-    /// let bytes_vec: Vec<u8> = Vec::from(epub_bytes);
-    /// let cursor = std::io::Cursor::new(bytes_vec);
-    /// let epub = Epub::read(cursor)?;
-    /// # Ok(())
-    /// # }
-    /// ```
-    /// - Opening from a [`File`](std::fs::File) directly:
-    /// ```no_run
-    /// # use rbook::epub::Epub;
-    /// # use std::error::Error;
-    /// # fn main() -> Result<(), Box<dyn Error>> {
-    /// let epub_file = std::fs::File::open("tests/ebooks/example.epub")?;
-    /// let epub = Epub::read(epub_file)?;
-    /// # Ok(())
-    /// # }
-    /// ```
     pub fn read<
         #[cfg(feature = "threadsafe")] R: 'static + Read + Seek + Send + Sync,
         #[cfg(not(feature = "threadsafe"))] R: 'static + Read + Seek,
@@ -867,8 +872,7 @@ impl EpubOpenOptions {
     /// - Has a [**table of contents**](EpubToc::contents).
     /// - Elements (e.g., `item`, `itemref`) have their required attributes present.
     ///
-    /// If any of the conditions are not met,
-    /// an error will be returned.
+    /// If any of the conditions are not met, an error will be returned.
     ///
     /// **This option does not validate that an EPUB conforms entirely to the spec.
     /// However, it will refuse further processing if malformations are found.**
@@ -944,7 +948,7 @@ impl EpubOpenOptions {
     /// # Side Effects
     /// - **Readers**:
     ///   Each created [`EpubReader`] **will** be untraversable
-    ///   as readers requires a lookup to the spine.
+    ///   as readers require a lookup to the spine.
     ///
     /// Default: `false`
     pub fn skip_spine(&mut self, skip: bool) -> &mut Self {

@@ -152,6 +152,13 @@ impl EpubMetaEntryData {
 /// EPUB metadata accessible via [`Epub::metadata`](super::Epub::metadata).
 /// See [`Metadata`] for more details.
 ///
+/// # Entries
+/// Common metadata entries are accessible via specialized accessors
+/// (e.g., [`Self::title`] and [`Self::creators`]).
+/// All metadata entries, including those accessible through specialized
+/// accessors, are also accessible by property key (e.g., `dc:title`, `dc:creator`)
+/// via [`Self::by_property`].
+///
 /// # Behavior
 /// `rbook` supports arbitrary refinements for any metadata element,
 /// including `item` and `itemref` elements.
@@ -579,7 +586,7 @@ impl<'ebook> EpubMetadata<'ebook> {
     /// Returns an iterator over non-refining metadata entries.
     #[doc = doc::inherent!(Metadata, iter)]
     /// # See Also
-    /// - [`EpubMetadataIter`] for important details.
+    /// - ***[`EpubMetadataIter`] for important details.***
     /// - [`EpubMetadataMut::iter_mut`] to iterate over mutable entries.
     pub fn iter(&self) -> EpubMetadataIter<'ebook> {
         EpubMetadataIter {

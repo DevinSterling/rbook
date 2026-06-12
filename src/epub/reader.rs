@@ -11,7 +11,8 @@ use crate::util::{Sealed, doc};
 use std::cmp::PartialEq;
 use std::iter::FusedIterator;
 
-/// A [`Reader`] for an [`Epub`].
+/// A [`Reader`] and [repeatable](Self::reset) [`Iterator`]
+/// over [`Epub`] [content](EpubReaderContent).
 ///
 /// # Configuration
 /// Reading behavior, such as how to handle non-linear content,
@@ -136,6 +137,8 @@ impl<'ebook> EpubReader<'ebook> {
 
     /// Returns the next [`EpubReaderContent`] and increments the reader's cursor by one.
     #[doc = doc::inherent!(Reader, read_next)]
+    /// # See Also
+    /// - [`Iterator::next`] to use the [`Iterator`] trait method alternatively.
     pub fn read_next(&mut self) -> Option<ReaderResult<EpubReaderContent<'ebook>>> {
         self.cursor
             .increment()
@@ -493,7 +496,7 @@ pub struct EpubReaderOptions<T = ()> {
 }
 
 impl<T> EpubReaderOptions<T> {
-    /// How `linear` and `non-linear` spine content are handled.
+    /// How `linear` and `non-linear` spine content is handled.
     ///
     /// Through this setting, content can be re-arranged or omitted
     /// depending on the selected [`LinearBehavior`].
@@ -528,7 +531,7 @@ impl EpubReaderOptions {
         Self::default()
     }
 
-    /// Consume this builder and create an [`EpubReader`] associated with the given [`Epub`].
+    /// Creates an [`EpubReader`] associated with the given [`Epub`].
     pub fn create<'ebook>(&self, epub: &'ebook Epub) -> EpubReader<'ebook> {
         EpubReader::new(epub, &self.config)
     }
