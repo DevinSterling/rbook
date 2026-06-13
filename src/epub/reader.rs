@@ -11,7 +11,113 @@ use crate::reader::{Reader, ReaderContent, ReaderKey};
 use crate::util::iter::IndexCursor;
 use crate::util::{Sealed, doc};
 use std::cmp::PartialEq;
+use std::fmt::{Debug, Formatter};
 use std::iter::FusedIterator;
+
+////////////////////////////////////////////////////////////////////////////////
+// PRIVATE API
+////////////////////////////////////////////////////////////////////////////////
+
+#[derive(Clone)]
+enum ReaderEntries<'ebook> {
+    // No allocation common case
+    Original(&'ebook Epub),
+    // Potentially in the future; this can become no alloc at the
+    // cost of greater time complexity for content retrieval
+    Reordered(Vec<EpubSpineEntry<'ebook>>),
+}
+
+impl<'ebook> ReaderEntries<'ebook> {
+    fn new(epub: &'ebook Epub, linearity: LinearBehavior) -> Self {
+        match linearity {
+            /* No allocation for common cases */
+            LinearBehavior::Original => Self::Original(epub),
+            // If there are only linear entries, use the original slice
+            LinearBehavior::LinearOnly
+            | LinearBehavior::PrependNonLinear
+            | LinearBehavior::AppendNonLinear
+                if epub.spine.entries.iter().all(|entry| entry.linear) =>
+            {
+                Self::Original(epub)
+            }
+            // This case may very well never happen
+            LinearBehavior::NonLinearOnly
+                if epub.spine.entries.iter().all(|entry| !entry.linear) =>
+            {
+                Self::Original(epub)
+            }
+
+            /* Allocate */
+            LinearBehavior::LinearOnly | LinearBehavior::NonLinearOnly => {
+                let predicate = linearity == LinearBehavior::LinearOnly;
+
+                Self::Reordered(
+                    epub.spine()
+                        .iter()
+                        .filter(|entry| entry.is_linear() == predicate)
+                        .collect(),
+                )
+            }
+            LinearBehavior::PrependNonLinear | LinearBehavior::AppendNonLinear => {
+                let spine = epub.spine();
+                let mut result = Vec::with_capacity(spine.len());
+                let append = linearity == LinearBehavior::AppendNonLinear;
+
+                // If appending, linear goes first
+                result.extend(spine.iter().filter(|e| e.is_linear() == append));
+                result.extend(spine.iter().filter(|e| e.is_linear() != append));
+                Self::Reordered(result)
+            }
+        }
+    }
+
+    fn get(&self, index: usize) -> Option<EpubSpineEntry<'ebook>> {
+        match self {
+            Self::Original(epub) => epub.spine().get(index),
+            Self::Reordered(entries) => entries.get(index).copied(),
+        }
+    }
+
+    fn len(&self) -> usize {
+        match self {
+            Self::Original(epub) => epub.spine.entries.len(),
+            Self::Reordered(entries) => entries.len(),
+        }
+    }
+
+    fn index_by_idref(&self, idref: &str) -> Option<usize> {
+        match self {
+            Self::Original(epub) => epub.spine().iter().position(|e| e.idref() == idref),
+            Self::Reordered(entries) => entries.iter().position(|e| e.idref() == idref),
+        }
+    }
+}
+
+impl Debug for ReaderEntries<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Original(_) => f.debug_tuple("Original").finish_non_exhaustive(),
+            Self::Reordered(entries) => f
+                .debug_tuple("Reordered")
+                .field(entries)
+                .finish_non_exhaustive(),
+        }
+    }
+}
+
+impl PartialEq for ReaderEntries<'_> {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Original(a), Self::Original(b)) => a == b,
+            (Self::Reordered(a), Self::Reordered(b)) => a == b,
+            _ => false,
+        }
+    }
+}
+
+////////////////////////////////////////////////////////////////////////////////
+// PUBLIC API
+////////////////////////////////////////////////////////////////////////////////
 
 /// A [`Reader`] and [repeatable](Self::reset) [`Iterator`]
 /// over [`Epub`] [content](EpubReaderContent).
@@ -46,13 +152,13 @@ use std::iter::FusedIterator;
 #[derive(Clone, Debug, PartialEq)]
 pub struct EpubReader<'ebook> {
     rewrite: EpubRewriteOptions,
-    entries: Vec<EpubSpineEntry<'ebook>>,
+    entries: ReaderEntries<'ebook>,
     cursor: IndexCursor,
 }
 
 impl<'ebook> EpubReader<'ebook> {
     pub(super) fn new(epub: &'ebook Epub, config: EpubReaderConfig) -> Self {
-        let entries = Self::get_entries(epub, config.linear_behavior);
+        let entries = ReaderEntries::new(epub, config.linear_behavior);
 
         EpubReader {
             rewrite: config.rewrite,
@@ -61,71 +167,29 @@ impl<'ebook> EpubReader<'ebook> {
         }
     }
 
-    // If and when EpubReader grows, this method will be extracted to a submodule.
-    fn get_entries(epub: &'ebook Epub, behavior: LinearBehavior) -> Vec<EpubSpineEntry<'ebook>> {
-        let iterator = epub.spine().iter();
-        match behavior {
-            LinearBehavior::Original => iterator.collect(),
-            LinearBehavior::LinearOnly | LinearBehavior::NonLinearOnly => {
-                let predicate = behavior == LinearBehavior::LinearOnly;
-                iterator
-                    .filter(|entry| entry.is_linear() == predicate)
-                    .collect()
-            }
-            LinearBehavior::PrependNonLinear | LinearBehavior::AppendNonLinear => {
-                let (mut linear, mut non_linear) =
-                    iterator.partition::<Vec<_>, _>(EpubSpineEntry::is_linear);
-
-                if matches!(&behavior, LinearBehavior::AppendNonLinear) {
-                    linear.extend(non_linear);
-                    linear
-                } else {
-                    non_linear.extend(linear);
-                    non_linear
-                }
-            }
-        }
-    }
-
-    fn get_manifest_entry(
-        spine_entry: EpubSpineEntry<'ebook>,
-    ) -> ReaderResult<EpubManifestEntry<'ebook>> {
-        spine_entry.manifest_entry().ok_or_else(|| {
-            ReaderError::Format(EpubError::InvalidIdref(spine_entry.idref().to_owned()).into())
-        })
-    }
-
-    fn find_entry_by_idref(&self, idref: &str) -> ReaderResult<usize> {
+    fn index_by_idref(&self, idref: &str) -> ReaderResult<usize> {
         self.entries
-            .iter()
-            .position(|entry| entry.idref() == idref)
+            .index_by_idref(idref)
             .ok_or_else(|| ReaderError::NoMapping(idref.to_string()))
     }
 
-    fn find_entry_by_position(&self, position: usize) -> ReaderResult<EpubReaderContent<'ebook>> {
-        let spine_entry = self.entries[position];
-        let manifest_entry = Self::get_manifest_entry(spine_entry)?;
-
-        self.create_reader_content(position, spine_entry, manifest_entry)
+    fn content_by_idref(&self, idref: &str) -> ReaderResult<(usize, EpubReaderContent<'ebook>)> {
+        let index = self.index_by_idref(idref)?;
+        let content = self.content_by_index(index)?;
+        Ok((index, content))
     }
 
-    fn find_entry_by_str(&self, idref: &str) -> ReaderResult<(usize, EpubReaderContent<'ebook>)> {
-        let position = self.find_entry_by_idref(idref)?;
-        let spine_entry = self.entries[position];
-        let manifest_entry = Self::get_manifest_entry(spine_entry)?;
-
-        Ok((
-            position,
-            self.create_reader_content(position, spine_entry, manifest_entry)?,
-        ))
-    }
-
-    fn create_reader_content(
-        &self,
-        position: usize,
-        spine_entry: EpubSpineEntry<'ebook>,
-        manifest_entry: EpubManifestEntry<'ebook>,
-    ) -> ReaderResult<EpubReaderContent<'ebook>> {
+    fn content_by_index(&self, position: usize) -> ReaderResult<EpubReaderContent<'ebook>> {
+        let spine_entry = self
+            .entries
+            .get(position)
+            .ok_or_else(|| ReaderError::OutOfBounds {
+                len: self.entries.len(),
+                position,
+            })?;
+        let manifest_entry = spine_entry.manifest_entry().ok_or_else(|| {
+            ReaderError::Format(EpubError::InvalidIdref(spine_entry.idref().to_owned()).into())
+        })?;
         let content = manifest_entry
             .read_str_with(&self.rewrite)
             .map_err(|error| match error {
@@ -155,7 +219,7 @@ impl<'ebook> EpubReader<'ebook> {
     pub fn read_next(&mut self) -> Option<ReaderResult<EpubReaderContent<'ebook>>> {
         self.cursor
             .increment()
-            .map(|index| self.find_entry_by_position(index))
+            .map(|index| self.content_by_index(index))
     }
 
     /// Returns the previous [`EpubReaderContent`] and decrements the reader's cursor by one.
@@ -163,14 +227,14 @@ impl<'ebook> EpubReader<'ebook> {
     pub fn read_prev(&mut self) -> Option<ReaderResult<EpubReaderContent<'ebook>>> {
         self.cursor
             .decrement()
-            .map(|index| self.find_entry_by_position(index))
+            .map(|index| self.content_by_index(index))
     }
 
     /// Returns the [`EpubReaderContent`] that the reader's cursor is currently positioned at.
     #[doc = doc::inherent!(Reader, read_current)]
     pub fn read_current(&self) -> Option<ReaderResult<EpubReaderContent<'ebook>>> {
         self.current_position()
-            .map(|position| self.find_entry_by_position(position))
+            .map(|position| self.content_by_index(position))
     }
 
     /// Returns the [`EpubReaderContent`] at the given [`ReaderKey`]
@@ -182,19 +246,15 @@ impl<'ebook> EpubReader<'ebook> {
     ) -> ReaderResult<EpubReaderContent<'ebook>> {
         match key.into() {
             ReaderKey::Value(idref) => {
-                let (index, content) = self.find_entry_by_str(idref)?;
+                let (index, content) = self.content_by_idref(idref)?;
                 self.cursor.set(index);
                 Ok(content)
             }
-            ReaderKey::Position(index) if index < self.entries.len() => {
-                let content = self.find_entry_by_position(index);
+            ReaderKey::Position(index) => {
+                let content = self.content_by_index(index)?;
                 self.cursor.set(index);
-                content
+                Ok(content)
             }
-            ReaderKey::Position(index) => Err(ReaderError::OutOfBounds {
-                position: index,
-                len: self.entries.len(),
-            }),
         }
     }
 
@@ -204,7 +264,7 @@ impl<'ebook> EpubReader<'ebook> {
     pub fn seek<'a>(&mut self, key: impl Into<ReaderKey<'a>>) -> ReaderResult<usize> {
         match key.into() {
             ReaderKey::Value(idref) => {
-                let index = self.find_entry_by_idref(idref)?;
+                let index = self.index_by_idref(idref)?;
                 self.cursor.set(index);
                 Ok(index)
             }
@@ -228,9 +288,9 @@ impl<'ebook> EpubReader<'ebook> {
     ) -> ReaderResult<EpubReaderContent<'ebook>> {
         match key.into() {
             ReaderKey::Value(manifest_id) => self
-                .find_entry_by_str(manifest_id)
+                .content_by_idref(manifest_id)
                 .map(|(_, content)| content),
-            ReaderKey::Position(index) => self.find_entry_by_position(index),
+            ReaderKey::Position(index) => self.content_by_index(index),
         }
     }
 
