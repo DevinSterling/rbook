@@ -219,7 +219,6 @@ impl<'ebook> EpubMetadata<'ebook> {
     /// - `dc:coverage`
     /// - `dc:format`
     /// - `dc:relation`
-    /// - `dc:rights`
     /// - `dc:source`
     /// - `dc:type`
     ///
@@ -581,6 +580,28 @@ impl<'ebook> EpubMetadata<'ebook> {
 
         self.data_by_property(dc::SUBJECT)
             .map(move |(i, data)| EpubTag::new(ctx.create_entry(data, i)))
+    }
+
+    /// Returns an iterator over **all** copyright (`dc:rights`) entries by
+    /// [`order`](EpubMetaEntry::order).
+    ///
+    /// # Examples
+    /// - Iterating over rights entries:
+    /// ```
+    /// # use rbook::Epub;
+    /// # use rbook::ebook::toc::TocEntryKind;
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
+    /// let epub = Epub::open("tests/ebooks/example_epub")?;
+    /// let metadata = epub.metadata();
+    /// let mut rights = epub.metadata().rights().map(|r| r.value());
+    ///
+    /// assert_eq!(Some("Apache License 2.0"), rights.next());
+    /// assert_eq!(None, rights.next());
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn rights(&self) -> impl Iterator<Item = EpubMetaEntry<'ebook>> + 'ebook {
+        self.by_property(dc::RIGHTS)
     }
 
     /// Returns an iterator over non-refining metadata entries.

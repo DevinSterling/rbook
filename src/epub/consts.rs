@@ -79,15 +79,13 @@ pub(crate) mod dc {
     pub(crate) const PUBLISHER: &str = "dc:publisher";
     pub(crate) const SUBJECT: &str = "dc:subject";
     pub(crate) const MODIFIED: &str = "dcterms:modified";
+    pub(crate) const RIGHTS: &str = "dc:rights";
 
     #[cfg(feature = "write")]
     mod write {
         pub(crate) const XMLNS_DC: &str = "xmlns:dc";
         pub(crate) const DUBLIN_CORE_NS: &str = "http://purl.org/dc/elements/1.1/";
         pub(crate) const NAMESPACE: &str = "dc:";
-
-        // Elements
-        pub(crate) const RIGHTS: &str = "dc:rights";
     }
 }
 
