@@ -1,4 +1,21 @@
 # Changelog
+## 0.7.8 (2026-06-14)
+### Additions **＋**
+- New module `epub::rewrite` for XHTML content rewriting:
+  - `EpubRewriteOptions`: Configuration for path prefixing and CSS injection.
+  - `PathRewrite`: Helper for path prefixing.
+- New methods that accept rewrite options:
+  - `Epub::read_resource_str_with`
+  - `EpubManifestEntry::read_str_with`
+  - `EpubReaderOptions::rewrite`
+- New method `EpubMetadata::rights` to iterate over all `dc:rights` entries.
+
+### Changes　**⟳**
+- Optimize `EpubReader` creation. The default `LinearBehavior::Original` and common cases no longer allocate.
+- Optimize EPUB writer performance for EPUBs with little or no manifest entry refinements.
+- Update `wasm-bindgen-test` dev dependency: 0.3.72 → 0.3.75
+- Refine documentation for enhanced clarity.
+
 ## 0.7.7 (2026-05-22)
 ### Additions **＋**
 - Implement `DoubleEndedIterator`, `ExactSizeIterator`, and  `FusedIterator` for applicable iterators.
@@ -6,7 +23,7 @@
 ### Changes　**⟳**
 - Optimize EPUB writer automatic ID generation.
 - Exclude `zopfli` transitive dependency from `zip`.
-- Update `quick-xml` dev dependency: 0.39.2 → 0.40.1
+- Update `quick-xml` dependency: 0.39.2 → 0.40.1
 - Update `zip` dependency: 8.5.1 → 8.6.0
 - Update `wasm-bindgen-test` dev dependency: 0.3.68 → 0.3.72
 - Refine documentation for enhanced clarity.
