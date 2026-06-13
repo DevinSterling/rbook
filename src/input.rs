@@ -4,6 +4,8 @@
 //! - [`Many`]: Flexibly pass one-to-many arguments (single items, arrays, or vectors) to methods.
 //! - [`IntoOption`]: Flexibly pass an [`Option`] or the underlying type directly.
 
+use std::borrow::Cow;
+
 /// A helper trait for flexible one-to-many arguments.
 ///
 /// This trait abstracts over single items and collections (e.g., arrays, vectors),
@@ -187,6 +189,7 @@ impl<T, I: Into<T>, It: IntoIterator<Item = I>> Many<T> for Batch<It> {
 /// # Examples
 /// Passing arguments to a method, `fn set_id(id: impl IntoOption<String>)`:
 /// ```
+/// # #[cfg(feature = "write")] {
 /// # use rbook::input::IntoOption;
 /// # struct Entry(Option<String>);
 /// # impl Entry {
@@ -199,22 +202,46 @@ impl<T, I: Into<T>, It: IntoIterator<Item = I>> Many<T> for Batch<It> {
 /// entry.set_id(String::from("my-id"));    // Owned String
 /// entry.set_id(None);                     // None
 /// entry.set_id(Some("my-id".to_owned())); // Explicit Option<String>
+/// # }
 /// ```
-#[cfg(feature = "write")]
 pub trait IntoOption<T> {
     /// Consumes self and returns an [`Option`].
     fn into_option(self) -> Option<T>;
 }
 
+impl<T> IntoOption<T> for Option<T> {
+    fn into_option(self) -> Self {
+        self
+    }
+}
+
+impl IntoOption<Self> for Cow<'_, str> {
+    fn into_option(self) -> Option<Self> {
+        Some(self)
+    }
+}
+
+impl<'a> IntoOption<Cow<'a, str>> for String {
+    fn into_option(self) -> Option<Cow<'a, str>> {
+        Some(Cow::Owned(self))
+    }
+}
+
+impl<'a> IntoOption<Cow<'a, str>> for &'a String {
+    fn into_option(self) -> Option<Cow<'a, str>> {
+        Some(Cow::Borrowed(self))
+    }
+}
+
+impl<'a> IntoOption<Cow<'a, str>> for &'a str {
+    fn into_option(self) -> Option<Cow<'a, str>> {
+        Some(Cow::Borrowed(self))
+    }
+}
+
 #[cfg(feature = "write")]
 mod write {
-    use crate::input::IntoOption;
-
-    impl<T> IntoOption<T> for Option<T> {
-        fn into_option(self) -> Self {
-            self
-        }
-    }
+    use crate::input::*;
 
     impl IntoOption<String> for &str {
         fn into_option(self) -> Option<String> {
@@ -234,7 +261,7 @@ mod write {
         }
     }
 
-    impl IntoOption<String> for std::borrow::Cow<'_, str> {
+    impl IntoOption<String> for Cow<'_, str> {
         fn into_option(self) -> Option<String> {
             Some(self.into_owned())
         }

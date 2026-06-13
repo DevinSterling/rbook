@@ -75,6 +75,38 @@ fn main() {
     }
 }
 ```
+
+<details>
+<summary>Click to view a minimal example of reader builder configuration</summary>
+
+```rust
+use rbook::Epub;
+use rbook::epub::reader::LinearBehavior;
+use rbook::epub::rewrite::{EpubRewriteOptions, PathRewrite};
+
+fn main() {
+    // Configure content rewriting behavior via options
+    let rewrite = EpubRewriteOptions::default()
+        .rewrite_paths(PathRewrite::prefix("ebook://"))
+        .inject_css("p > b { color: fuchsia; }");
+
+    let epub = Epub::open("example.epub").unwrap();
+    let reader = epub
+        .reader_builder()
+        .linear_behavior(LinearBehavior::LinearOnly) // Omit supplementary content
+        .rewrite(rewrite)
+        .create();
+
+    for data_result in reader {
+        let data = data_result.unwrap();
+        // Print the content with paths prefixed and CSS injected
+        println!("{}", data.content());
+    }
+}
+```
+
+</details>
+
 ### Accessing metadata: Retrieving the main title
 ```rust
 use rbook::Epub;

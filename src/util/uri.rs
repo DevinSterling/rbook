@@ -63,9 +63,10 @@ pub(crate) fn file_extension(href: &str) -> Option<&str> {
 
 // This given href is assumed to be well-formed.
 pub(crate) fn has_scheme(href: &str) -> bool {
-    // The scheme must be ASCII
-    let ascii = href.as_bytes();
+    has_scheme_bytes(href.as_bytes())
+}
 
+pub(crate) fn has_scheme_bytes(ascii: &[u8]) -> bool {
     // Check if a colon exists
     let Some(colon_pos) = ascii.iter().position(|&c| c == b':') else {
         return false;

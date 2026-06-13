@@ -1,8 +1,10 @@
 //! [`Reader`]-specific implementations for the [`Epub`] format.
 
+use crate::ebook::errors::{EbookError, FormatError};
 use crate::epub::Epub;
 use crate::epub::errors::EpubError;
 use crate::epub::manifest::EpubManifestEntry;
+use crate::epub::rewrite::EpubRewriteOptions;
 use crate::epub::spine::EpubSpineEntry;
 use crate::reader::errors::{ReaderError, ReaderResult};
 use crate::reader::{Reader, ReaderContent, ReaderKey};
@@ -43,15 +45,17 @@ use std::iter::FusedIterator;
 /// ```
 #[derive(Clone, Debug, PartialEq)]
 pub struct EpubReader<'ebook> {
+    rewrite: EpubRewriteOptions,
     entries: Vec<EpubSpineEntry<'ebook>>,
     cursor: IndexCursor,
 }
 
 impl<'ebook> EpubReader<'ebook> {
-    pub(super) fn new(epub: &'ebook Epub, config: &EpubReaderConfig) -> Self {
+    pub(super) fn new(epub: &'ebook Epub, config: EpubReaderConfig) -> Self {
         let entries = Self::get_entries(epub, config.linear_behavior);
 
         EpubReader {
+            rewrite: config.rewrite,
             cursor: IndexCursor::new(entries.len()),
             entries,
         }
@@ -102,7 +106,7 @@ impl<'ebook> EpubReader<'ebook> {
         let spine_entry = self.entries[position];
         let manifest_entry = Self::get_manifest_entry(spine_entry)?;
 
-        Self::create_reader_content(position, spine_entry, manifest_entry)
+        self.create_reader_content(position, spine_entry, manifest_entry)
     }
 
     fn find_entry_by_str(&self, idref: &str) -> ReaderResult<(usize, EpubReaderContent<'ebook>)> {
@@ -112,17 +116,26 @@ impl<'ebook> EpubReader<'ebook> {
 
         Ok((
             position,
-            Self::create_reader_content(position, spine_entry, manifest_entry)?,
+            self.create_reader_content(position, spine_entry, manifest_entry)?,
         ))
     }
 
     fn create_reader_content(
+        &self,
         position: usize,
         spine_entry: EpubSpineEntry<'ebook>,
         manifest_entry: EpubManifestEntry<'ebook>,
     ) -> ReaderResult<EpubReaderContent<'ebook>> {
+        let content = manifest_entry
+            .read_str_with(&self.rewrite)
+            .map_err(|error| match error {
+                EbookError::Archive(e) => ReaderError::Archive(e),
+                EbookError::Format(e) => ReaderError::Format(e),
+                e => ReaderError::Format(FormatError::Unparsable(Box::new(e))),
+            })?;
+
         Ok(EpubReaderContent {
-            content: manifest_entry.read_str()?,
+            content,
             position,
             spine_entry,
             manifest_entry,
@@ -423,12 +436,14 @@ pub enum LinearBehavior {
 pub(super) struct EpubReaderConfig {
     /// See [`EpubReaderOptions::linear_behavior`]
     linear_behavior: LinearBehavior,
+    rewrite: EpubRewriteOptions,
 }
 
 impl Default for EpubReaderConfig {
     fn default() -> Self {
         Self {
             linear_behavior: LinearBehavior::Original,
+            rewrite: EpubRewriteOptions::default(),
         }
     }
 }
@@ -451,10 +466,13 @@ impl Default for EpubReaderConfig {
 /// ## Ordering
 /// - [`linear_behavior`](EpubReaderOptions::linear_behavior)
 ///   (Default: [`LinearBehavior::Original`])
+/// ## Modification
+/// - [`rewrite`](EpubReaderOptions::rewrite) (Default: [`EpubRewriteOptions::default`])
 ///
 /// # See Also
 /// - [`Epub::reader_builder`] to create an [`EpubReader`] directly from an [`Epub`].
-/// - [`EpubReaderOptions::default`] to create multiple [`EpubReader`] instances with identical options.
+/// - [`EpubReaderOptions::default`] to create multiple
+///   [`EpubReader`] instances with identical options.
 ///
 /// # Examples
 /// - Creating an [`EpubReader`] (Attached):
@@ -506,6 +524,18 @@ impl<T> EpubReaderOptions<T> {
         self.config.linear_behavior = linear_behavior;
         self
     }
+
+    /// Applies reader-scoped content rewriting to each [`EpubReaderContent`] entry.
+    ///
+    /// # See Also
+    /// - [`Epub::read_resource_str_with`] for resource-scoped rewriting.
+    /// - [`EpubManifestEntry::read_str_with`] for manifest entry-scoped rewriting.
+    ///
+    /// Default: [`EpubRewriteOptions::default`] (no rewriting)
+    pub fn rewrite(mut self, rewrite: EpubRewriteOptions) -> Self {
+        self.config.rewrite = rewrite;
+        self
+    }
 }
 
 impl<'ebook> EpubReaderOptions<&'ebook Epub> {
@@ -518,7 +548,7 @@ impl<'ebook> EpubReaderOptions<&'ebook Epub> {
 
     /// Consume this builder and create an [`EpubReader`].
     pub fn create(self) -> EpubReader<'ebook> {
-        EpubReader::new(self.container, &self.config)
+        EpubReader::new(self.container, self.config)
     }
 }
 
@@ -533,6 +563,6 @@ impl EpubReaderOptions {
 
     /// Creates an [`EpubReader`] associated with the given [`Epub`].
     pub fn create<'ebook>(&self, epub: &'ebook Epub) -> EpubReader<'ebook> {
-        EpubReader::new(epub, &self.config)
+        EpubReader::new(epub, self.config.clone())
     }
 }

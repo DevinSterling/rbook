@@ -9,12 +9,15 @@ mod write;
 use crate::ebook::archive::ResourceProvider;
 use crate::ebook::archive::errors::ArchiveResult;
 use crate::ebook::element::{Attributes, AttributesData, Href, Properties, PropertiesData};
+use crate::ebook::errors::EbookResult;
 use crate::ebook::manifest::{Manifest, ManifestEntry};
 use crate::ebook::resource::consts::mime;
 use crate::ebook::resource::{Resource, ResourceKind};
 use crate::epub::consts::opf;
 use crate::epub::metadata::{EpubMetadataData, EpubRefinements, EpubRefinementsData};
 use crate::epub::package::EpubPackageMetaContext;
+use crate::epub::rewrite::EpubRewriteOptions;
+use crate::epub::rewrite::rewriter::ContentRewriter;
 use crate::input::Many;
 use crate::util::iter::IteratorExt;
 use crate::util::{Sealed, doc};
@@ -761,9 +764,46 @@ impl<'ebook> EpubManifestEntry<'ebook> {
     /// Returns the associated content as a [`String`].
     #[doc = doc::inherent!(ManifestEntry, read_str)]
     /// # See Also
+    /// - [`Self::read_str_with`] to retrieve the associated content with modifications applied.
     /// - [`EpubManifestEntryMut::set_content`] to modify the content.
     pub fn read_str(&self) -> ArchiveResult<String> {
         ManifestEntry::read_str(self)
+    }
+
+    /// Returns the associated content as a [`String`]
+    /// with the given [`EpubRewriteOptions`] applied.
+    ///
+    /// # See Also
+    /// - [`EpubReaderOptions::rewrite`](crate::epub::reader::EpubReaderOptions::rewrite)
+    ///   for reader-wide rewrite operations.
+    ///
+    /// # Examples
+    /// - Injecting CSS and path rewriting:
+    /// ```
+    /// # use rbook::Epub;
+    /// use rbook::epub::rewrite::{EpubRewriteOptions, PathRewrite};
+    ///
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
+    /// let rewrite = EpubRewriteOptions::default()
+    ///     .rewrite_paths(PathRewrite::root_relative())
+    ///     .inject_css("body > p { color: fuchsia; }");
+    ///
+    /// let epub = Epub::open("tests/ebooks/example_epub")?;
+    /// let chapter_1 = epub.manifest().by_id("c1").unwrap();
+    ///
+    /// println!("{}", chapter_1.read_str_with(&rewrite)?);
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn read_str_with(&self, rewrite: &EpubRewriteOptions) -> EbookResult<String> {
+        let config = &rewrite.0;
+        // `read_str` converts UTF-16 to UTF-8, unlike `read_bytes`
+        let mut content = self.read_str()?;
+
+        if config.content_requires_modification() {
+            content = ContentRewriter::new(config, &self.data.href).rewrite(content.as_bytes())?;
+        }
+        Ok(content)
     }
 
     /// Returns the associated content as bytes.

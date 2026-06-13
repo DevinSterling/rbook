@@ -1,3 +1,5 @@
+pub mod xml;
+
 use rbook::epub::{Epub, EpubOpenOptions};
 use std::io::Cursor;
 

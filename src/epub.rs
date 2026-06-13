@@ -22,6 +22,15 @@
 //! The first `rootfile` declared in `META-INF/container.xml`
 //! will always be selected as the active rendition.
 //!
+//! ## Content Rewriting
+//! Retrievable string content can be manipulated using [`EpubRewriteOptions`]
+//! to inject CSS and prefix file paths contained within XHTML content.
+//!
+//! The following methods accept rewrite options:
+//! - [`Epub::read_resource_str_with`]
+//! - [`EpubManifestEntry::read_str_with`](manifest::EpubManifestEntry::read_str_with)
+//! - [`EpubReaderOptions::rewrite`]
+//!
 //! ## Examples
 //! - Opening an [`Epub`] and inspecting the manifest:
 //! ```
@@ -263,6 +272,7 @@ pub mod metadata;
 pub mod package;
 mod parser;
 pub mod reader;
+pub mod rewrite;
 pub mod spine;
 pub mod toc;
 #[cfg(feature = "write")]
@@ -279,6 +289,8 @@ use crate::epub::metadata::{EpubMetadata, EpubMetadataData, EpubVersion};
 use crate::epub::package::{EpubPackage, EpubPackageData};
 use crate::epub::parser::{EpubParseConfig, EpubParser};
 use crate::epub::reader::{EpubReader, EpubReaderOptions};
+use crate::epub::rewrite::EpubRewriteOptions;
+use crate::epub::rewrite::rewriter::ContentRewriter;
 use crate::epub::spine::{EpubSpine, EpubSpineData};
 use crate::epub::toc::{EpubToc, EpubTocData};
 use crate::util::{Sealed, doc, uri};
@@ -621,6 +633,51 @@ impl Epub {
         resource: impl Into<Resource<'a>>,
     ) -> ArchiveResult<String> {
         Ebook::read_resource_str(self, resource)
+    }
+
+    /// Returns the content of a [`Resource`] as a string
+    /// with the given [`EpubRewriteOptions`] applied.
+    ///
+    /// # See Also
+    /// - [`EpubManifestEntry::read_str_with`](manifest::EpubManifestEntry::read_str_with)
+    ///   to retrieve the content directly from a manifest entry.
+    /// - [`EpubReaderOptions::rewrite`](EpubReaderOptions::rewrite)
+    ///   for reader-wide rewrite operations.
+    ///
+    /// # Examples
+    /// - Injecting CSS and path rewriting:
+    /// ```
+    /// # use rbook::Epub;
+    /// use rbook::epub::rewrite::{EpubRewriteOptions, PathRewrite};
+    ///
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
+    /// let rewrite = EpubRewriteOptions::default()
+    ///     .rewrite_paths(PathRewrite::prefix("ebook://"))
+    ///     .inject_css("p > b { color: tomato; }");
+    ///
+    /// let epub = Epub::open("tests/ebooks/example_epub")?;
+    /// let content = epub.read_resource_str_with("c1.xhtml", &rewrite)?;
+    ///
+    /// println!("{content}");
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn read_resource_str_with<'a>(
+        &self,
+        resource: impl Into<Resource<'a>>,
+        rewrite: &EpubRewriteOptions,
+    ) -> EbookResult<String> {
+        let config = &rewrite.0;
+        let normalized = self.transform_resource(resource.into());
+        // `read_resource_str` converts UTF-16 to UTF-8, unlike `read_resource_bytes`
+        let mut content = self.read_resource_str(&normalized)?;
+
+        if let ResourceKey::Value(href) = normalized.key()
+            && config.content_requires_modification()
+        {
+            content = ContentRewriter::new(config, href).rewrite(content.as_bytes())?;
+        }
+        Ok(content)
     }
 
     /// Returns the content of a [`Resource`] as bytes.

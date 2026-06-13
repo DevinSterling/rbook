@@ -108,16 +108,22 @@
 //! ```
 //! Concrete [`Reader`](reader::Reader) implementations implement [`Iterator`].
 //! Moreover, prior to creation, a reader can receive options to control its behavior,
-//! such as [linearity](epub::reader::EpubReaderOptions::linear_behavior):
+//! such as [linearity](epub::reader::EpubReaderOptions::linear_behavior)
+//! and [rewriting behavior](epub::reader::EpubReaderOptions::rewrite):
 //! ```
 //! # use rbook::Epub;
 //! use rbook::epub::reader::LinearBehavior;
+//! use rbook::epub::rewrite::{EpubRewriteOptions, PathRewrite};
 //!
 //! # let epub = Epub::open("tests/ebooks/example_epub").unwrap();
+//! let rewrite = EpubRewriteOptions::default()
+//!     .inject_css("ol { list-style: none; }") // Inject CSS content directly into files
+//!     .rewrite_paths(PathRewrite::prefix("http://localhost:8080/"));
+//!
 //! let mut reader = epub.reader_builder()
-//!                      // Make a reader omit non-linear content
-//!                      .linear_behavior(LinearBehavior::LinearOnly)
-//!                      .create();
+//!     .linear_behavior(LinearBehavior::LinearOnly) // Omit supplementary (non-linear) content
+//!     .rewrite(rewrite)
+//!     .create();
 //! ```
 //!
 //! # Resource retrieval from an [`Ebook`]
