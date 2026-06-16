@@ -76,11 +76,6 @@ impl<'a> Resource<'a> {
         }
     }
 
-    pub(crate) fn swap_value(mut self, value: String) -> Self {
-        self.key = ResourceKey::Value(Cow::Owned(value));
-        self
-    }
-
     pub(crate) fn as_static(&self) -> Resource<'static> {
         Resource {
             key: self.key.as_static(),

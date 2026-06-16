@@ -619,7 +619,7 @@ impl Epub {
         writer: &mut impl Write,
     ) -> ArchiveResult<u64> {
         self.archive
-            .copy_resource_decoded(&self.transform_resource(resource.into()), writer)
+            .copy_resource_decoded(&self.transform_resource(&resource.into()), writer)
     }
 
     /// Returns the content of a [`Resource`] as a string.
@@ -668,9 +668,9 @@ impl Epub {
         rewrite: &EpubRewriteOptions,
     ) -> EbookResult<String> {
         let config = &rewrite.0;
-        let normalized = self.transform_resource(resource.into());
-        // `read_resource_str` converts UTF-16 to UTF-8, unlike `read_resource_bytes`
-        let mut content = self.read_resource_str(&normalized)?;
+        let resource = resource.into();
+        let normalized = self.transform_resource(&resource);
+        let mut content = self.read_resource_str(&*normalized)?;
 
         if let ResourceKey::Value(href) = normalized.key()
             && config.content_requires_modification()
@@ -697,28 +697,33 @@ impl Epub {
     // PRIVATE API
     //////////////////////////////////
 
-    fn transform_resource<'a>(&self, resource: Resource<'a>) -> Resource<'a> {
-        // Decoding must happen first before path normalization
-        let decoded_href = match resource.key() {
-            ResourceKey::Value(value) => uri::decode(value),
-            ResourceKey::Position(_) => return resource,
+    fn transform_resource<'a>(&self, resource: &'a Resource<'a>) -> Cow<'a, Resource<'a>> {
+        let ResourceKey::Value(original) = resource.key() else {
+            return Cow::Borrowed(resource);
         };
 
-        let normalized = if decoded_href.starts_with(uri::SEPARATOR) {
-            uri::normalize(&decoded_href)
+        // Remove fragment/query
+        let path = uri::path(original);
+        // Decoding must happen first before path normalization
+        let decoded_path = uri::decode(path);
+        let normalized = if decoded_path.starts_with(uri::SEPARATOR) {
+            uri::normalize(&decoded_path)
         } else {
-            uri::resolve(&self.package().directory().decode(), &decoded_href)
+            uri::resolve(&self.package().directory().decode(), &decoded_path)
         };
 
         if let Cow::Owned(normalized) = normalized {
             // Input is not normalized
-            resource.swap_value(normalized)
-        } else if let Cow::Owned(decoded) = decoded_href {
+            Cow::Owned(Resource::from(normalized))
+        } else if let Cow::Owned(decoded) = decoded_path {
             // Input is normalized, not decoded
-            resource.swap_value(decoded)
+            Cow::Owned(Resource::from(decoded))
+        } else if original.len() != path.len() {
+            // Input has a query/fragment that should be removed
+            Cow::Owned(Resource::from(path))
         } else {
-            // Input is already decoded and normalized
-            resource
+            // Input is already decoded, normalized, and has no query/fragment
+            Cow::Borrowed(resource)
         }
     }
 

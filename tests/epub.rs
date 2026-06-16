@@ -11,8 +11,9 @@ mod epub {
     mod write;
 
     use crate::epub::util::TestEpub::{Epub3Dir, Epub3File};
-    use rbook::ebook::errors::ArchiveError;
+    use rbook::ebook::errors::{ArchiveError, EbookResult};
     use std::path::Path;
+    use wasm_bindgen_test::wasm_bindgen_test;
 
     #[test]
     fn test_comparison() {
@@ -59,6 +60,16 @@ mod epub {
 
             assert_eq!(content_a, content_b);
         }
+    }
+
+    #[test]
+    #[wasm_bindgen_test]
+    fn test_read_resource_with_uri_query_and_fragment() -> EbookResult<()> {
+        let epub = Epub3File.open_strict();
+        epub.read_resource_str("c1.xhtml#start")?;
+        epub.read_resource_bytes("c2.xhtml?abc=xyz#start")?;
+        epub.copy_resource("c1a.xhtml?flag=1&flag2=2", &mut Vec::new())?;
+        Ok(())
     }
 
     /// Test path traversal when using a directory as the backend
