@@ -245,7 +245,8 @@ impl<'ebook> EpubMetadata<'ebook> {
     }
 
     /// Searches the metadata hierarchy, including refinements, and returns the
-    /// [`EpubMetaEntry`] matching the given `id`, or [`None`] if not found.
+    /// [`EpubMetaEntry`] matching the given [`id`](EpubMetaEntry::id),
+    /// or [`None`] if not found.
     ///
     /// # Performance Implications
     /// This is a recursive linear operation as the underlying structure

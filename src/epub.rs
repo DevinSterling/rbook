@@ -570,11 +570,14 @@ impl Epub {
     ///
     /// # Normalization
     /// If the given [`Resource::key`] is a relative path,
-    /// it is appended to [`EpubPackage::directory`].
-    /// Such behavior may be circumvented by making the path absolute by adding a forward
-    /// slash (`/`) before ***any*** components.
+    /// it is resolved relative to [`EpubPackage::directory`].
+    /// Such behavior can be circumvented by making the given resource path
+    /// absolute (i.e., prefixing it with `/`).
     ///
-    /// Paths are percent-decoded ***then*** normalized before resource retrieval.
+    /// Paths are processed in the following order before retrieval:
+    /// 1. Strip fragment identifiers (`#section`) and query parameters (`?q=1`).
+    /// 2. Apply URI percent-decoding.
+    /// 3. Apply path normalization.
     #[doc = doc::inherent!(Ebook, copy_resource)]
     /// # See Also
     /// - [`EpubManifestEntry::copy_bytes`](manifest::EpubManifestEntry::copy_bytes)
@@ -623,6 +626,26 @@ impl Epub {
     }
 
     /// Returns the content of a [`Resource`] as a string.
+    ///
+    /// # Note
+    /// XHTML content often contains relative resource paths that require
+    /// manual resolution to use effectively.
+    /// [`Self::read_resource_str_with`] handles such cases if needed:
+    /// ```
+    /// # use rbook::Epub;
+    /// use rbook::epub::rewrite::{EpubRewriteOptions, PathRewrite};
+    ///
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
+    /// # let epub = Epub::open("tests/ebooks/example_epub")?;
+    /// let rewrite = EpubRewriteOptions::default()
+    ///     .rewrite_paths(PathRewrite::root_relative());
+    ///
+    /// // All contained resource paths are now resolved
+    /// // (`../images/1.png` → `/opf/data/images/1.png`)
+    /// let content = epub.read_resource_str_with("c2.xhtml", &rewrite);
+    /// # Ok(())
+    /// # }
+    /// ```
     #[doc = doc::inherent!(Ebook, read_resource_str)]
     /// # See Also
     /// - [`Self::copy_resource`] for path normalization details.

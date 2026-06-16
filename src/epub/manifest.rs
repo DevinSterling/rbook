@@ -219,7 +219,8 @@ impl<'ebook> EpubManifest<'ebook> {
             .map(|(id, data)| self.ctx.create_entry(id, data))
     }
 
-    /// Returns the [entry](EpubManifestEntry) matching the given `id`, or [`None`] if not found.
+    /// Returns the [entry](EpubManifestEntry) matching the given [`id`](EpubManifestEntry::id)
+    /// , or [`None`] if not found.
     ///
     /// Computes in **O(1)** time.
     ///
@@ -232,7 +233,8 @@ impl<'ebook> EpubManifest<'ebook> {
             .map(|(id, data)| self.ctx.create_entry(id, data))
     }
 
-    /// Returns the [entry](EpubManifestEntry) matching the given `href`, or [`None`] if not found.
+    /// Returns the [entry](EpubManifestEntry) matching the given `href`,
+    /// or [`None`] if not found.
     ///
     /// # Note
     /// The given `href` is ***not*** normalized or percent-decoded.
@@ -762,9 +764,29 @@ impl<'ebook> EpubManifestEntry<'ebook> {
     }
 
     /// Returns the associated content as a [`String`].
+    ///
+    /// # Note
+    /// XHTML content often contains relative resource paths that require
+    /// manual resolution to use effectively.
+    /// [`Self::read_str_with`] handles such cases if needed:
+    /// ```
+    /// # use rbook::Epub;
+    /// use rbook::epub::rewrite::{EpubRewriteOptions, PathRewrite};
+    ///
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
+    /// # let epub = Epub::open("tests/ebooks/example_epub")?;
+    /// # let manifest_entry = epub.manifest().by_id("toc").unwrap();
+    /// let rewrite = EpubRewriteOptions::default()
+    ///     .rewrite_paths(PathRewrite::root_relative());
+    ///
+    /// // All contained resource paths are now resolved
+    /// // (`../images/1.png` → `/opf/data/images/1.png`)
+    /// let content = manifest_entry.read_str_with(&rewrite);
+    /// # Ok(())
+    /// # }
+    /// ```
     #[doc = doc::inherent!(ManifestEntry, read_str)]
     /// # See Also
-    /// - [`Self::read_str_with`] to retrieve the associated content with modifications applied.
     /// - [`EpubManifestEntryMut::set_content`] to modify the content.
     pub fn read_str(&self) -> ArchiveResult<String> {
         ManifestEntry::read_str(self)
@@ -797,7 +819,6 @@ impl<'ebook> EpubManifestEntry<'ebook> {
     /// ```
     pub fn read_str_with(&self, rewrite: &EpubRewriteOptions) -> EbookResult<String> {
         let config = &rewrite.0;
-        // `read_str` converts UTF-16 to UTF-8, unlike `read_bytes`
         let mut content = self.read_str()?;
 
         if config.content_requires_modification() {
