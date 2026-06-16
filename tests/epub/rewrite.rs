@@ -3,6 +3,7 @@ use crate::epub::util::TestEpub::Epub3File;
 use rbook::ebook::errors::EbookResult;
 use rbook::epub::rewrite::{EpubRewriteOptions, PathRewrite};
 use rbook::reader::errors::ReaderResult;
+use std::collections::HashSet;
 use wasm_bindgen_test::wasm_bindgen_test;
 
 #[test]
@@ -16,6 +17,7 @@ fn test_manifest_entry_read_str_with() -> EbookResult<()> {
 
     for path in util::xml::extract_attributes(&xhtml, &[b"href", b"src"]) {
         assert!(path.starts_with("/"));
+        epub.read_resource_str(&path)?;
     }
     Ok(())
 }
@@ -24,12 +26,33 @@ fn test_manifest_entry_read_str_with() -> EbookResult<()> {
 #[wasm_bindgen_test]
 fn test_epub_read_resource_str_with() -> EbookResult<()> {
     const CSS: &str = "body { color: red; }";
-    let epub = Epub3File.open_strict();
-    let rewrite = EpubRewriteOptions::default().inject_css(CSS);
 
-    let xhtml = epub.read_resource_str_with("/toc.xhtml", &rewrite)?;
+    let epub = Epub3File.open_strict();
+    let rewrite = EpubRewriteOptions::default()
+        .rewrite_paths(PathRewrite::root_relative())
+        .inject_css(CSS);
+    let xhtml = epub.read_resource_str_with("c1.xhtml", &rewrite)?;
+
+    // Check for injected CSS
     let inserted = format!("<style>/*<![CDATA[*/{CSS}/*]]>*/</style>");
     assert!(xhtml.contains(&inserted));
+
+    // Check resolved paths
+    let mut hrefs = HashSet::from([
+        "#start",
+        "/EPUB/c1a.xhtml",
+        "/EPUB/c2.xhtml#start",
+        "/toc.xhtml",
+    ]);
+
+    for path in util::xml::extract_attributes(&xhtml, &[b"href"]) {
+        hrefs.remove(path.as_str());
+    }
+
+    assert!(
+        hrefs.is_empty(),
+        "Paths should be resolved. Missing: {hrefs:?}",
+    );
     Ok(())
 }
 
@@ -50,9 +73,10 @@ fn test_reader_rewrite_paths() -> ReaderResult<()> {
             let xhtml = data.content();
 
             for path in util::xml::extract_attributes(xhtml, &[b"href", b"src"]) {
-                // Strip query/fragment;
-                let end = path.find(['#', '?']).unwrap_or(path.len());
-                let path = &path[..end];
+                // Skip fragments
+                if path.starts_with('#') {
+                    continue;
+                }
 
                 // check for prefix
                 assert!(path.starts_with(prefix));
