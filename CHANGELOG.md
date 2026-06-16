@@ -1,4 +1,15 @@
 # Changelog
+## 0.7.9 (2026-06-16)
+### Additions **＋**
+- For `Epub`, ignore URI query parameters and fragments in resource paths passed to
+  `copy_resource`, `read_resource_bytes`, and `read_resource_str`.
+
+### Fixes　**✓**
+- Fix incorrectly rewriting anchor-only hrefs (e.g., `#section`) when `PathRewrite::Prefix` is set.
+
+### Changes　**⟳**
+- Refine documentation for enhanced clarity.
+
 ## 0.7.8 (2026-06-14)
 ### Additions **＋**
 - New module `epub::rewrite` for XHTML content rewriting:
