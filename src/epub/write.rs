@@ -1,25 +1,24 @@
 mod editor;
 mod writer;
 
-use crate::ebook::archive::ResourceProvider;
 use crate::ebook::element::Href;
 use crate::ebook::errors::EbookResult;
 use crate::ebook::resource::Resource;
 use crate::epub::Epub;
 use crate::epub::archive::EpubArchive;
 use crate::epub::consts::opf;
-use crate::epub::manifest::{EpubManifestContext, EpubManifestData, EpubManifestMut};
+use crate::epub::manifest::{EpubManifestData, EpubManifestMut};
 use crate::epub::metadata::{
     DetachedEpubMetaEntry, EpubMetadataData, EpubMetadataMut, EpubVersion,
 };
-use crate::epub::package::{EpubPackageData, EpubPackageMetaContext, EpubPackageMut};
-use crate::epub::spine::{EpubSpineContext, EpubSpineData, EpubSpineMut};
-use crate::epub::toc::{EpubTocContext, EpubTocData, EpubTocMut};
+use crate::epub::package::{EpubPackageData, EpubPackageMut};
+use crate::epub::spine::{EpubSpineData, EpubSpineMut};
+use crate::epub::toc::{EpubTocData, EpubTocMut};
 use crate::epub::write::writer::{EpubWriteConfig, EpubWriter};
 use crate::input::Many;
 use crate::util::borrow::MaybeOwned;
 use crate::util::sync::SendAndSync;
-use crate::util::uri::{self, UriResolver};
+use crate::util::uri;
 use std::fmt::Debug;
 use std::io::{Cursor, Write};
 use std::path::Path;
@@ -165,15 +164,7 @@ impl Epub {
     /// # See Also
     /// - [`Self::edit`] for simple modification tasks.
     pub fn manifest_mut(&mut self) -> EpubManifestMut<'_> {
-        EpubManifestMut::new(
-            UriResolver::parent_of(&self.package.location),
-            (&self.package).into(),
-            &mut self.archive,
-            &mut self.manifest,
-            &mut self.metadata,
-            &mut self.spine,
-            &mut self.toc,
-        )
+        EpubManifestMut::new(self)
     }
 
     /// Advanced [`EpubSpine`](super::EpubSpine) modification.
@@ -181,17 +172,7 @@ impl Epub {
     /// # See Also
     /// - [`Self::edit`] for simple modification tasks.
     pub fn spine_mut(&mut self) -> EpubSpineMut<'_> {
-        EpubSpineMut::new(
-            EpubSpineContext::new(
-                EpubManifestContext::new(
-                    ResourceProvider::Archive(&self.archive),
-                    (&self.package).into(),
-                    Some(&self.manifest),
-                ),
-                (&self.package).into(),
-            ),
-            &mut self.spine,
-        )
+        EpubSpineMut::new(self)
     }
 
     /// Advanced [`EpubToc`](super::EpubToc) modification.
@@ -199,15 +180,7 @@ impl Epub {
     /// # See Also
     /// - [`Self::edit`] for simple modification tasks.
     pub fn toc_mut(&mut self) -> EpubTocMut<'_> {
-        EpubTocMut::new(
-            EpubTocContext::new(EpubManifestContext::new(
-                ResourceProvider::Archive(&self.archive),
-                (&self.package).into(),
-                Some(&self.manifest),
-            )),
-            UriResolver::parent_of(&self.package.location),
-            &mut self.toc,
-        )
+        EpubTocMut::new(self)
     }
 
     /// Cleans up the content of an [`Epub`], removing broken references.

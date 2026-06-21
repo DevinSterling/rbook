@@ -2,6 +2,7 @@ use crate::ebook::archive::ResourceProvider;
 use crate::ebook::element::{Attribute, Attributes, Properties};
 use crate::ebook::errors::ArchiveResult;
 use crate::ebook::resource::{self, ResourceContent};
+use crate::epub::Epub;
 use crate::epub::archive::EpubArchive;
 use crate::epub::consts::opf;
 use crate::epub::errors::EpubError;
@@ -20,6 +21,47 @@ use std::fmt::{Debug, Write};
 ////////////////////////////////////////////////////////////////////////////////
 // PRIVATE API
 ////////////////////////////////////////////////////////////////////////////////
+
+/// Context where all EPUB components are required for cross-referencing.
+///
+/// For example:
+/// - Mutating content (to synchronize id/href changes)
+/// - Looking up the cover image via the EPUB 2 cover metadata entry.
+struct EpubManifestWriteContext<'ebook> {
+    href_resolver: UriResolver<'ebook>,
+    meta_ctx: EpubPackageMetaContext<'ebook>,
+    archive: &'ebook mut EpubArchive,
+    manifest: &'ebook mut EpubManifestData,
+    metadata: &'ebook mut EpubMetadataData,
+    spine: &'ebook mut EpubSpineData,
+    toc: &'ebook mut EpubTocData,
+}
+
+impl<'ebook> EpubManifestWriteContext<'ebook> {
+    fn new(epub: &'ebook mut Epub) -> Self {
+        Self {
+            href_resolver: UriResolver::parent_of(&epub.package.location),
+            meta_ctx: (&epub.package).into(),
+            archive: &mut epub.archive,
+            manifest: &mut epub.manifest,
+            metadata: &mut epub.metadata,
+            spine: &mut epub.spine,
+            toc: &mut epub.toc,
+        }
+    }
+
+    pub(super) fn lend(&mut self) -> EpubManifestWriteContext<'_> {
+        EpubManifestWriteContext {
+            href_resolver: self.href_resolver,
+            meta_ctx: self.meta_ctx,
+            archive: self.archive,
+            manifest: self.manifest,
+            metadata: self.metadata,
+            spine: self.spine,
+            toc: self.toc,
+        }
+    }
+}
 
 impl<'ebook> EpubManifestContext<'ebook> {
     fn attached(archive: &'ebook EpubArchive, package: EpubPackageMetaContext<'ebook>) -> Self {
@@ -286,7 +328,7 @@ impl EpubManifestEntry<'_> {
     ///
     /// # Note
     /// If the source manifest entry has an `id`, the detached entry will retain it.
-    /// To avoid ID collisions if re-inserting into the same [`Epub`](crate::epub::Epub),
+    /// To avoid ID collisions if re-inserting into the same [`Epub`],
     /// consider changing the ID using
     /// [`DetachedEpubManifestEntry::id`] or [`EpubManifestEntryMut::set_id`].
     ///
@@ -373,7 +415,7 @@ impl EpubManifestEntry<'_> {
     }
 }
 
-/// An owned [`EpubManifestEntry`] detached from an [`Epub`](crate::epub::Epub).
+/// An owned [`EpubManifestEntry`] detached from an [`Epub`].
 ///
 /// This struct acts as a builder for creating new manifest entries
 /// before insertion into [`EpubManifestMut`].
@@ -420,14 +462,11 @@ impl DetachedEpubManifestEntry {
     /// Returns a mutable view to modify an entry's data,
     /// useful for modifications without builder-esque methods.
     pub fn as_mut(&mut self) -> EpubManifestEntryMut<'_> {
-        EpubManifestEntryMut::new(
-            EpubPackageMetaContext::EMPTY,
-            ManifestEntryDataHandle::Detached {
-                id: &mut self.id,
-                data: &mut self.data,
-                content: &mut self.content,
-            },
-        )
+        EpubManifestEntryMut::detached(ManifestEntryDataHandle::Detached {
+            id: &mut self.id,
+            data: &mut self.data,
+            content: &mut self.content,
+        })
     }
 
     /// Returns a read-only view, useful for inspecting state before applying modifications.
@@ -541,7 +580,7 @@ impl DetachedEpubManifestEntry {
     /// - Calling this method will set [`EpubManifestEntry::href`] to an empty location (`""`),
     ///   as there is no [package directory](crate::epub::package::EpubPackage::directory)
     ///   to resolve against for a detached entry.
-    ///   The resolved href is computed once the entry is inserted into an [`Epub`](crate::epub::Epub).
+    ///   The resolved href is computed once the entry is inserted into an [`Epub`].
     ///
     /// # See Also
     /// - [`EpubEditor::resource`](crate::epub::EpubEditor::resource):
@@ -628,7 +667,7 @@ impl DetachedEpubManifestEntry {
     ///
     /// # Note
     /// This is an EPUB 3 feature.
-    /// When [writing](crate::Epub::write) an EPUB 2 ebook, this field is ignored.
+    /// When [writing](Epub::write) an EPUB 2 ebook, this field is ignored.
     pub fn media_overlay(mut self, idref: impl IntoOption<String>) -> Self {
         self.as_mut().set_media_overlay(idref);
         self
@@ -638,7 +677,7 @@ impl DetachedEpubManifestEntry {
     ///
     /// # Note
     /// This is an EPUB 3 feature.
-    /// When [writing](crate::Epub::write) an EPUB 2 ebook, properties are ignored.
+    /// When [writing](Epub::write) an EPUB 2 ebook, properties are ignored.
     ///
     /// # See Also
     /// - [`EpubManifestEntryMut::properties_mut`] for a modifiable collection of attributes
@@ -653,7 +692,7 @@ impl DetachedEpubManifestEntry {
     /// # Omitted Attributes
     /// The following attributes **should not** be set via this method
     /// as they have dedicated setters.
-    /// If set here, they are ignored during [writing](crate::epub::Epub::write):
+    /// If set here, they are ignored during [writing](Epub::write):
     /// - [`id`](Self::id)
     /// - [`href`](Self::href)
     /// - [`media_type`](Self::media_type)
@@ -675,7 +714,7 @@ impl DetachedEpubManifestEntry {
     ///
     /// # Note
     /// This is an EPUB 3 feature.
-    /// When [writing](crate::Epub::write) an EPUB 2 ebook, refinements are ignored.
+    /// When [writing](Epub::write) an EPUB 2 ebook, refinements are ignored.
     ///
     /// # See Also
     /// - [`EpubManifestEntryMut::refinements_mut`] for a modifiable collection of refinements
@@ -714,8 +753,7 @@ impl<H: Into<String>, C: Into<ResourceContent>> From<(H, C)> for DetachedEpubMan
     }
 }
 
-/// Mutable view of [`EpubManifest`] accessible via
-/// [`Epub::manifest_mut`](crate::epub::Epub::manifest_mut).
+/// Mutable view of [`EpubManifest`] accessible via [`Epub::manifest_mut`].
 ///
 /// Allows the management of resources, including
 /// adding, removing, and modifying manifest entries.
@@ -723,63 +761,28 @@ impl<H: Into<String>, C: Into<ResourceContent>> From<(H, C)> for DetachedEpubMan
 /// # See Also
 /// - [`EpubEditor`](crate::epub::EpubEditor) for simple modification tasks.
 pub struct EpubManifestMut<'ebook> {
-    href_resolver: UriResolver<'ebook>,
-    meta_ctx: EpubPackageMetaContext<'ebook>,
-    archive: &'ebook mut EpubArchive,
-    manifest: &'ebook mut EpubManifestData,
-
-    // References to other content (to synchronize id/href changes)
-    // - Metadata may include references that assist manifest item lookup.
-    //   For example, looking up the cover image via the EPUB 2 cover metadata entry.
-    metadata: &'ebook mut EpubMetadataData,
-    spine: &'ebook mut EpubSpineData,
-    toc: &'ebook mut EpubTocData,
+    ctx: EpubManifestWriteContext<'ebook>,
 }
 
 impl<'ebook> EpubManifestMut<'ebook> {
-    pub(in crate::epub) fn new(
-        href_resolver: UriResolver<'ebook>,
-        meta_ctx: EpubPackageMetaContext<'ebook>,
-        archive: &'ebook mut EpubArchive,
-        manifest: &'ebook mut EpubManifestData,
-        metadata: &'ebook mut EpubMetadataData,
-        spine: &'ebook mut EpubSpineData,
-        toc: &'ebook mut EpubTocData,
-    ) -> Self {
+    pub(in crate::epub) fn new(epub: &'ebook mut Epub) -> Self {
         Self {
-            href_resolver,
-            meta_ctx,
-            archive,
-            manifest,
-            metadata,
-            spine,
-            toc,
+            ctx: EpubManifestWriteContext::new(epub),
         }
     }
 
     fn entry_at(&mut self, index: usize) -> EpubManifestEntryMut<'_> {
-        EpubManifestEntryMut::new(
-            self.meta_ctx,
-            ManifestEntryDataHandle::Attached(AttachedEntryContext {
-                href_resolver: self.href_resolver,
-                archive: self.archive,
-                manifest: self.manifest,
-                metadata: self.metadata,
-                spine: self.spine,
-                toc: self.toc,
-                index,
-            }),
-        )
+        EpubManifestEntryMut::attached(&mut self.ctx, index)
     }
 
     fn insert_detached(&mut self, mut entry: DetachedEpubManifestEntry) {
         // Resolve href
-        entry.data.resolve_href(self.href_resolver);
+        entry.data.resolve_href(self.ctx.href_resolver);
 
         // Update Archive:
         // If present, store the associated binary resource in the archive
         if let Some(binary) = entry.content {
-            self.archive.insert(entry.data.href.clone(), binary);
+            self.ctx.archive.insert(entry.data.href.clone(), binary);
         }
 
         // Infer media type if not provided
@@ -787,16 +790,16 @@ impl<'ebook> EpubManifestMut<'ebook> {
             entry.data.media_type = resource::write::infer_media_type(&entry.data.href);
         }
 
-        let (i, replaced) = self.manifest.entries.insert_full(entry.id, entry.data);
+        let (i, replaced) = self.ctx.manifest.entries.insert_full(entry.id, entry.data);
 
         // Remove the replaced entry
         if let Some(old) = replaced {
-            let new = &self.manifest.entries[i];
+            let new = &self.ctx.manifest.entries[i];
 
             // Check if archive must be replaced!
             if old.href != new.href {
                 // Remove orphaned resource
-                self.archive.remove(&old.href);
+                self.ctx.archive.remove(&old.href);
             }
         }
     }
@@ -808,10 +811,10 @@ impl<'ebook> EpubManifestMut<'ebook> {
     /// Returns a read-only view, useful for inspecting state before applying modifications.
     pub fn as_view(&self) -> EpubManifest<'_> {
         EpubManifest::new(
-            ResourceProvider::Archive(self.archive),
-            self.meta_ctx,
-            self.manifest,
-            self.metadata,
+            ResourceProvider::Archive(self.ctx.archive),
+            self.ctx.meta_ctx,
+            self.ctx.manifest,
+            self.ctx.metadata,
         )
     }
 
@@ -823,7 +826,7 @@ impl<'ebook> EpubManifestMut<'ebook> {
     ///
     /// ToC entries that reference the replaced manifest entry’s href are orphaned if
     /// the new entry has a different [`href`](EpubManifestEntry::href).
-    /// See [`Epub::cleanup`](crate::epub::Epub::cleanup) to remove orphaned entries.
+    /// See [`Epub::cleanup`] to remove orphaned entries.
     ///
     /// # See Also
     /// - [`EpubEditor::container_resource`](crate::epub::EpubEditor::container_resource)
@@ -840,7 +843,7 @@ impl<'ebook> EpubManifestMut<'ebook> {
     /// # See Also
     /// - [`Self::by_id_mut`] to get an entry by [`id`](EpubManifestEntry::id).
     pub fn get_mut(&mut self, index: usize) -> Option<EpubManifestEntryMut<'_>> {
-        (index < self.manifest.entries.len()).then(|| self.entry_at(index))
+        (index < self.ctx.manifest.entries.len()).then(|| self.entry_at(index))
     }
 
     /// Returns a mutable view of the entry with the given `id`, if present.
@@ -848,7 +851,8 @@ impl<'ebook> EpubManifestMut<'ebook> {
     /// # See Also
     /// - [`Self::get_mut`] to get an entry by `index`.
     pub fn by_id_mut(&mut self, id: &str) -> Option<EpubManifestEntryMut<'_>> {
-        self.manifest
+        self.ctx
+            .manifest
             .entries
             .get_index_of(id)
             .map(|index| self.entry_at(index))
@@ -864,14 +868,15 @@ impl<'ebook> EpubManifestMut<'ebook> {
     ///   to conveniently create or set a new cover image resource.
     /// - [`EpubManifestEntryMut::set_content`] to change the cover image contents.
     pub fn cover_image_mut(&mut self) -> Option<EpubManifestEntryMut<'_>> {
-        for (i, data) in self.manifest.entries.values().enumerate() {
+        for (i, data) in self.ctx.manifest.entries.values().enumerate() {
             if data.properties.has_property(opf::COVER_IMAGE) {
                 return Some(self.entry_at(i));
             }
         }
         // Fallback to EPUB 2
-        if let Some(cover_id) = self.metadata.epub2_cover_image_id() {
+        if let Some(cover_id) = self.ctx.metadata.epub2_cover_image_id() {
             return self
+                .ctx
                 .manifest
                 .entries
                 .get_index_of(cover_id)
@@ -921,13 +926,7 @@ impl<'ebook> EpubManifestMut<'ebook> {
     /// [`EpubManifestMutIter::next`]
     pub fn iter_mut(&mut self) -> EpubManifestMutIter<'_> {
         EpubManifestMutIter {
-            href_resolver: self.href_resolver,
-            meta_ctx: self.meta_ctx,
-            archive: self.archive,
-            metadata: self.metadata,
-            manifest: self.manifest,
-            spine: self.spine,
-            toc: self.toc,
+            ctx: self.ctx.lend(),
             index: 0,
         }
     }
@@ -939,13 +938,7 @@ impl<'ebook> EpubManifestMut<'ebook> {
     #[allow(clippy::should_implement_trait)]
     pub fn into_iter(self) -> EpubManifestMutIter<'ebook> {
         EpubManifestMutIter {
-            href_resolver: self.href_resolver,
-            meta_ctx: self.meta_ctx,
-            archive: self.archive,
-            manifest: self.manifest,
-            metadata: self.metadata,
-            spine: self.spine,
-            toc: self.toc,
+            ctx: self.ctx,
             index: 0,
         }
     }
@@ -956,18 +949,18 @@ impl<'ebook> EpubManifestMut<'ebook> {
     /// Panics if `index` is out of bounds.
     ///
     /// # See Also
-    /// - [`Epub::cleanup`](crate::epub::Epub::cleanup) to remove orphaned entries.
+    /// - [`Epub::cleanup`] to remove orphaned entries.
     pub fn remove(&mut self, index: usize) -> DetachedEpubManifestEntry {
-        let (id, data) = match self.manifest.entries.shift_remove_index(index) {
+        let (id, data) = match self.ctx.manifest.entries.shift_remove_index(index) {
             Some(entry) => entry,
             None => panic!(
                 "removal index (is {index}) should be < len (is {})",
-                self.manifest.entries.len(),
+                self.ctx.manifest.entries.len(),
             ),
         };
 
         DetachedEpubManifestEntry {
-            content: self.archive.remove(&data.href),
+            content: self.ctx.archive.remove(&data.href),
             id,
             data,
         }
@@ -976,13 +969,14 @@ impl<'ebook> EpubManifestMut<'ebook> {
     /// Removes and returns the entry matching the given `id`, if present.
     ///
     /// # See Also
-    /// - [`Epub::cleanup`](crate::epub::Epub::cleanup) to remove orphaned entries.
+    /// - [`Epub::cleanup`] to remove orphaned entries.
     pub fn remove_by_id(&mut self, id: &str) -> Option<DetachedEpubManifestEntry> {
-        self.manifest
+        self.ctx
+            .manifest
             .entries
             .shift_remove_entry(id)
             .map(|(id, data)| DetachedEpubManifestEntry {
-                content: self.archive.remove(&data.href),
+                content: self.ctx.archive.remove(&data.href),
                 id,
                 data,
             })
@@ -996,15 +990,15 @@ impl<'ebook> EpubManifestMut<'ebook> {
     /// This method operates in place and visits every entry exactly once.
     ///
     /// # See Also
-    /// - [`Epub::cleanup`](crate::epub::Epub::cleanup) to remove orphaned entries.
+    /// - [`Epub::cleanup`] to remove orphaned entries.
     /// - [`Self::extract_if`] to retrieve an iterator of the removed entries.
     pub fn retain(&mut self, mut f: impl FnMut(EpubManifestEntry<'_>) -> bool) {
-        self.manifest.entries.retain(|id, entry| {
-            let ctx = EpubManifestContext::attached(self.archive, self.meta_ctx);
+        self.ctx.manifest.entries.retain(|id, entry| {
+            let ctx = EpubManifestContext::attached(self.ctx.archive, self.ctx.meta_ctx);
             let retain = f(ctx.create_entry(id, entry));
 
             if !retain {
-                self.archive.remove(&entry.href);
+                self.ctx.archive.remove(&entry.href);
             }
             retain
         });
@@ -1023,7 +1017,7 @@ impl<'ebook> EpubManifestMut<'ebook> {
     /// Prefer [`Self::retain`] with a negated predicate if the returned iterator is not needed.
     ///
     /// # See Also
-    /// - [`Epub::cleanup`](crate::epub::Epub::cleanup) to remove orphaned entries.
+    /// - [`Epub::cleanup`] to remove orphaned entries.
     ///
     /// # Examples
     /// - Extracting all image entries:
@@ -1042,13 +1036,14 @@ impl<'ebook> EpubManifestMut<'ebook> {
         &mut self,
         mut f: impl FnMut(EpubManifestEntry<'_>) -> bool,
     ) -> impl Iterator<Item = DetachedEpubManifestEntry> {
-        self.manifest
+        self.ctx
+            .manifest
             .entries
             .extract_if(.., move |id, entry| {
                 f(EpubManifestContext::EMPTY.create_entry(id, entry))
             })
             .map(|(id, data)| DetachedEpubManifestEntry {
-                content: self.archive.remove(&data.href),
+                content: self.ctx.archive.remove(&data.href),
                 id,
                 data,
             })
@@ -1057,13 +1052,14 @@ impl<'ebook> EpubManifestMut<'ebook> {
     /// Removes and returns all manifest entries.
     ///
     /// # See Also
-    /// - [`Epub::cleanup`](crate::epub::Epub::cleanup) to remove orphaned entries.
+    /// - [`Epub::cleanup`] to remove orphaned entries.
     pub fn drain(&mut self) -> impl Iterator<Item = DetachedEpubManifestEntry> {
-        self.manifest
+        self.ctx
+            .manifest
             .entries
             .drain(..)
             .map(|(id, data)| DetachedEpubManifestEntry {
-                content: self.archive.remove(&data.href),
+                content: self.ctx.archive.remove(&data.href),
                 id,
                 data,
             })
@@ -1072,21 +1068,18 @@ impl<'ebook> EpubManifestMut<'ebook> {
     /// Removes all manifest entries.
     ///
     /// # See Also
-    /// - [`Epub::cleanup`](crate::epub::Epub::cleanup) to remove orphaned entries.
+    /// - [`Epub::cleanup`] to remove orphaned entries.
     /// - [`Self::drain`] to retrieve an iterator of the removed entries.
     pub fn clear(&mut self) {
-        for (_, removed) in self.manifest.entries.drain(..) {
-            self.archive.remove(&removed.href);
+        for (_, removed) in self.ctx.manifest.entries.drain(..) {
+            self.ctx.archive.remove(&removed.href);
         }
     }
 }
 
 impl Debug for EpubManifestMut<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-        f.debug_struct("EpubManifestMut")
-            .field("href_resolver", &self.href_resolver)
-            .field("manifest", &self.manifest)
-            .finish_non_exhaustive()
+        f.debug_struct("EpubManifestMut").finish_non_exhaustive()
     }
 }
 
@@ -1110,13 +1103,7 @@ impl Extend<DetachedEpubManifestEntry> for EpubManifestMut<'_> {
 /// # See Also
 /// - [`EpubManifestMut::iter_mut`] to create an instance of this struct.
 pub struct EpubManifestMutIter<'ebook> {
-    href_resolver: UriResolver<'ebook>,
-    meta_ctx: EpubPackageMetaContext<'ebook>,
-    archive: &'ebook mut EpubArchive,
-    manifest: &'ebook mut EpubManifestData,
-    metadata: &'ebook mut EpubMetadataData,
-    spine: &'ebook mut EpubSpineData,
-    toc: &'ebook mut EpubTocData,
+    ctx: EpubManifestWriteContext<'ebook>,
     index: usize,
 }
 
@@ -1126,24 +1113,13 @@ impl EpubManifestMutIter<'_> {
     /// Returns [`None`] when iteration is finished.
     #[allow(clippy::should_implement_trait)]
     pub fn next(&mut self) -> Option<EpubManifestEntryMut<'_>> {
-        let entries = &mut self.manifest.entries;
+        let entries = &mut self.ctx.manifest.entries;
 
         if self.index < entries.len() {
             let index = self.index;
             self.index += 1;
 
-            Some(EpubManifestEntryMut::new(
-                self.meta_ctx,
-                ManifestEntryDataHandle::Attached(AttachedEntryContext {
-                    href_resolver: self.href_resolver,
-                    archive: self.archive,
-                    manifest: self.manifest,
-                    metadata: self.metadata,
-                    spine: self.spine,
-                    toc: self.toc,
-                    index,
-                }),
-            ))
+            Some(EpubManifestEntryMut::attached(&mut self.ctx, index))
         } else {
             None
         }
@@ -1153,7 +1129,6 @@ impl EpubManifestMutIter<'_> {
 impl Debug for EpubManifestMutIter<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
         f.debug_struct("EpubManifestMutIter")
-            .field("href_resolver", &self.href_resolver)
             .field("index", &self.index)
             .finish_non_exhaustive()
     }
@@ -1171,11 +1146,26 @@ pub struct EpubManifestEntryMut<'ebook> {
 }
 
 impl<'ebook> EpubManifestEntryMut<'ebook> {
-    fn new(
-        meta_ctx: EpubPackageMetaContext<'ebook>,
-        data: ManifestEntryDataHandle<'ebook>,
-    ) -> Self {
-        Self { meta_ctx, data }
+    fn detached(data: ManifestEntryDataHandle<'ebook>) -> Self {
+        Self {
+            meta_ctx: EpubPackageMetaContext::EMPTY,
+            data,
+        }
+    }
+
+    fn attached(ctx: &'ebook mut EpubManifestWriteContext<'_>, index: usize) -> Self {
+        Self {
+            meta_ctx: ctx.meta_ctx,
+            data: ManifestEntryDataHandle::Attached(AttachedEntryContext {
+                href_resolver: ctx.href_resolver,
+                archive: ctx.archive,
+                manifest: ctx.manifest,
+                metadata: ctx.metadata,
+                spine: ctx.spine,
+                toc: ctx.toc,
+                index,
+            }),
+        }
     }
 
     /// Returns a read-only view, useful for inspecting state before applying modifications.
@@ -1204,8 +1194,7 @@ impl<'ebook> EpubManifestEntryMut<'ebook> {
     ///
     /// # Note
     /// After setting the content, all resource content retrieval methods
-    /// (e.g. [`Epub::copy_resource`](crate::Epub::copy_resource),
-    /// [`EpubManifestEntry::copy_bytes`])
+    /// (e.g. [`Epub::copy_resource`], [`EpubManifestEntry::copy_bytes`])
     /// will return the newly set content instead.
     ///
     /// # See Also
@@ -1383,7 +1372,7 @@ impl<'ebook> EpubManifestEntryMut<'ebook> {
     /// Setting this field from a [`DetachedEpubManifestEntry`] will make
     /// [`EpubManifestEntry::href`] return an empty location (`""`), as there is no
     /// [package directory](crate::epub::package::EpubPackage::directory) to resolve against.
-    /// The resolved href is computed once the entry is inserted into an [`Epub`](crate::epub::Epub).
+    /// The resolved href is computed once the entry is inserted into an [`Epub`].
     ///
     /// # See Also
     /// - ***[`DetachedEpubManifestEntry::href`] for important details.***

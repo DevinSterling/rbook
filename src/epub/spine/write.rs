@@ -1,5 +1,7 @@
+use crate::ebook::archive::ResourceProvider;
 use crate::ebook::element::{Attribute, Attributes, Properties};
 use crate::ebook::spine::PageDirection;
+use crate::epub::Epub;
 use crate::epub::manifest::EpubManifestContext;
 use crate::epub::metadata::{DetachedEpubMetaEntry, EpubRefinementsMut};
 use crate::epub::package::EpubPackageMetaContext;
@@ -43,7 +45,7 @@ impl EpubSpineEntry<'_> {
     ///
     /// # Note
     /// If the source spine entry has an `id`, the detached entry will retain it.
-    /// To avoid ID collisions if re-inserting into the same [`Epub`](crate::epub::Epub),
+    /// To avoid ID collisions if re-inserting into the same [`Epub`],
     /// consider clearing or changing the ID using
     /// [`DetachedEpubSpineEntry::id`] or [`EpubSpineEntryMut::set_id`].
     ///
@@ -78,7 +80,7 @@ impl EpubSpineEntry<'_> {
     }
 }
 
-/// An owned [`EpubSpineEntry`] detached from an [`Epub`](crate::epub::Epub).
+/// An owned [`EpubSpineEntry`] detached from an [`Epub`].
 ///
 /// This struct acts as a builder for creating new spine entries
 /// before insertion into [`EpubSpineMut`].
@@ -203,7 +205,7 @@ impl DetachedEpubSpineEntry {
     ///
     /// # Note
     /// This is an EPUB 3 feature.
-    /// When [writing](crate::Epub::write) an EPUB 2 ebook, properties are ignored.
+    /// When [writing](Epub::write) an EPUB 2 ebook, properties are ignored.
     ///
     /// # See Also
     /// - [`EpubSpineEntryMut::properties_mut`] for a modifiable collection of attributes
@@ -219,7 +221,7 @@ impl DetachedEpubSpineEntry {
     /// # Omitted Attributes
     /// The following attributes **should not** be set via this method
     /// as they have dedicated setters.
-    /// If set here, they are ignored during [writing](crate::epub::Epub::write):
+    /// If set here, they are ignored during [writing](Epub::write):
     /// - [`id`](Self::id)
     /// - [`idref`](Self::idref)
     /// - [`linear`](Self::linear)
@@ -239,7 +241,7 @@ impl DetachedEpubSpineEntry {
     ///
     /// # Note
     /// This is an EPUB 3 feature.
-    /// When [writing](crate::Epub::write) an EPUB 2 ebook, refinements are ignored.
+    /// When [writing](Epub::write) an EPUB 2 ebook, refinements are ignored.
     ///
     /// # See Also
     /// - [`EpubSpineEntryMut::refinements_mut`] for a modifiable collection of refinements
@@ -268,8 +270,7 @@ impl<'a> From<std::borrow::Cow<'a, str>> for DetachedEpubSpineEntry {
     }
 }
 
-/// Mutable view of [`EpubSpine`] accessible via
-/// [`Epub::spine_mut`](crate::epub::Epub::spine_mut).
+/// Mutable view of [`EpubSpine`] accessible via [`Epub::spine_mut`].
 ///
 /// Allows the management of reading order, including
 /// adding, removing, and reordering of spine entries.
@@ -282,11 +283,18 @@ pub struct EpubSpineMut<'ebook> {
 }
 
 impl<'ebook> EpubSpineMut<'ebook> {
-    pub(in crate::epub) fn new(
-        ctx: EpubSpineContext<'ebook>,
-        spine: &'ebook mut EpubSpineData,
-    ) -> Self {
-        Self { ctx, spine }
+    pub(in crate::epub) fn new(epub: &'ebook mut Epub) -> Self {
+        Self {
+            ctx: EpubSpineContext::new(
+                EpubManifestContext::new(
+                    ResourceProvider::Archive(&epub.archive),
+                    (&epub.package).into(),
+                    Some(&epub.manifest),
+                ),
+                (&epub.package).into(),
+            ),
+            spine: &mut epub.spine,
+        }
     }
 
     fn index_of(&mut self, predicate: impl Fn(&EpubSpineEntryData) -> bool) -> Option<usize> {
@@ -318,7 +326,7 @@ impl<'ebook> EpubSpineMut<'ebook> {
     ///
     /// # Note
     /// This is an EPUB 3 feature.
-    /// When [writing](crate::Epub::write) an EPUB 2 ebook, this field is ignored.
+    /// When [writing](Epub::write) an EPUB 2 ebook, this field is ignored.
     ///
     /// # See Also
     /// - [`EpubSpine::page_direction`] to get the page direction
@@ -669,7 +677,7 @@ impl<'ebook> EpubSpineEntryMut<'ebook> {
     /// # ID Generation
     /// If this parent entry does not have an ID
     /// ([`self.as_view().id()`](EpubSpineEntry::id)), a unique ID will be
-    /// auto-generated during [writing](crate::epub::Epub::write).
+    /// auto-generated during [writing](Epub::write).
     /// This ensures that all refinements correctly reference their parent.
     ///
     /// # Note

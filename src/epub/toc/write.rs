@@ -1,6 +1,8 @@
+use crate::ebook::archive::ResourceProvider;
 use crate::ebook::element::{Attribute, Attributes};
 use crate::ebook::metadata::Version;
 use crate::ebook::toc::TocEntryKind;
+use crate::epub::Epub;
 use crate::epub::manifest::EpubManifestContext;
 use crate::epub::metadata::EpubVersion;
 use crate::epub::toc::{
@@ -121,7 +123,7 @@ impl EpubTocEntry<'_> {
     ///
     /// # Note
     /// If the source ToC entry has an `id`, the detached entry will retain it.
-    /// To avoid ID collisions if re-inserting into the same [`Epub`](crate::epub::Epub),
+    /// To avoid ID collisions if re-inserting into the same [`Epub`],
     /// consider clearing or changing the ID using
     /// [`DetachedEpubTocEntry::id`] or [`EpubTocEntryMut::set_id`].
     ///
@@ -405,15 +407,15 @@ pub struct EpubTocMut<'ebook> {
 }
 
 impl<'ebook> EpubTocMut<'ebook> {
-    pub(in crate::epub) fn new(
-        ctx: EpubTocContext<'ebook>,
-        href_resolver: UriResolver<'ebook>,
-        toc: &'ebook mut EpubTocData,
-    ) -> Self {
+    pub(in crate::epub) fn new(epub: &'ebook mut Epub) -> Self {
         Self {
-            ctx,
-            href_resolver,
-            toc,
+            ctx: EpubTocContext::new(EpubManifestContext::new(
+                ResourceProvider::Archive(&epub.archive),
+                (&epub.package).into(),
+                Some(&epub.manifest),
+            )),
+            href_resolver: UriResolver::parent_of(&epub.package.location),
+            toc: &mut epub.toc,
         }
     }
 
