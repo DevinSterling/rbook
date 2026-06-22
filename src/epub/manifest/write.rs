@@ -475,7 +475,7 @@ impl DetachedEpubManifestEntry {
     /// or [media overlays](EpubManifestEntry::media_overlay) on a detached instance will not work,
     /// returning [`None`].
     pub fn as_view(&self) -> EpubManifestEntry<'_> {
-        EpubManifestContext::detached(self.content.as_ref()).create_entry(&self.id, &self.data)
+        EpubManifestContext::detached(self.content.as_ref()).create_entry(0, &self.id, &self.data)
     }
 
     /// Returns a reference to the associated [resource content](ResourceContent), if present.
@@ -858,6 +858,46 @@ impl<'ebook> EpubManifestMut<'ebook> {
             .map(|index| self.entry_at(index))
     }
 
+    // NOTE: `EpubManifest` doesn't have an equivalent immutable `by_spine_index` method.
+    // - Immutable access is done via `epub.spine().get(i)?.manifest_entry()` with O(1) time.
+    // - This is a convenience method as `EpubSpineEntryMut` does not provide an accessor like
+    //   `EpubSpineEntry::manifest_entry` due to borrow checker constraints.
+    /// Returns the associated [manifest entry](EpubManifestEntryMut) at the given spine `index`.
+    ///
+    /// Returns [`None`] if `index` is out of bounds or if the referenced spine entry
+    /// has an invalid [idref](crate::epub::spine::EpubSpineEntry::idref).
+    ///
+    /// Computes in **O(1)** time.
+    ///
+    /// # Examples
+    /// - Mutating all content referenced by the spine:
+    /// ```
+    /// # use rbook::Epub;
+    /// # use rbook::epub::manifest::EpubManifestEntryMut;
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
+    /// # let mut epub = Epub::open("tests/ebooks/example_epub")?;
+    /// let len = epub.spine().len();
+    /// let mut manifest = epub.manifest_mut();
+    ///
+    /// for i in 0..len {
+    ///     if let Some(mut entry) = manifest.by_spine_index_mut(i) {
+    ///         let content = transform_content(&mut entry);
+    ///         entry.set_content(content);
+    ///     }
+    /// }
+    /// # Ok(())
+    /// # }
+    /// # fn transform_content(_unused: &mut EpubManifestEntryMut) -> String { String::new() }
+    /// ```
+    pub fn by_spine_index_mut(&mut self, index: usize) -> Option<EpubManifestEntryMut<'_>> {
+        self.ctx
+            .spine
+            .entries
+            .get(index)
+            .and_then(|entry| self.ctx.manifest.entries.get_index_of(&entry.idref))
+            .and_then(|manifest_index| self.get_mut(manifest_index))
+    }
+
     /// The mutable cover image entry in the manifest, if present.
     ///
     /// This method returns the entry with the `cover-image` property,
@@ -993,9 +1033,13 @@ impl<'ebook> EpubManifestMut<'ebook> {
     /// - [`Epub::cleanup`] to remove orphaned entries.
     /// - [`Self::extract_if`] to retrieve an iterator of the removed entries.
     pub fn retain(&mut self, mut f: impl FnMut(EpubManifestEntry<'_>) -> bool) {
+        let mut i = 0;
+
         self.ctx.manifest.entries.retain(|id, entry| {
             let ctx = EpubManifestContext::attached(self.ctx.archive, self.ctx.meta_ctx);
-            let retain = f(ctx.create_entry(id, entry));
+            let retain = f(ctx.create_entry(i, id, entry));
+
+            i += 1;
 
             if !retain {
                 self.ctx.archive.remove(&entry.href);
@@ -1036,11 +1080,15 @@ impl<'ebook> EpubManifestMut<'ebook> {
         &mut self,
         mut f: impl FnMut(EpubManifestEntry<'_>) -> bool,
     ) -> impl Iterator<Item = DetachedEpubManifestEntry> {
+        let mut i = 0;
+
         self.ctx
             .manifest
             .entries
             .extract_if(.., move |id, entry| {
-                f(EpubManifestContext::EMPTY.create_entry(id, entry))
+                let extract = f(EpubManifestContext::EMPTY.create_entry(i, id, entry));
+                i += 1;
+                extract
             })
             .map(|(id, data)| DetachedEpubManifestEntry {
                 content: self.ctx.archive.remove(&data.href),
@@ -1178,9 +1226,9 @@ impl<'ebook> EpubManifestEntryMut<'ebook> {
                 self.meta_ctx,
                 Some(ctx.manifest),
             )
-            .create_entry(id, data),
+            .create_entry(ctx.index, id, data),
             ManifestEntryDataHandle::Detached { content, .. } => {
-                EpubManifestContext::detached(content.as_ref()).create_entry(id, data)
+                EpubManifestContext::detached(content.as_ref()).create_entry(0, id, data)
             }
         }
     }

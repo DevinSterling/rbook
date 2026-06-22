@@ -277,6 +277,8 @@ impl<'a> From<std::borrow::Cow<'a, str>> for DetachedEpubSpineEntry {
 ///
 /// # See Also
 /// - [`EpubEditor`](crate::epub::EpubEditor) for simple modification tasks.
+/// - [`EpubManifestMut::by_spine_index_mut`](crate::epub::manifest::EpubManifestMut::by_spine_index_mut)
+///   to retrieve an associated manifest entry by spine index.
 pub struct EpubSpineMut<'ebook> {
     ctx: EpubSpineContext<'ebook>,
     spine: &'ebook mut EpubSpineData,

@@ -26,7 +26,7 @@ use indexmap::map::Iter as HashMapIter;
 use std::collections::HashSet;
 use std::fmt::Debug;
 use std::io::Write;
-use std::iter::FusedIterator;
+use std::iter::{Enumerate, FusedIterator};
 
 #[cfg(feature = "write")]
 pub use write::{
@@ -60,14 +60,16 @@ impl EpubManifestData {
         }
     }
 
-    pub(super) fn by_id(&self, id: &str) -> Option<(&String, &EpubManifestEntryData)> {
-        self.entries.get_key_value(id)
+    pub(super) fn by_id(&self, id: &str) -> Option<(usize, &String, &EpubManifestEntryData)> {
+        self.entries.get_full(id)
     }
 
-    pub(super) fn by_href(&self, href: &str) -> Option<(&String, &EpubManifestEntryData)> {
+    pub(super) fn by_href(&self, href: &str) -> Option<(usize, &String, &EpubManifestEntryData)> {
         self.entries
             .iter()
-            .find(|(_, entry)| entry.href == href || entry.href_raw == href)
+            .enumerate()
+            .find(|(_, (_, entry))| entry.href == href || entry.href_raw == href)
+            .map(|(i, (id, data))| (i, id, data))
     }
 
     pub(super) fn iter(&self) -> HashMapIter<'_, String, EpubManifestEntryData> {
@@ -116,11 +118,13 @@ impl<'ebook> EpubManifestContext<'ebook> {
 
     pub(super) fn create_entry(
         self,
+        index: usize,
         id: &'ebook str,
         data: &'ebook EpubManifestEntryData,
     ) -> EpubManifestEntry<'ebook> {
         EpubManifestEntry {
             ctx: self,
+            index,
             id,
             data,
         }
@@ -129,13 +133,13 @@ impl<'ebook> EpubManifestContext<'ebook> {
     pub(super) fn by_id(&self, id: &str) -> Option<EpubManifestEntry<'ebook>> {
         self.manifest?
             .by_id(id)
-            .map(|(id, data)| self.create_entry(id, data))
+            .map(|(i, id, data)| self.create_entry(i, id, data))
     }
 
     pub(super) fn by_href(&self, href: &str) -> Option<EpubManifestEntry<'ebook>> {
         self.manifest?
             .by_href(href)
-            .map(|(id, data)| self.create_entry(id, data))
+            .map(|(i, id, data)| self.create_entry(i, id, data))
     }
 }
 
@@ -216,7 +220,7 @@ impl<'ebook> EpubManifest<'ebook> {
         self.manifest
             .entries
             .get_index(index)
-            .map(|(id, data)| self.ctx.create_entry(id, data))
+            .map(|(id, data)| self.ctx.create_entry(index, id, data))
     }
 
     /// Returns the [entry](EpubManifestEntry) matching the given [`id`](EpubManifestEntry::id)
@@ -230,7 +234,7 @@ impl<'ebook> EpubManifest<'ebook> {
     pub fn by_id(&self, id: &str) -> Option<EpubManifestEntry<'ebook>> {
         self.manifest
             .by_id(id)
-            .map(|(id, data)| self.ctx.create_entry(id, data))
+            .map(|(i, id, data)| self.ctx.create_entry(i, id, data))
     }
 
     /// Returns the [entry](EpubManifestEntry) matching the given `href`,
@@ -246,7 +250,7 @@ impl<'ebook> EpubManifest<'ebook> {
     pub fn by_href(&self, href: &str) -> Option<EpubManifestEntry<'ebook>> {
         self.manifest
             .by_href(href)
-            .map(|(id, data)| self.ctx.create_entry(id, data))
+            .map(|(i, id, data)| self.ctx.create_entry(i, id, data))
     }
 
     /// Returns an iterator over all [entries](EpubManifestEntry) in the
@@ -260,8 +264,9 @@ impl<'ebook> EpubManifest<'ebook> {
 
         self.manifest
             .iter()
-            .filter(|(_, data)| data.properties.has_property(property))
-            .map(move |(id, data)| ctx.create_entry(id, data))
+            .enumerate()
+            .filter(|(_, (_, data))| data.properties.has_property(property))
+            .map(move |(i, (id, data))| ctx.create_entry(i, id, data))
     }
 
     /// The total number of [entries](EpubManifestEntry) that makes up the manifest.
@@ -284,7 +289,7 @@ impl<'ebook> EpubManifest<'ebook> {
     pub fn iter(&self) -> EpubManifestIter<'ebook> {
         EpubManifestIter {
             ctx: self.ctx,
-            iter: self.manifest.iter(),
+            iter: self.manifest.iter().enumerate(),
         }
     }
 
@@ -365,7 +370,8 @@ impl<'ebook> EpubManifest<'ebook> {
 
         self.manifest
             .iter()
-            .filter(move |(_, data)| {
+            .enumerate()
+            .filter(move |(_, (_, data))| {
                 let kind = ResourceKind::from(&*data.media_type);
 
                 targets.repeat_once().any(|target| {
@@ -377,7 +383,7 @@ impl<'ebook> EpubManifest<'ebook> {
                     }
                 })
             })
-            .map(move |(id, data)| ctx.create_entry(id, data))
+            .map(move |(i, (id, data))| ctx.create_entry(i, id, data))
     }
 }
 
@@ -485,7 +491,7 @@ impl<'ebook> IntoIterator for EpubManifest<'ebook> {
 /// ```
 pub struct EpubManifestIter<'ebook> {
     ctx: EpubManifestContext<'ebook>,
-    iter: HashMapIter<'ebook, String, EpubManifestEntryData>,
+    iter: Enumerate<HashMapIter<'ebook, String, EpubManifestEntryData>>,
 }
 
 impl<'ebook> Iterator for EpubManifestIter<'ebook> {
@@ -494,7 +500,7 @@ impl<'ebook> Iterator for EpubManifestIter<'ebook> {
     fn next(&mut self) -> Option<Self::Item> {
         self.iter
             .next()
-            .map(|(id, data)| self.ctx.create_entry(id, data))
+            .map(|(i, (id, data))| self.ctx.create_entry(i, id, data))
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
@@ -506,7 +512,7 @@ impl DoubleEndedIterator for EpubManifestIter<'_> {
     fn next_back(&mut self) -> Option<Self::Item> {
         self.iter
             .next_back()
-            .map(|(id, data)| self.ctx.create_entry(id, data))
+            .map(|(i, (id, data))| self.ctx.create_entry(i, id, data))
     }
 }
 
@@ -515,6 +521,7 @@ impl ExactSizeIterator for EpubManifestIter<'_> {
         self.iter.len()
     }
 }
+
 impl FusedIterator for EpubManifestIter<'_> {}
 
 /// A [`ManifestEntry`] contained within an [`EpubManifest`], encompassing
@@ -525,14 +532,59 @@ impl FusedIterator for EpubManifestIter<'_> {}
 #[derive(Copy, Clone)]
 pub struct EpubManifestEntry<'ebook> {
     ctx: EpubManifestContext<'ebook>,
+    index: usize,
     id: &'ebook str,
     data: &'ebook EpubManifestEntryData,
 }
 
 impl<'ebook> EpubManifestEntry<'ebook> {
+    /// The index (0-based) of an entry within the [`EpubManifest`].
+    ///
+    /// # Note
+    /// The index is not stable and may change when the manifest's
+    /// length or order is modified via [`EpubManifestMut`].
+    ///
+    /// # See Also
+    /// - [`Self::id`] to retrieve the unique ID.
+    ///
+    /// # Examples
+    /// - Storing the index and accessing a mutable entry:
+    /// ```
+    /// # #[cfg(feature = "write")] {
+    /// # use rbook::Epub;
+    /// use rbook::ebook::toc::TocEntryKind;
+    ///
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
+    /// let mut epub = Epub::open("tests/ebooks/example_epub")?;
+    ///
+    /// // Find the body matter (main content)
+    /// let landmarks = epub.toc().landmarks().unwrap();
+    /// let toc_entry = landmarks
+    ///     .iter()
+    ///     .find(|e| matches!(e.kind(), TocEntryKind::BodyMatter))
+    ///     .unwrap();
+    ///
+    /// // Get the position of the entry within the manifest
+    /// let manifest_entry = toc_entry.manifest_entry().unwrap();
+    /// let index = manifest_entry.index();
+    /// assert_eq!(1, index);
+    ///
+    /// let mut manifest = epub.manifest_mut();
+    /// let mut manifest_entry = manifest.get_mut(index).unwrap();
+    /// let old_id = manifest_entry.set_id("bodymatter");
+    /// assert_eq!("c1", old_id);
+    /// # Ok(())
+    /// # }
+    /// # }
+    /// ```
+    pub fn index(&self) -> usize {
+        self.index
+    }
+
     /// The unique `id` of an entry within the [`EpubManifest`].
     ///
     /// # See Also
+    /// - [`Self::index`] to retrieve the index.
     /// - [`EpubManifestEntryMut::set_id`] to modify the `id`.
     pub fn id(&self) -> &'ebook str {
         self.id

@@ -1,4 +1,5 @@
 mod editor;
+mod manifest;
 mod metadata;
 
 use crate::epub::manifest::EXPECTED_MANIFEST;

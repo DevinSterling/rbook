@@ -267,6 +267,43 @@ fn test_manifest_iterators() {
     assert_eq!(2, video.len());
 }
 
+#[test]
+#[wasm_bindgen_test]
+fn test_manifest_indices_from_iterator() {
+    let epub = Epub3File.open_strict();
+    let manifest = epub.manifest();
+
+    for entry in manifest.iter() {
+        assert_eq!(entry, manifest.get(entry.index()).unwrap());
+    }
+
+    let mut iter = manifest.iter();
+    assert_eq!(0, iter.next().unwrap().index());
+    assert_eq!(11, iter.next_back().unwrap().index());
+    assert_eq!(1, iter.next().unwrap().index());
+    assert_eq!(8, iter.nth_back(2).unwrap().index());
+
+    let mut images = manifest.images();
+    assert_eq!(6, images.next().unwrap().index());
+    assert_eq!(7, images.next().unwrap().index());
+}
+
+#[test]
+#[wasm_bindgen_test]
+fn test_manifest_access_index() {
+    let epub = Epub3File.open_strict();
+    let manifest = epub.manifest();
+
+    for (i, data) in EXPECTED_MANIFEST.iter().enumerate() {
+        let entry_a = manifest.by_id(data.id).unwrap();
+        assert_eq!(i, entry_a.index());
+
+        let entry_b = manifest.get(i).unwrap();
+        assert_eq!(i, entry_b.index());
+        assert_eq!(entry_a, entry_b);
+    }
+}
+
 /////////////////////////////////////////////////
 // TEST DATA
 /////////////////////////////////////////////////
