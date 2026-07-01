@@ -1,4 +1,16 @@
 # Changelog
+## 0.7.10 (2026-07-01)
+### Additions **＋**
+- New methods to assist with EPUB mutation workflows \[[#6](https://github.com/DevinSterling/rbook/issues/6)]:
+  - `EpubManifestEntry::index` to get the index of a manifest entry.
+  - `EpubManifestMut::by_spine_index_mut` to get a mutable manifest entry by spine index.
+- For `EpubManifest::by_href`, ignore URI query parameters and fragments in resource paths.
+
+### Changes　**⟳**
+- Update `quick-xml` dependency: 0.40.1 → 0.41.0
+- Update `wasm-bindgen-test` dev dependency: 0.3.75 → 0.3.76
+- Refine documentation for enhanced clarity.
+
 ## 0.7.9 (2026-06-16)
 ### Additions **＋**
 - For `Epub`, ignore URI query parameters and fragments in resource paths passed to
