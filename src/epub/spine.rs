@@ -346,10 +346,11 @@ pub struct EpubSpineEntry<'ebook> {
 }
 
 impl<'ebook> EpubSpineEntry<'ebook> {
-    /// The unique `id` of a spine entry.
+    /// The unique ID of a spine entry.
     ///
     /// # See Also
-    /// - [`EpubSpineEntryMut::set_id`] to modify the `id`.
+    /// - [`EpubSpine::get`] to get an entry by ID.
+    /// - [`EpubSpineEntryMut::set_id`] to modify the ID.
     pub fn id(&self) -> Option<&'ebook str> {
         self.data.id.as_deref()
     }
@@ -361,7 +362,8 @@ impl<'ebook> EpubSpineEntry<'ebook> {
     /// [`Self::manifest_entry`] is preferred.
     ///
     /// # See Also
-    /// - [`EpubSpineEntryMut::set_idref`] to modify the `idref`.
+    /// - [`EpubSpine::by_idref`] to get entries by idref.
+    /// - [`EpubSpineEntryMut::set_idref`] to modify the idref.
     pub fn idref(&self) -> &'ebook str {
         &self.data.idref
     }

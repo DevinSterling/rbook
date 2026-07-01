@@ -22,7 +22,7 @@ impl EpubMetaEntry<'_> {
     /// Creates an owned detached metadata entry by cloning.
     ///
     /// # Note
-    /// If the source metadata entry has an `id`, the detached entry will retain it.
+    /// If the source metadata entry has an ID, the detached entry will retain it.
     /// To avoid ID collisions if re-inserting into the same [`Epub`](crate::epub::Epub),
     /// consider clearing or changing the ID using
     /// [`DetachedEpubMetaEntry::id`] or [`EpubMetaEntryMut::set_id`].
@@ -1232,8 +1232,7 @@ impl<'ebook> EpubMetadataMut<'ebook> {
     ///
     /// # See Also
     /// - [`EpubMetadata::by_id`] (immutable equivalent) for more details.
-    /// - [`Self::by_property_mut`] to retrieve entries by their
-    ///   [`property`](EpubMetaEntry::property) (e.g. all titles).
+    /// - [`Self::by_property_mut`] to get entries by their [`property`](EpubMetaEntry::property) (e.g. all titles).
     ///
     /// # Examples
     /// - Updating an entry:
@@ -1465,7 +1464,7 @@ impl<'ebook> EpubMetadataMut<'ebook> {
     /// This method operates in place and visits every entry exactly once.
     ///
     /// # See Also
-    /// - [`Self::extract_if`] to retrieve an iterator of the removed entries.
+    /// - [`Self::extract_if`] to get an iterator of the removed entries.
     ///
     /// # Examples
     /// - Removing legacy EPUB 2 `<meta>` elements:
@@ -1590,7 +1589,7 @@ impl<'ebook> EpubMetadataMut<'ebook> {
     /// Removes all top-level (non-refining) metadata entries.
     ///
     /// # See Also
-    /// - [`Self::drain`] to retrieve an iterator of the removed entries.
+    /// - [`Self::drain`] to get an iterator of the removed entries.
     pub fn clear(&mut self) {
         self.metadata.entries.clear();
     }
@@ -1718,7 +1717,7 @@ impl<'ebook> EpubMetaEntryMut<'ebook> {
     ///
     /// # See Also
     /// - ***[`DetachedEpubMetaEntry::id`] for important details.***
-    /// - [`EpubMetaEntry::id`] to get the `id` (Accessible via [`Self::as_view`]).
+    /// - [`EpubMetaEntry::id`] to get the ID (Accessible via [`Self::as_view`]).
     pub fn set_id(&mut self, id: impl IntoOption<String>) -> Option<String> {
         std::mem::replace(&mut self.data.id, id.into_option())
     }
@@ -1768,7 +1767,7 @@ impl<'ebook> EpubMetaEntryMut<'ebook> {
     /// Mutable view of all direct refinements.
     ///
     /// # ID Generation
-    /// If this parent entry does not have an `id`
+    /// If this parent entry does not have an ID
     /// ([`self.as_view().id()`](EpubMetaEntry::id)), a unique ID will be
     /// auto-generated during [writing](crate::epub::Epub::write).
     /// This ensures that all refinements correctly reference their parent.
@@ -1956,7 +1955,7 @@ impl<'ebook> EpubRefinementsMut<'ebook> {
     /// This method operates in place and visits every direct refinement exactly once.
     ///
     /// # See Also
-    /// - [`Self::extract_if`] to retrieve an iterator of the removed refinements.
+    /// - [`Self::extract_if`] to get an iterator of the removed refinements.
     pub fn retain(&mut self, mut f: impl FnMut(EpubMetaEntry<'_>) -> bool) {
         let mut index = 0;
 
@@ -2010,7 +2009,7 @@ impl<'ebook> EpubRefinementsMut<'ebook> {
     /// Removes all direct refinements.
     ///
     /// # See Also
-    /// - [`Self::drain`] to retrieve an iterator of the removed refinements.
+    /// - [`Self::drain`] to get an iterator of the removed refinements.
     pub fn clear(&mut self) {
         self.data.clear();
     }

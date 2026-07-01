@@ -44,7 +44,7 @@ impl EpubSpineEntry<'_> {
     /// Creates an owned detached spine entry by cloning.
     ///
     /// # Note
-    /// If the source spine entry has an `id`, the detached entry will retain it.
+    /// If the source spine entry has an [`id`](EpubSpineEntry::id), the detached entry will retain it.
     /// To avoid ID collisions if re-inserting into the same [`Epub`],
     /// consider clearing or changing the ID using
     /// [`DetachedEpubSpineEntry::id`] or [`EpubSpineEntryMut::set_id`].
@@ -126,7 +126,7 @@ impl EpubSpineEntry<'_> {
 pub struct DetachedEpubSpineEntry(EpubSpineEntryData);
 
 impl DetachedEpubSpineEntry {
-    /// Creates a new spine entry (`<itemref>`) referencing the given manifest `id`.
+    /// Creates a new spine entry (`<itemref>`) referencing the given manifest ID.
     ///
     /// Upon insertion into an [`EpubSpine`], the given [`idref`](Self::idref) should
     /// match the [`id`](crate::epub::manifest::EpubManifestEntry::id) of an
@@ -278,7 +278,7 @@ impl<'a> From<std::borrow::Cow<'a, str>> for DetachedEpubSpineEntry {
 /// # See Also
 /// - [`EpubEditor`](crate::epub::EpubEditor) for simple modification tasks.
 /// - [`EpubManifestMut::by_spine_index_mut`](crate::epub::manifest::EpubManifestMut::by_spine_index_mut)
-///   to retrieve an associated manifest entry by spine index.
+///   to get an associated manifest entry by spine index.
 pub struct EpubSpineMut<'ebook> {
     ctx: EpubSpineContext<'ebook>,
     spine: &'ebook mut EpubSpineData,
@@ -444,7 +444,7 @@ impl<'ebook> EpubSpineMut<'ebook> {
     /// This method operates in place and visits every entry exactly once.
     ///
     /// # See Also
-    /// - [`Self::extract_if`] to retrieve an iterator of the removed entries.
+    /// - [`Self::extract_if`] to get an iterator of the removed entries.
     pub fn retain(&mut self, mut f: impl FnMut(EpubSpineEntry<'_>) -> bool) {
         let mut index = 0;
 
@@ -513,7 +513,7 @@ impl<'ebook> EpubSpineMut<'ebook> {
     /// Removes all spine entries.
     ///
     /// # See Also
-    /// - [`Self::drain`] to retrieve an iterator of the removed entries.
+    /// - [`Self::drain`] to get an iterator of the removed entries.
     pub fn clear(&mut self) {
         self.spine.entries.clear();
     }
@@ -631,7 +631,7 @@ impl<'ebook> EpubSpineEntryMut<'ebook> {
     ///
     /// # See Also
     /// - ***[`DetachedEpubSpineEntry::id`] for important details.***
-    /// - [`EpubSpineEntry::id`] to get the `id` (Accessible via [`Self::as_view`]).
+    /// - [`EpubSpineEntry::id`] to get the ID (Accessible via [`Self::as_view`]).
     pub fn set_id(&mut self, id: impl IntoOption<String>) -> Option<String> {
         std::mem::replace(&mut self.data.id, id.into_option())
     }

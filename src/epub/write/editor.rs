@@ -985,8 +985,8 @@ impl EpubEditor<'_> {
     /// - `/META-INF/foo.xml` → `/META-INF/foo.xml` (Absolute path)
     ///
     /// # Auto-Generated ID and Media Type Detection
-    /// For each resource given, the `media type` is automatically inferred
-    /// from the file extension and a unique `id` is generated from the href.
+    /// For each resource given, the [media type](DetachedEpubManifestEntry::media_type) is automatically inferred
+    /// from the file extension and a unique [ID](DetachedEpubManifestEntry::id) is generated from the href.
     ///
     /// Extensions that support media type detection:
     ///
@@ -1537,7 +1537,7 @@ impl EpubChapter {
     /// and will be staged for inserted into
     /// [`EpubSpineMut`](crate::epub::spine::EpubSpineMut).
     ///
-    /// The `id` of the referenced manifest entry ([`DetachedEpubSpineEntry::idref`])
+    /// The ID of the referenced manifest entry ([`DetachedEpubSpineEntry::idref`])
     /// will be **overridden** when inserted into [`EpubEditor`].
     ///
     /// # Examples

@@ -122,7 +122,7 @@ impl EpubTocEntry<'_> {
     /// Creates an owned detached ToC entry by cloning.
     ///
     /// # Note
-    /// If the source ToC entry has an `id`, the detached entry will retain it.
+    /// If the source ToC entry has an [`id`](EpubTocEntry::id), the detached entry will retain it.
     /// To avoid ID collisions if re-inserting into the same [`Epub`],
     /// consider clearing or changing the ID using
     /// [`DetachedEpubTocEntry::id`] or [`EpubTocEntryMut::set_id`].
@@ -460,8 +460,7 @@ impl<'ebook> EpubTocMut<'ebook> {
     ///
     /// # See Also
     /// - [`Self::by_kind_mut`] to see selection and fallback behavior, which this method uses.
-    /// - [`Self::by_kind_version_mut`] to retrieve a specific format
-    ///   (e.g. explicitly editing the NCX).
+    /// - [`Self::by_kind_version_mut`] to get a specific format (e.g. explicitly editing the NCX).
     pub fn contents_mut(&mut self) -> Option<EpubTocEntryMut<'_>> {
         self.by_kind_mut(TocEntryKind::Toc)
     }
@@ -532,8 +531,7 @@ impl<'ebook> EpubTocMut<'ebook> {
     /// If neither variant exists, [`None`] is returned.
     ///
     /// # See Also
-    /// - [`Self::by_kind_version_mut`]
-    ///   to retrieve a specific root entry without any fallback behavior.
+    /// - [`Self::by_kind_version_mut`] to get a specific root entry without any fallback behavior.
     pub fn by_kind_mut<'a>(
         &mut self,
         kind: impl Into<TocEntryKind<'a>>,
@@ -629,7 +627,7 @@ impl<'ebook> EpubTocMut<'ebook> {
     /// This method operates in place and visits every root exactly once.
     ///
     /// # See Also
-    /// - [`Self::extract_if`] to retrieve an iterator of the removed roots.
+    /// - [`Self::extract_if`] to get an iterator of the removed roots.
     pub fn retain(&mut self, mut f: impl FnMut(EpubTocEntry) -> bool) {
         self.toc
             .entries
@@ -684,7 +682,7 @@ impl<'ebook> EpubTocMut<'ebook> {
     /// Removes all root entries.
     ///
     /// # See Also
-    /// - [`Self::drain`] to retrieve an iterator of the removed roots.
+    /// - [`Self::drain`] to get an iterator of the removed roots.
     pub fn clear(&mut self) {
         self.toc.entries.clear();
     }
@@ -828,7 +826,7 @@ impl<'ebook> EpubTocEntryMut<'ebook> {
     ///
     /// # See Also
     /// - ***[`DetachedEpubTocEntry::id`] for important details.***
-    /// - [`EpubTocEntry::id`] to get the `id` (Accessible via [`Self::as_view`]).
+    /// - [`EpubTocEntry::id`] to get the ID (Accessible via [`Self::as_view`]).
     pub fn set_id(&mut self, id: impl IntoOption<String>) -> Option<String> {
         std::mem::replace(&mut self.data.id, id.into_option())
     }
@@ -983,7 +981,7 @@ impl<'ebook> EpubTocEntryMut<'ebook> {
     /// This method operates in place and visits every direct entry exactly once.
     ///
     /// # See Also
-    /// - [`Self::extract_if`] to retrieve an iterator of the removed entries.
+    /// - [`Self::extract_if`] to get an iterator of the removed entries.
     pub fn retain(&mut self, mut f: impl FnMut(EpubTocEntry<'_>) -> bool) {
         self.data
             .children
@@ -1035,7 +1033,7 @@ impl<'ebook> EpubTocEntryMut<'ebook> {
     /// Removes all direct children.
     ///
     /// # See Also
-    /// - [`Self::drain`] to retrieve an iterator of the removed entries.
+    /// - [`Self::drain`] to get an iterator of the removed entries.
     pub fn clear(&mut self) {
         self.data.children.clear();
     }

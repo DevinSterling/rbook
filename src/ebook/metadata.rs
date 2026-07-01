@@ -119,7 +119,7 @@ pub trait Metadata<'ebook>: Sealed {
     /// The last modified date; when an [`Ebook`](super::Ebook) was last modified.
     ///
     /// # See Also
-    /// - [`Self::published`] to retrieve the data en ebook was published.
+    /// - [`Self::published`] to get the date an ebook was published.
     ///
     /// # Examples
     /// - Retrieving the modification date:
@@ -164,7 +164,7 @@ pub trait Metadata<'ebook>: Sealed {
     /// The main [`Title`].
     ///
     /// # See Also
-    /// - [`Self::titles`] to retrieve all titles by [`order`](MetaEntry::order).
+    /// - [`Self::titles`] to get all titles by [`order`](MetaEntry::order).
     ///
     /// # Examples
     /// - Retrieving the main title:
@@ -495,13 +495,13 @@ pub trait MetaEntry<'ebook>: Sealed {
 pub trait Language<'ebook>: MetaEntry<'ebook> {
     /// The language's scheme, such as `BCP 47`.
     ///
-    /// This is a lower-level call than [`Self::kind`] to retrieve the raw string value.
+    /// This is a lower-level call than [`Self::kind`] to get the raw string value.
     fn scheme(&self) -> Scheme<'ebook>;
 
     /// The language kind enum.
     ///
     /// If [`LanguageKind::Unknown`] is returned, [`Self::scheme`]
-    /// can be used to retrieve the string value of the unknown language kind.
+    /// can be used to get the string value of the unknown language kind.
     fn kind(&self) -> LanguageKind;
 }
 
@@ -558,13 +558,13 @@ pub trait Identifier<'ebook>: MetaEntry<'ebook> + Eq + Hash {
 pub trait Title<'ebook>: MetaEntry<'ebook> {
     /// The title’s scheme or [`None`] if unspecified.
     ///
-    /// This is a lower-level call than [`Self::kind`] to retrieve the raw string value, if any.
+    /// This is a lower-level call than [`Self::kind`] to get the raw string value, if any.
     fn scheme(&self) -> Option<Scheme<'ebook>>;
 
     /// The kind of title.
     ///
     /// If [`TitleKind::Unknown`] is returned, [`Self::scheme`]
-    /// can be used to retrieve the string value of the unknown title kind, if present.
+    /// can be used to get the string value of the unknown title kind, if present.
     fn kind(&self) -> TitleKind;
 }
 

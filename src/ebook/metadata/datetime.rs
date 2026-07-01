@@ -323,8 +323,8 @@ impl Time {
     /// | `-238` | `-03:58` |
     ///
     /// # See Also
-    /// - [`Self::offset_hour`] to retrieve the offset in hours (`510` → `8`).
-    /// - [`Self::offset_minute`] to retrieve the offset in minutes (`510` → `30`).
+    /// - [`Self::offset_hour`] to get the offset in hours (`510` → `8`).
+    /// - [`Self::offset_minute`] to get the offset in minutes (`510` → `30`).
     pub fn offset(&self) -> Option<i16> {
         self.offset
     }

@@ -217,7 +217,7 @@ impl<'ebook> EpubToc<'ebook> {
     ///
     /// # See Also
     /// - [`EpubOpenOptions`](super::EpubOpenOptions) to see conditional ToC-related parsing options.
-    /// - [`Self::by_kind`] to retrieve the toc root for a given [`TocEntryKind`].
+    /// - [`Self::by_kind`] to get the toc root for a given [`TocEntryKind`].
     /// - [`EpubTocMut::by_kind_version_mut`] to get a mutable root entry.
     pub fn by_kind_version(
         &self,
@@ -247,7 +247,7 @@ impl<'ebook> EpubToc<'ebook> {
     #[doc = doc::inherent!(Toc, contents)]
     /// # See Also
     /// - [`Self::by_kind`] to see selection and fallback behavior, which this method uses.
-    /// - [`Self::by_kind_version`] to retrieve a specific variant (e.g. EPUB 2 NCX).
+    /// - [`Self::by_kind_version`] to get a specific variant (e.g. EPUB 2 NCX).
     /// - [`EpubTocMut::contents_mut`] to get the mutable contents.
     pub fn contents(&self) -> Option<EpubTocEntry<'ebook>> {
         self.by_kind(TocEntryKind::Toc)
@@ -412,7 +412,7 @@ impl FusedIterator for EpubTocIter<'_> {}
 ///
 /// # See Also
 /// - [`EpubTocEntryMut`] for a mutable view.
-/// - [`Self::attributes`] to retrieve the legacy EPUB 2 NCX `playOrder` attribute.
+/// - [`Self::attributes`] to get the legacy EPUB 2 NCX `playOrder` attribute.
 ///
 /// # Examples
 /// - Observing the root entry of landmarks:
@@ -453,13 +453,13 @@ impl<'ebook> EpubTocEntry<'ebook> {
         self.version
     }
 
-    /// The unique `id` of a toc entry.
+    /// The unique ID of a toc entry.
     ///
     /// # Note
     /// For EPUB 3, this field is derived from the anchor (`a`) element.
     ///
     /// # See Also
-    /// - [`EpubTocEntryMut::set_id`] to modify the `id`.
+    /// - [`EpubTocEntryMut::set_id`] to modify the ID.
     pub fn id(&self) -> Option<&'ebook str> {
         self.data.id.as_deref()
     }
@@ -523,9 +523,9 @@ impl<'ebook> EpubTocEntry<'ebook> {
     ///   they are automatically encoded.
     ///
     /// # See Also
-    /// - [`Href::path`] to retrieve the href value without the query and fragment.
+    /// - [`Href::path`] to get the href value without the query and fragment.
     /// - [`Self::resource`] as the primary means for retrieving ebook content.
-    /// - [`EpubTocEntryMut::set_href`] to modify the `href`.
+    /// - [`EpubTocEntryMut::set_href`] to modify the href.
     pub fn href(&self) -> Option<Href<'ebook>> {
         self.data.href.as_deref().map(Href::new)
     }
@@ -556,8 +556,8 @@ impl<'ebook> EpubTocEntry<'ebook> {
     ///
     /// # See Also
     /// - [`Epub`](super::Epub) documentation of `copy_resource` for normalization details.
-    /// - [`Href::path`] to retrieve the href value without the query and fragment.
-    /// - [`EpubTocEntryMut::set_href`] to modify the `href`.
+    /// - [`Href::path`] to get the href value without the query and fragment.
+    /// - [`EpubTocEntryMut::set_href`] to modify the href.
     pub fn href_raw(&self) -> Option<Href<'ebook>> {
         self.data.href_raw.as_deref().map(Href::new)
     }

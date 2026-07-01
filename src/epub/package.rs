@@ -24,7 +24,7 @@ pub(super) struct EpubPackageData {
     /// (e.g. `/OEBPS/package.opf`).
     pub(super) location: String,
     pub(super) version: EpubVersionData,
-    /// The `id` of the primary unique identifier.
+    /// The ID of the primary unique identifier.
     pub(super) unique_identifier: String,
     pub(super) prefixes: Prefixes,
     /// Default package document language
@@ -127,8 +127,8 @@ impl<'ebook> EpubPackage<'ebook> {
     /// and is percent encoded (e.g., `/my%20dir/my%20pkg.opf`).
     ///
     /// # See Also
-    /// - [`Href::decode`] to retrieve the percent-decoded form.
-    /// - [`Href::name`] to retrieve the filename.
+    /// - [`Href::decode`] to get the percent-decoded form.
+    /// - [`Href::name`] to get the filename.
     /// - [`EpubPackageMut::set_location`] to modify the location.
     ///
     /// # Examples
@@ -156,7 +156,7 @@ impl<'ebook> EpubPackage<'ebook> {
     /// referenced in the package file are resolved relative to the package directory.
     ///
     /// # See Also
-    /// - [`Href::decode`] to retrieve the percent-decoded form.
+    /// - [`Href::decode`] to get the percent-decoded form.
     ///
     /// # Examples
     /// - Retrieving the package file and directory:
@@ -201,7 +201,7 @@ impl<'ebook> EpubPackage<'ebook> {
         self.0.version.raw.as_str()
     }
 
-    /// The `id` of the package's unique identifier metadata entry.
+    /// The ID of the package's unique identifier metadata entry.
     ///
     /// This is a lower-level call than
     /// [`EpubMetadata::identifier`](super::metadata::EpubMetadata::identifier).
@@ -316,7 +316,7 @@ impl Prefixes {
     /// Returns the [`Prefix`] with the given `name` if present, otherwise [`None`].
     ///
     /// # See Also
-    /// - [`Self::get_uri`] to retrieve the prefix [uri](Prefix::uri) directly.
+    /// - [`Self::get_uri`] to get the prefix [uri](Prefix::uri) directly.
     pub fn by_name(&self, name: &str) -> Option<&Prefix> {
         self.0.by_key(name)
     }

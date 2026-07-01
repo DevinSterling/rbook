@@ -245,7 +245,7 @@ impl Attributes {
     /// This method operates in place and visits every attribute exactly once.
     ///
     /// # See Also
-    /// - [`Self::extract_if`] to retrieve an iterator of the removed attributes.
+    /// - [`Self::extract_if`] to get an iterator of the removed attributes.
     pub fn retain(&mut self, f: impl FnMut(&Attribute) -> bool) {
         self.0.retain(f);
     }
@@ -276,7 +276,7 @@ impl Attributes {
     /// Removes all attributes.
     ///
     /// # See Also
-    /// - [`Self::drain`] to retrieve an iterator of the removed attributes.
+    /// - [`Self::drain`] to get an iterator of the removed attributes.
     pub fn clear(&mut self) {
         self.0.clear();
     }

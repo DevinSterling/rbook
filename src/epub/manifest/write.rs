@@ -255,9 +255,9 @@ enum ManifestEntryDataHandle<'ebook> {
 }
 
 impl ManifestEntryDataHandle<'_> {
-    /// For [`Self::Attached`], the referenced entry by `id` is **guaranteed** to exist.
+    /// For [`Self::Attached`], the referenced entry by ID is **guaranteed** to exist.
     /// 1. Before any [`Self::Attached`] is created,
-    ///    the referenced entry by `id` is checked if it exists.
+    ///    the referenced entry by ID is checked if it exists.
     /// 2. [`Self`] holds an exclusive borrow (`&mut`) of [`EpubManifestData`].
     /// 3. No other code can remove the ID while this object exists,
     ///    except [`EpubManifestEntryMut::set_id`], which immediately re-inserts it.
@@ -327,7 +327,6 @@ impl EpubManifestEntry<'_> {
     /// To retrieve the associated binary content as well, see [`Self::to_detached_with_content`].
     ///
     /// # Note
-    /// If the source manifest entry has an `id`, the detached entry will retain it.
     /// To avoid ID collisions if re-inserting into the same [`Epub`],
     /// consider changing the ID using
     /// [`DetachedEpubManifestEntry::id`] or [`EpubManifestEntryMut::set_id`].
@@ -419,6 +418,11 @@ impl EpubManifestEntry<'_> {
 ///
 /// This struct acts as a builder for creating new manifest entries
 /// before insertion into [`EpubManifestMut`].
+///
+/// # Note
+/// [`DetachedEpubManifestEntry`] instances always have an
+/// [`index`](EpubManifestEntry::index) of `0`.
+/// An index is assigned once the entry is inserted into [`EpubManifestMut`].
 ///
 /// # Examples
 /// - Inserting an image into a manifest:
@@ -822,7 +826,7 @@ impl<'ebook> EpubManifestMut<'ebook> {
     ///
     /// # Replacements
     /// Duplicate IDs are overridden.
-    /// For example, if an entry with the same `id` exists within the manifest, it is replaced.
+    /// For example, if an entry with the same [`id`](EpubManifestEntry::id) exists within the manifest, it is replaced.
     ///
     /// ToC entries that reference the replaced manifest entry’s href are orphaned if
     /// the new entry has a different [`href`](EpubManifestEntry::href).
@@ -1031,7 +1035,7 @@ impl<'ebook> EpubManifestMut<'ebook> {
     ///
     /// # See Also
     /// - [`Epub::cleanup`] to remove orphaned entries.
-    /// - [`Self::extract_if`] to retrieve an iterator of the removed entries.
+    /// - [`Self::extract_if`] to get an iterator of the removed entries.
     pub fn retain(&mut self, mut f: impl FnMut(EpubManifestEntry<'_>) -> bool) {
         let mut i = 0;
 
@@ -1117,7 +1121,7 @@ impl<'ebook> EpubManifestMut<'ebook> {
     ///
     /// # See Also
     /// - [`Epub::cleanup`] to remove orphaned entries.
-    /// - [`Self::drain`] to retrieve an iterator of the removed entries.
+    /// - [`Self::drain`] to get an iterator of the removed entries.
     pub fn clear(&mut self) {
         for (_, removed) in self.ctx.manifest.entries.drain(..) {
             self.ctx.archive.remove(&removed.href);

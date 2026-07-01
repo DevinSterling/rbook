@@ -14,7 +14,7 @@ use std::fmt::Display;
 /// Each [`TocEntry`] returned by [`Toc`] is a top-level root containing
 /// [children](TocEntry::iter).
 ///
-/// The methods [`Self::by_kind`] and [`Self::iter`] can be used to retrieve TOC variants,
+/// The methods [`Self::by_kind`] and [`Self::iter`] can be used to get ToC variants,
 /// such as [`landmarks`](TocEntryKind::Landmarks), [`page-list`](TocEntryKind::PageList), etc.
 ///
 /// # See Also
@@ -76,7 +76,7 @@ pub trait Toc<'ebook>: Sealed {
     /// Returns an iterator over all **root** [entries](TocEntry).
     ///
     /// # See Also
-    /// - [`TocEntry::kind`] to retrieve the [`TocEntryKind`] of each root.
+    /// - [`TocEntry::kind`] to get the [`TocEntryKind`] of each root.
     ///
     /// # Examples
     /// - Iterating over roots and observing their kind:

@@ -403,7 +403,7 @@ pub trait ReaderContent<'ebook>: Into<String> + Into<Vec<u8>> + Sealed {
     /// This method is equivalent to calling `into::<String>()`.
     ///
     /// # See Also
-    /// - [`Self::content`] to retrieve a reference without taking ownership.
+    /// - [`Self::content`] to get a reference without taking ownership.
     ///
     /// # Examples
     /// - Extracting the contained content in the form of a [`String`]:

@@ -118,7 +118,7 @@ impl<'ebook> EpubPackageMut<'ebook> {
     }
 
     /// Sets the `id` reference of the package-level unique identifier
-    /// and returns the previous `id`.
+    /// and returns the previous ID.
     ///
     /// **This does not correspond to the identifier
     /// [value](crate::ebook::metadata::MetaEntry::value) itself.**
@@ -285,7 +285,7 @@ impl Prefixes {
     /// This method operates in place and visits every prefix exactly once.
     ///
     /// # See Also
-    /// - [`Self::extract_if`] to retrieve an iterator of the removed prefixes.
+    /// - [`Self::extract_if`] to get an iterator of the removed prefixes.
     pub fn retain(&mut self, f: impl FnMut(&Prefix) -> bool) {
         self.0.retain(f);
     }
@@ -313,7 +313,7 @@ impl Prefixes {
     /// Removes all prefixes.
     ///
     /// # See Also
-    /// - [`Self::drain`] to retrieve an iterator of the removed prefixes.
+    /// - [`Self::drain`] to get an iterator of the removed prefixes.
     pub fn clear(&mut self) {
         self.0.clear();
     }

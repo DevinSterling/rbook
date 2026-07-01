@@ -96,7 +96,7 @@ pub trait Spine<'ebook>: Sealed {
     /// the spine in canonical order.
     ///
     /// # See Also
-    /// - [`Spine::len`] to retrieve the total number of entries.
+    /// - [`Spine::len`] to get the total number of entries.
     fn iter(&self) -> impl Iterator<Item = impl SpineEntry<'ebook> + 'ebook> + 'ebook;
 
     /// Returns `true` if there are no [entries](SpineEntry).
@@ -113,6 +113,9 @@ pub trait Spine<'ebook>: Sealed {
 /// - [`EpubSpineEntry`](crate::epub::spine::EpubSpineEntry) for epub-specific entry information.
 pub trait SpineEntry<'ebook>: Sealed {
     /// The canonical order of an entry (`0 = first entry`).
+    ///
+    /// # See Also
+    /// - [`Spine::get`] to get an entry by order.
     fn order(&self) -> usize;
 
     /// The associated [`ManifestEntry`].
@@ -144,7 +147,7 @@ pub trait SpineEntry<'ebook>: Sealed {
 /// [`right-to-left (rtl)`](PageDirection::RightToLeft),
 /// and [`no preference (default)`](PageDirection::Default).
 ///
-/// [`PageDirection::as_str`] can be used to retrieve the string form.
+/// [`PageDirection::as_str`] can be used to get the string form.
 ///
 /// Default: [`PageDirection::Default`]
 #[non_exhaustive]

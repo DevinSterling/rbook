@@ -199,7 +199,7 @@ impl<'ebook> EpubManifest<'ebook> {
     /// - [`EpubManifestMut::get_mut`] to get a mutable entry.
     ///
     /// # Examples
-    /// - Retrieving the same entries by `index` and `id`:
+    /// - Retrieving the same entries by index and ID:
     /// ```
     /// # use rbook::Epub;
     /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
@@ -223,8 +223,8 @@ impl<'ebook> EpubManifest<'ebook> {
             .map(|(id, data)| self.ctx.create_entry(index, id, data))
     }
 
-    /// Returns the [entry](EpubManifestEntry) matching the given [`id`](EpubManifestEntry::id)
-    /// , or [`None`] if not found.
+    /// Returns the [entry](EpubManifestEntry) matching the given [`id`](EpubManifestEntry::id),
+    /// or [`None`] if not found.
     ///
     /// Computes in **O(1)** time.
     ///
@@ -545,7 +545,8 @@ impl<'ebook> EpubManifestEntry<'ebook> {
     /// length or order is modified via [`EpubManifestMut`].
     ///
     /// # See Also
-    /// - [`Self::id`] to retrieve the unique ID.
+    /// - [`EpubManifest::get`] to get an entry by index.
+    /// - [`Self::id`] to get the unique ID.
     ///
     /// # Examples
     /// - Storing the index and accessing a mutable entry:
@@ -584,8 +585,9 @@ impl<'ebook> EpubManifestEntry<'ebook> {
     /// The unique `id` of an entry within the [`EpubManifest`].
     ///
     /// # See Also
-    /// - [`Self::index`] to retrieve the index.
-    /// - [`EpubManifestEntryMut::set_id`] to modify the `id`.
+    /// - [`EpubManifest::by_id`] to get an entry by ID.
+    /// - [`EpubManifestEntryMut::set_id`] to modify the ID.
+    /// - [`Self::index`] to get the index.
     pub fn id(&self) -> &'ebook str {
         self.id
     }
@@ -609,10 +611,11 @@ impl<'ebook> EpubManifestEntry<'ebook> {
     ///   they are automatically encoded.
     ///
     /// # See Also
+    /// - [`EpubManifest::by_href`] to get an entry by href.
     /// - [`Self::resource`] as the primary means for retrieving ebook content.
     ///
     /// # See Also
-    /// - [`EpubManifestEntryMut::set_href`] to modify the `href`.
+    /// - [`EpubManifestEntryMut::set_href`] to modify the href.
     pub fn href(&self) -> Href<'ebook> {
         Href::new(&self.data.href)
     }
@@ -637,7 +640,8 @@ impl<'ebook> EpubManifestEntry<'ebook> {
     ///
     /// # See Also
     /// - [`Epub`](super::Epub) documentation of `copy_resource` for normalization details.
-    /// - [`EpubManifestEntryMut::set_href`] to modify the `href`.
+    /// - [`EpubManifestEntryMut::set_href`] to modify the href.
+    /// - [`EpubManifest::by_href`] to get an entry by href.
     pub fn href_raw(&self) -> Href<'ebook> {
         Href::new(&self.data.href_raw)
     }

@@ -166,7 +166,7 @@ pub enum EpubError {
     #[error("Missing `manifest` element")]
     NoManifestFound,
 
-    /// An `item` element within the manifest contains a duplicate `id`.
+    /// An `item` element within the manifest contains a duplicate ID.
     ///
     /// Each item in the manifest must have a unique ID.
     ///

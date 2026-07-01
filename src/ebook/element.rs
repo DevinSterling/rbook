@@ -108,8 +108,7 @@ impl<'a> Href<'a> {
     ///
     /// # Percent Encoding
     /// Paths **may** be percent-encoded.
-    /// [`Self::decode`] can be called directly after invoking this method
-    /// to retrieve the percent-decoded form.
+    /// [`Self::decode`] can be called directly after invoking this method to get the percent-decoded form.
     ///
     /// # See Also
     /// - [`Self::fragment`]
@@ -138,8 +137,7 @@ impl<'a> Href<'a> {
     ///
     /// # Percent Encoding
     /// Filenames **may** be percent-encoded.
-    /// [`Self::decode`] can be called directly after invoking this method
-    /// to retrieve the percent-decoded form.
+    /// [`Self::decode`] can be called directly after invoking this method to get the percent-decoded form.
     ///
     /// # Examples
     /// - Retrieving the filename:
@@ -471,7 +469,7 @@ impl Attributes {
     /// Returns the [`Attribute`] with the given `name` if present, otherwise [`None`].
     ///
     /// # See Also
-    /// - [`Self::get_value`] to retrieve the attribute [value](Attribute::value) directly.
+    /// - [`Self::get_value`] to get the attribute [value](Attribute::value) directly.
     pub fn by_name(&self, name: &str) -> Option<&Attribute> {
         self.0.by_key(name)
     }
@@ -692,7 +690,7 @@ impl Display for Name<'_> {
 /// read from left-to-right (`ltr`), right-to-left (`rtl`), or automatically
 /// (`auto`).
 ///
-/// [`TextDirection::as_str`] can be used to retrieve the string form.
+/// [`TextDirection::as_str`] can be used to get the string form.
 ///
 /// Default: [`TextDirection::Auto`]
 #[derive(Copy, Clone, Debug, Default, Hash, PartialEq, Eq)]

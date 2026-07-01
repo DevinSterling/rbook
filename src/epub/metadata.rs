@@ -245,14 +245,13 @@ impl<'ebook> EpubMetadata<'ebook> {
     }
 
     /// Searches the metadata hierarchy, including refinements, and returns the
-    /// [`EpubMetaEntry`] matching the given [`id`](EpubMetaEntry::id),
-    /// or [`None`] if not found.
+    /// [`EpubMetaEntry`] matching the given [`id`](EpubMetaEntry::id), or [`None`] if not found.
     ///
     /// # Performance Implications
     /// This is a recursive linear operation as the underlying structure
-    /// is ***not*** a hashmap with `id` as the key.
+    /// is ***not*** a hashmap with ID as the key.
     /// Generally, the number of metadata entries is small (<20).
-    /// However, for larger sets, frequent lookups can impede performance.
+    /// However, for very large sets, frequent lookups can impede performance.
     ///
     /// # Note
     /// Refinements on
@@ -371,7 +370,7 @@ impl<'ebook> EpubMetadata<'ebook> {
     /// The publication date; when an [`Epub`](super::Epub) was published.
     #[doc = doc::inherent!(Metadata, published)]
     /// # See Also
-    /// - [`Self::published_entry`] to retrieve the source [`EpubMetaEntry`] instead.
+    /// - [`Self::published_entry`] to get the source [`EpubMetaEntry`] instead.
     pub fn published(&self) -> Option<DateTime> {
         self.published_entry()
             .and_then(|entry| DateTime::parse(entry.value()))
@@ -380,7 +379,7 @@ impl<'ebook> EpubMetadata<'ebook> {
     /// The last modified date; when an [`Epub`](super::Epub) was last modified.
     #[doc = doc::inherent!(Metadata, modified)]
     /// # See Also
-    /// - [`Self::modified_entry`] to retrieve the source [`EpubMetaEntry`] instead.
+    /// - [`Self::modified_entry`] to get the source [`EpubMetaEntry`] instead.
     pub fn modified(&self) -> Option<DateTime> {
         self.modified_entry()
             .and_then(|entry| DateTime::parse(entry.value()))
@@ -402,7 +401,7 @@ impl<'ebook> EpubMetadata<'ebook> {
     /// - `1.12.2025`
     ///
     /// # See Also
-    /// - [`Self::published`] to retrieve the parsed date.
+    /// - [`Self::published`] to get the parsed date.
     pub fn published_entry(&self) -> Option<EpubMetaEntry<'ebook>> {
         let mut inferred_date = None;
 
@@ -424,8 +423,8 @@ impl<'ebook> EpubMetadata<'ebook> {
     /// The last modified date entry; when an [`Epub`](super::Epub) was last modified.
     ///
     /// # See Also
-    /// - [`Self::published_entry`] to retrieve the publication date entry.
-    /// - [`Self::modified`] to retrieve the parsed date.
+    /// - [`Self::published_entry`] to get the publication date entry.
+    /// - [`Self::modified`] to get the parsed date.
     pub fn modified_entry(&self) -> Option<EpubMetaEntry<'ebook>> {
         // Attempt to retrieve `dcterms:modified` first
         if let Some((i, modified_date)) = self.data_by_property(dc::MODIFIED).next() {
@@ -452,7 +451,7 @@ impl<'ebook> EpubMetadata<'ebook> {
     /// the `<package>` element by the `unique-identifier` attribute.
     ///
     /// # See Also
-    /// - [`EpubIdentifier::scheme`] to retrieve the type of identifier (e.g., ISBN, DOI, URI).
+    /// - [`EpubIdentifier::scheme`] to get the type of identifier (e.g., ISBN, DOI, URI).
     #[doc = doc::inherent!(Metadata, identifier)]
     pub fn identifier(&self) -> Option<EpubIdentifier<'ebook>> {
         self.data_by_property(dc::IDENTIFIER)
@@ -1057,23 +1056,23 @@ impl<'ebook> EpubMetaEntry<'ebook> {
         self.index
     }
 
-    /// The unique `id` of a metadata entry.
+    /// The unique ID of a metadata entry.
     ///
     /// # See Also
-    /// - [`EpubMetaEntryMut::set_id`] to modify the `id`.
+    /// - [`EpubMetaEntryMut::set_id`] to modify the ID.
     pub fn id(&self) -> Option<&'ebook str> {
         self.data.id.as_deref()
     }
 
-    /// The associated element `id` a metadata entry refines.
+    /// The associated element [`id`](Self::id) a metadata entry refines.
     ///
     /// Returns [`Some`] if an entry is refining another, otherwise [`None`].
     ///
     /// This is akin to a parent-child relationship where children are
     /// [refinements](Self::refinements),
-    /// referring to their parent by `id` through the `refines` field.
+    /// referring to their parent by ID through the `refines` field.
     ///
-    /// Referenced entries by `id` can be the following:
+    /// Referenced entries by ID can be the following:
     /// - [`EpubSpineEntry`](super::spine::EpubSpineEntry::refinements)
     /// - [`EpubManifestEntry`](super::manifest::EpubManifestEntry::refinements)
     /// - [`EpubMetaEntry`](Self::refinements)
@@ -1254,7 +1253,7 @@ impl<'ebook> EpubMetaEntry<'ebook> {
     /// Complementary refinement metadata entries.
     ///
     /// # See Also
-    /// - [`Self::refines`] to inspect which entry (by `id`) a metadata entry refines.
+    /// - [`Self::refines`] to inspect which entry (by [ID](Self::id)) a metadata entry refines.
     /// - [`EpubMetaEntryMut::refinements_mut`] to modify the refinements.
     /// - [`EpubManifestEntry::refinements`](super::manifest::EpubManifestEntry::refinements)
     ///   for manifest entry refinements.
@@ -1410,7 +1409,7 @@ impl<'ebook> EpubLink<'ebook> {
 /// - [`Link`](EpubMetaEntryKind::Link)
 ///
 /// # See Also
-/// - [`EpubMetaEntry::kind`] to retrieve the kind from an [`EpubMetaEntry`].
+/// - [`EpubMetaEntry::kind`] to get the kind from an [`EpubMetaEntry`].
 #[non_exhaustive]
 #[derive(Copy, Clone, Debug, Hash, PartialEq, Eq)]
 pub enum EpubMetaEntryKind {
@@ -1714,7 +1713,7 @@ pub enum EpubVersion {
 }
 
 impl EpubVersion {
-    /// Utility to retrieve the major of each compatible EPUB versions.
+    /// Utility to get the major of each compatible EPUB versions.
     pub(crate) const VERSIONS: [Self; 2] = [Self::EPUB2, Self::EPUB3];
 
     /// [`EpubVersion::Epub2`] constant with a predefined [`Version`] of `2.0`.

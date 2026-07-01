@@ -39,6 +39,8 @@
 //! # fn main() -> rbook::ebook::errors::EbookResult<()> {
 //! let epub = Epub::options()
 //!     .strict(true)
+//!     .skip_spine(true)
+//!     .skip_toc(true)
 //!     .open("tests/ebooks/example_epub")?;
 //!
 //! assert!(epub.metadata().version().is_epub3());
@@ -48,13 +50,28 @@
 //! assert_eq!(3, manifest.images().count());
 //! assert_eq!(0, manifest.audio().count());
 //! assert_eq!(12, manifest.len());
-//!
-//! let cover = manifest.cover_image().unwrap();
+//! # Ok(())
+//! # }
+//! ```
+//! - Retrieving the [cover image](EpubManifest::cover_image) of an [`Epub`]:
+//! ```
+//! # use rbook::epub::Epub;
+//! # use rbook::epub::metadata::EpubVersion;
+//! # fn main() -> rbook::ebook::errors::EbookResult<()> {
+//! # let epub = Epub::open("tests/ebooks/example_epub")?;
+//! let cover = epub.manifest().cover_image().unwrap();
 //! assert_eq!("cover-image1", cover.id());
 //! assert_eq!("/EPUB/img/cover.webm", cover.href());
 //!
+//! // Cover resource via href path
+//! let resource = epub.manifest().by_href("/EPUB/img/cover.webm").unwrap();
 //! // Or `copy_bytes` to copy directly into any `Write` implementation
-//! let cover_bytes = cover.read_bytes().unwrap();
+//! let cover_bytes_a = resource.read_bytes()?;
+//! assert_eq!("image/webm", resource.media_type());
+//!
+//! // Cover resource bytes directly via href path
+//! let cover_bytes_b = epub.read_resource_bytes("/EPUB/img/cover.webm")?;
+//! assert_eq!(cover_bytes_a, cover_bytes_b);
 //! # Ok(())
 //! # }
 //! ```
@@ -109,7 +126,8 @@
 //! and [target compatibility](EpubWriteOptions::target) is available via [`EpubWriteOptions`].
 //!
 //! ## Cascading Updates
-//! Modifying a manifest entry's `id` or `href` triggers a cascading update across an [`Epub`]:
+//! Modifying a manifest entry's [`id`](manifest::EpubManifestEntry::id) or [`href`](manifest::EpubManifestEntry::href)
+//! triggers a cascading update across an [`Epub`]:
 //!
 //! - Renaming a resource `id` updates all referencing `idref` values in the
 //!   [spine](EpubSpine).
