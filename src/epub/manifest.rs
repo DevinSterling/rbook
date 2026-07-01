@@ -20,7 +20,7 @@ use crate::epub::rewrite::EpubRewriteOptions;
 use crate::epub::rewrite::rewriter::ContentRewriter;
 use crate::input::Many;
 use crate::util::iter::IteratorExt;
-use crate::util::{Sealed, doc};
+use crate::util::{Sealed, doc, uri};
 use indexmap::IndexMap;
 use indexmap::map::Iter as HashMapIter;
 use std::collections::HashSet;
@@ -240,16 +240,41 @@ impl<'ebook> EpubManifest<'ebook> {
     /// Returns the [entry](EpubManifestEntry) matching the given `href`,
     /// or [`None`] if not found.
     ///
+    /// If a [query](Href::query) or [fragment](Href::fragment) is present
+    /// in the given `href`, it is [stripped](Href::path) out before lookup.
+    ///
     /// # Note
     /// The given `href` is ***not*** normalized or percent-decoded.
-    /// It is compared **case-sensitively** against both [`EpubManifestEntry::href()`] and
-    /// [`EpubManifestEntry::href_raw()`].
+    /// It is compared **case-sensitively** against both [`EpubManifestEntry::href`] and
+    /// [`EpubManifestEntry::href_raw`].
     ///
     /// [`Self::by_id`] is recommended over this method,
     /// as this method performs a linear `O(N)` search.
+    ///
+    /// # Examples
+    /// - Retrieving the same entries by href:
+    /// ```
+    /// # use rbook::Epub;
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
+    /// let epub = Epub::open("tests/ebooks/example_epub")?;
+    /// let manifest = epub.manifest();
+    ///
+    /// let a = manifest.by_href("/EPUB/c1.xhtml").unwrap();
+    /// let b = manifest.by_href("c1.xhtml").unwrap();
+    /// assert_eq!(a, b);
+    ///
+    /// // Query parameters and fragments are ignored
+    /// let c = manifest.by_href("/EPUB/c1.xhtml?key=value#fragment").unwrap();
+    /// assert_eq!("application/xhtml+xml", c.media_type());
+    /// assert_eq!("c1", c.id());
+    /// assert_eq!(b, c);
+    /// # Ok(())
+    /// # }
+    /// ```
     pub fn by_href(&self, href: &str) -> Option<EpubManifestEntry<'ebook>> {
         self.manifest
-            .by_href(href)
+            // Call `uri::path` to omit the query/fragment portion, if present
+            .by_href(uri::path(href))
             .map(|(i, id, data)| self.ctx.create_entry(i, id, data))
     }
 
