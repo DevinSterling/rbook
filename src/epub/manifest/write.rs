@@ -826,12 +826,69 @@ impl<'ebook> EpubManifestMut<'ebook> {
     ///
     /// # Replacements
     /// Duplicate IDs are overridden.
-    /// For example, if an entry with the same [`id`](EpubManifestEntry::id) exists within the manifest, it is replaced.
+    /// For example, if an entry with the same [`id`](EpubManifestEntry::id)
+    /// exists within the manifest, it is replaced.
     ///
-    /// ToC entries that reference the replaced manifest entry’s href are orphaned if
+    /// ToC entries that reference the replaced manifest entry's href are orphaned if
     /// the new entry has a different [`href`](EpubManifestEntry::href).
     /// See [`Epub::cleanup`] to remove orphaned entries.
     ///
+    /// # Examples
+    /// Adding manifest entries:
+    /// ```
+    /// use std::path::Path;
+    /// # use rbook::Epub;
+    /// # use rbook::epub::manifest::DetachedEpubManifestEntry;
+    ///
+    /// # fn main() {
+    /// # const CHAPTER_2_BYTES: &[u8] = &[];
+    /// let mut epub = Epub::new();
+    /// let mut manifest = epub.manifest_mut();
+    ///
+    /// manifest.push([
+    ///     // Referencing a file stored on disk
+    ///     DetachedEpubManifestEntry::new("c1")
+    ///         .href("c1.xhtml")
+    ///         .content(Path::new("Z:/local/draft/c1.xhtml")),
+    ///     // Passing raw in-memory bytes (e.g., &[u8], Vec<u8>)
+    ///     DetachedEpubManifestEntry::new("c2")
+    ///         .href("c2.xhtml")
+    ///         .content(CHAPTER_2_BYTES),
+    ///     // Passing a string
+    ///     DetachedEpubManifestEntry::new("css")
+    ///         .href("main.css")
+    ///         .content("p > b { color: fuchsia; }"),
+    /// ]);
+    /// # }
+    /// ```
+    /// Alternatively, tuples can be used for simple cases via
+    /// [`From<(H, C)> for DetachedEpubManifestEntry`][DetachedEpubManifestEntry::from]:
+    /// ```
+    /// # use std::path::Path;
+    /// # use rbook::Epub;
+    /// # fn main() {
+    /// # const COVER_IMAGE: &[u8] = &[];
+    /// # const ART_IMAGE: &[u8] = &[];
+    /// # const CHAPTER_2_BYTES: &[u8] = &[];
+    /// # let mut epub = Epub::new();
+    /// # let mut manifest = epub.manifest_mut();
+    ///
+    /// // Referencing a file stored on disk
+    /// manifest.push(("c1.xhtml", Path::new("Z:/local/draft/c1.xhtml")));
+    ///
+    /// // Passing raw in-memory bytes (e.g., &[u8], Vec<u8>)
+    /// manifest.push(("c2.xhtml", CHAPTER_2_BYTES));
+    ///
+    /// // Passing a string
+    /// manifest.push(("main.css", "p > b { color: fuchsia; }"));
+    ///
+    /// // Passing tuples in bulk
+    /// manifest.push([
+    ///     ("cover.jpg", COVER_IMAGE),
+    ///     ("art1.jpg", ART_IMAGE),
+    /// ]);
+    /// # }
+    /// ```
     /// # See Also
     /// - [`EpubEditor::container_resource`](crate::epub::EpubEditor::container_resource)
     ///   to insert a resource without adding it to the manifest.

@@ -134,8 +134,8 @@ impl<'ebook> EpubTocContext<'ebook> {
 // PUBLIC API
 ////////////////////////////////////////////////////////////////////////////////
 
-/// The EPUB table of contents, accessible via [`Epub::toc`](super::Epub::toc).
-/// See [`Toc`] for additional details.
+/// The Table of Contents ([`Toc`]) of an [`Epub`](crate::epub)
+/// accessible via [`Epub::toc`](super::Epub::toc).
 ///
 /// For EPUB 3 ebooks backwards compatible with EPUB2,
 /// the preferred toc format is configurable via

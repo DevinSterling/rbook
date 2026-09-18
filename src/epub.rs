@@ -326,7 +326,7 @@ pub use write::{EpubChapter, EpubEditor, EpubWriteOptions, OrphanFilter};
 /// - [`EpubMetadata`]: Metadata details (title, language, identifiers, version)
 /// - [`EpubManifest`]: Manifest resources (HTML, images, CSS, Media Overlays (SMIL))
 /// - [`EpubSpine`]: Canonical reading order
-/// - [`EpubToc`]: Table of contents, Guide and Landmarks
+/// - [`EpubToc`]: Table of Contents, Guide and Landmarks
 ///
 /// # Configuration
 /// Parsing can be configured using [`EpubOpenOptions`].

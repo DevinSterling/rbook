@@ -10,7 +10,7 @@
 //! - [`manifest`]: Resources contained within an ebook.
 //! - [`metadata`]: Metadata details (title, authors, identifiers, version).
 //! - [`spine`]: The canonical reading-order sequence.
-//! - [`toc`]: Table of contents navigation.
+//! - [`toc`]: Table of Contents navigation.
 //!
 //! ## Supporting Components
 //! - [`resource`]: Resource identification and handles.
@@ -51,7 +51,7 @@ use std::io::Write;
 /// - [`Metadata`]: Metadata details (title, language, identifiers)
 /// - [`Manifest`]: Manifest resources (HTML, images, CSS)
 /// - [`Spine`]: Canonical reading order
-/// - [`Toc`]: Table of contents
+/// - [`Toc`]: Table of Contents
 ///
 /// # Supported ebook formats:
 /// - [EPUB 2 and 3](crate::Epub)
@@ -77,7 +77,7 @@ pub trait Ebook: Sealed {
     /// - [`Self::reader`] to sequentially read spine content with greater control.
     fn spine(&self) -> impl Spine<'_>;
 
-    /// The table of contents ([`Toc`]), encompassing navigation points.
+    /// The Table of Contents ([`Toc`]), encompassing navigation points.
     fn toc(&self) -> impl Toc<'_>;
 
     /// Copies the content of a [`Resource`] into the given `writer`,

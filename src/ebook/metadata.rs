@@ -388,7 +388,7 @@ impl<'ebook> AlternateScript<'ebook> {
 /// # See Also
 /// - [`EpubMetaEntry`](crate::epub::metadata::EpubMetaEntry) for epub-specific entry information.
 pub trait MetaEntry<'ebook>: Sealed {
-    /// The plain text value of an entry.
+    /// The decoded plain text value of an entry.
     ///
     /// # Example
     /// - Retrieving the value of metadata entries:

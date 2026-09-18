@@ -149,8 +149,8 @@ impl EpubMetaEntryData {
 // PUBLIC API
 ////////////////////////////////////////////////////////////////////////////////
 
-/// EPUB metadata accessible via [`Epub::metadata`](super::Epub::metadata).
-/// See [`Metadata`] for more details.
+/// The [`Metadata`] of an [`Epub`](crate::Epub)
+/// accessible via [`Epub::metadata`](crate::Epub::metadata).
 ///
 /// # Entries
 /// Common metadata entries are accessible via specialized accessors
@@ -2196,7 +2196,7 @@ mod macros {
                     ))
                 }
 
-                /// The plain text value of an entry.
+                /// The decoded plain text value of an entry.
                 #[doc = doc::inherent!(MetaEntry, value)]
                 /// # See Also
                 /// - [`EpubMetaEntryMut::set_value`] to modify the value.

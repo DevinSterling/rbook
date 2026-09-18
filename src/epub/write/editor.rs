@@ -64,6 +64,16 @@ use crate::util::uri;
 /// - [`landmarks_title`](Self::landmarks_title) (Default: `Landmarks`)
 /// - [`toc_stylesheet`](EpubWriteOptions::toc_stylesheet) via [`EpubWriteOptions`]
 ///
+/// # Timestamps
+/// If not set, the publication and modification dates
+/// are generated automatically using the system clock in
+/// [**ISO 8601-1**](https://www.iso.org/iso-8601-date-and-time-format.html) format.
+///
+/// - For EPUB 2, the modification date is not generated.
+/// - **WebAssembly**: On `wasm32-unknown-unknown`, the system clock is unavailable.
+///   Timestamps can be provided manually via [`EpubEditor::published_date`]
+///   and [`EpubEditor::modified_date`].
+///
 /// # XML Escaping
 /// Text values (metadata values, chapter titles, ToC labels, and attribute values) are
 /// stored as plain text (e.g. `"1 < 2 & 3"`).

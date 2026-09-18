@@ -9,7 +9,7 @@ use crate::ebook::toc::macros::toc_entry_kind;
 use crate::util::Sealed;
 use std::fmt::Display;
 
-/// The table of contents, aiding navigation throughout an ebook [`Ebook`](super::Ebook).
+/// The Table of Contents (ToC), aiding navigation throughout an ebook [`Ebook`](super::Ebook).
 ///
 /// Each [`TocEntry`] returned by [`Toc`] is a top-level root containing
 /// [children](TocEntry::iter).

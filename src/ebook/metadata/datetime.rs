@@ -10,9 +10,9 @@
 //!
 //! Absent components default to the earliest valid value.
 //! For example:
-//! - `2024` → `2024-01-01 00:00:00`
+//! - `2024` (original) → `2024-01-01 00:00:00` (absent components defaulted)
 //! - `2025.12` → `2025-12-01 00:00:00`
-//! - `2026.1.26`
+//! - `2026.1.26` → `2025-01-26 00:00:00`
 //! - `2024/1/15`
 //! - `2023-01-25 10:11:35Z`
 //! - `2020-10-12T09:05:01+08:21`
@@ -264,7 +264,6 @@ impl Time {
 
         // Extract the hour
         let hour = take_time_num(&mut chars, 2)? as u8;
-        // Default month/day to the 1st
         let mut minute = 0;
         let mut second = 0;
         let mut offset = None;
@@ -323,8 +322,8 @@ impl Time {
     /// | `-238` | `-03:58` |
     ///
     /// # See Also
-    /// - [`Self::offset_hour`] to get the offset in hours (`510` → `8`).
-    /// - [`Self::offset_minute`] to get the offset in minutes (`510` → `30`).
+    /// - [`Self::offset_hour`] to get the hour component (`510` → `8`).
+    /// - [`Self::offset_minute`] to get the minute component (`510` → `30`).
     pub fn offset(&self) -> Option<i16> {
         self.offset
     }
