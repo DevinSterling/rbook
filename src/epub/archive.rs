@@ -23,6 +23,11 @@ impl EpubArchive {
     }
 
     /// Avoids double-decoding the given `resource` key, as it is already percent-decoded.
+    pub(super) fn contains_resource_decoded(&self, resource: &Resource) -> ArchiveResult<bool> {
+        self.0.contains_resource(resource)
+    }
+
+    /// Similar to [`Self::contains_resource_decoded`], avoids double-decoding the key.
     pub(super) fn copy_resource_decoded(
         &self,
         resource: &Resource,
@@ -31,6 +36,14 @@ impl EpubArchive {
         // Since the given resource key is already decoded,
         // calling `transform_href` is not needed.
         self.0.copy_resource(resource, writer)
+    }
+
+    fn transform_resource<'a>(resource: &'a Resource<'_>) -> Resource<'a> {
+        Resource::from(match resource.key() {
+            // Ensure the given resource key value is decoded
+            ResourceKey::Value(href) => Self::transform_href(href),
+            ResourceKey::Position(position) => ResourceKey::Position(*position),
+        })
     }
 
     fn transform_href(href: &str) -> ResourceKey<'_> {
@@ -87,14 +100,14 @@ impl EpubArchive {
 }
 
 impl Archive for EpubArchive {
-    fn copy_resource(&self, resource: &Resource, writer: &mut dyn Write) -> ArchiveResult<u64> {
-        // Ensure the given resource key value is decoded
-        let transformed = match resource.key() {
-            ResourceKey::Value(href) => Self::transform_href(href),
-            ResourceKey::Position(position) => ResourceKey::Position(*position),
-        };
+    fn contains_resource(&self, resource: &Resource) -> ArchiveResult<bool> {
+        self.0
+            .contains_resource(&Self::transform_resource(resource))
+    }
 
-        self.0.copy_resource(&Resource::from(transformed), writer)
+    fn copy_resource(&self, resource: &Resource, writer: &mut dyn Write) -> ArchiveResult<u64> {
+        self.0
+            .copy_resource(&Self::transform_resource(resource), writer)
     }
 
     /// [Paths](ResourceKey::Value) are prefixed with `/`, indicating the EPUB container root.

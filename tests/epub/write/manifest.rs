@@ -18,3 +18,18 @@ fn test_manifest_by_spine_index() {
 
     assert!(manifest.by_spine_index_mut(5).is_none());
 }
+
+#[test]
+#[wasm_bindgen_test]
+fn test_contains_new_file_after_modification() {
+    let mut epub = Epub3File.open_strict();
+    assert!(!epub.contains_resource("my_file.txt"));
+
+    let mut manifest = epub.manifest_mut();
+    manifest.push(("my_file.txt", "Hello World!"));
+    assert!(epub.contains_resource("my_file.txt"));
+
+    let mut manifest = epub.manifest_mut();
+    manifest.remove_by_id("my-file-txt");
+    assert!(!epub.contains_resource("my_file.txt"));
+}

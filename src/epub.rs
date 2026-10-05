@@ -583,6 +583,73 @@ impl Epub {
         EpubToc::new(self.manifest().into(), &self.toc)
     }
 
+    /// Returns `true` if the given [`Resource`] exists.
+    ///
+    #[doc = doc::inherent!(Ebook, contains_resource)]
+    /// # Examples
+    /// - Checking for the existence of specific resources:
+    /// ```
+    /// # use rbook::Epub;
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
+    /// let epub = Epub::open("tests/ebooks/example_epub")?;
+    ///
+    /// // Container files (absolute paths)
+    /// assert!(epub.contains_resource("/META-INF/container.xml"));
+    /// assert!(!epub.contains_resource("/META-INF/encryption.xml"));
+    ///
+    /// // Relative paths are resolved against the package directory
+    /// assert!(epub.contains_resource("c1.xhtml"));
+    /// assert!(epub.contains_resource("../toc.ncx"));
+    /// assert!(!epub.contains_resource("."));
+    ///
+    /// // Positional keys always return `false`
+    /// assert!(!epub.contains_resource(1337));
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # See Also
+    /// - [`Self::copy_resource`] for path normalization details.
+    /// - [`Self::try_contains_resource`] to check for errors.
+    pub fn contains_resource<'a>(&self, resource: impl Into<Resource<'a>>) -> bool {
+        Ebook::contains_resource(self, resource)
+    }
+
+    /// Returns `Ok(true)` if the given [`Resource`] exists.
+    ///
+    #[doc = doc::inherent!(Ebook, try_contains_resource)]
+    /// # Examples
+    /// - Checking for the existence of specific resources:
+    /// ```
+    /// # use rbook::Epub;
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
+    /// let epub = Epub::open("tests/ebooks/example_epub")?;
+    ///
+    /// // Container files (absolute paths)
+    /// assert!(matches!(epub.try_contains_resource("/META-INF/container.xml"), Ok(true)));
+    /// assert!(matches!(epub.try_contains_resource("/META-INF/encryption.xml"), Ok(false)));
+    ///
+    /// // Relative paths are resolved against the package directory
+    /// assert!(matches!(epub.try_contains_resource("c1.xhtml"), Ok(true)));
+    /// assert!(matches!(epub.try_contains_resource("../toc.ncx"), Ok(true)));
+    /// assert!(matches!(epub.try_contains_resource("."), Ok(false)));
+    ///
+    /// // Positional keys are unsupported
+    /// assert!(matches!(epub.try_contains_resource(1337), Err(_)));
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// # See Also
+    /// - [`Self::contains_resource`] to treat errors as `false`.
+    pub fn try_contains_resource<'a>(
+        &self,
+        resource: impl Into<Resource<'a>>,
+    ) -> ArchiveResult<bool> {
+        self.archive
+            .contains_resource_decoded(&self.transform_resource(&resource.into()))
+    }
+
     /// Copies the content of a [`Resource`] into the given `writer`,
     /// returning the total number of bytes written on success.
     ///
@@ -805,6 +872,10 @@ impl Ebook for Epub {
 
     fn toc(&self) -> EpubToc<'_> {
         self.toc()
+    }
+
+    fn try_contains_resource<'a>(&self, resource: impl Into<Resource<'a>>) -> ArchiveResult<bool> {
+        self.try_contains_resource(resource)
     }
 
     fn copy_resource<'a>(

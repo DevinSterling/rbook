@@ -1,7 +1,7 @@
 use crate::ebook::archive::errors::ArchiveResult;
 use crate::ebook::archive::{self, Archive, ArchiveError};
 use crate::ebook::resource::Resource;
-use std::fs::File;
+use std::fs::{self, File};
 use std::io::{self, Write};
 use std::path::{Path, PathBuf};
 
@@ -25,8 +25,40 @@ impl DirectoryArchive {
             }),
         }
     }
+}
 
-    fn get_path(&self, resource: &Resource) -> Result<PathBuf, ArchiveError> {
+impl Archive for DirectoryArchive {
+    fn contains_resource(&self, resource: &Resource) -> ArchiveResult<bool> {
+        fn is_absent(error: &io::Error) -> bool {
+            matches!(
+                error.kind(),
+                io::ErrorKind::NotFound | io::ErrorKind::NotADirectory
+            )
+        }
+
+        let path = self.0.join(archive::extract_resource_path(resource)?);
+        let resolved = match path.canonicalize() {
+            Ok(path) => path,
+            Err(error) if is_absent(&error) => return Ok(false),
+            Err(error) => return Err(io_to_cannot_read_error(error, resource)),
+        };
+
+        // Path traversal mitigation
+        if !resolved.starts_with(&self.0) {
+            return Ok(false);
+        }
+
+        match fs::symlink_metadata(resolved) {
+            Ok(metadata) => Ok(metadata.is_file()),
+            // This condition is primarily handled by the first match.
+            // However, this protects against race conditions
+            // where the resolved path is promptly removed.
+            Err(error) if is_absent(&error) => Ok(false),
+            Err(error) => Err(io_to_cannot_read_error(error, resource)),
+        }
+    }
+
+    fn copy_resource(&self, resource: &Resource, writer: &mut dyn Write) -> ArchiveResult<u64> {
         let path = self.0.join(archive::extract_resource_path(resource)?);
         let resolved = path
             .canonicalize()
@@ -36,33 +68,21 @@ impl DirectoryArchive {
             })?;
 
         // Path traversal mitigation
-        if resolved.starts_with(&self.0) && resolved.is_file() {
-            Ok(resolved)
-        } else {
-            Err(ArchiveError::InvalidResource {
+        if !resolved.starts_with(&self.0) || !resolved.is_file() {
+            return Err(ArchiveError::InvalidResource {
                 source: io::Error::new(
                     io::ErrorKind::NotFound,
                     "Provided path is inaccessible or not a file",
                 ),
                 resource: resource.as_static(),
-            })
+            });
         }
-    }
-}
 
-impl Archive for DirectoryArchive {
-    fn copy_resource(&self, resource: &Resource, writer: &mut dyn Write) -> ArchiveResult<u64> {
-        let path = self.get_path(resource)?;
-        let file = File::open(&path);
-
-        match file {
+        match File::open(resolved) {
             Ok(mut file) => io::copy(&mut file, writer),
             Err(error) => Err(error),
         }
-        .map_err(|error| ArchiveError::CannotRead {
-            source: error,
-            resource: resource.as_static(),
-        })
+        .map_err(|error| io_to_cannot_read_error(error, resource))
     }
 
     #[cfg(feature = "write")]
@@ -117,5 +137,12 @@ impl Archive for DirectoryArchive {
         let mut set = ResourceKeySet::new();
         traverse(&mut set, &self.0, &self.0)?;
         Ok(set)
+    }
+}
+
+fn io_to_cannot_read_error(source: io::Error, resource: &Resource<'_>) -> ArchiveError {
+    ArchiveError::CannotRead {
+        resource: resource.as_static(),
+        source,
     }
 }

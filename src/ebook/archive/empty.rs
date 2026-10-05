@@ -11,6 +11,10 @@ use crate::ebook::archive::write::ResourceKeySet;
 pub(crate) struct EmptyArchive;
 
 impl Archive for EmptyArchive {
+    fn contains_resource(&self, _resource: &Resource) -> ArchiveResult<bool> {
+        Ok(false)
+    }
+
     fn copy_resource(&self, resource: &Resource, _writer: &mut dyn Write) -> ArchiveResult<u64> {
         Err(ArchiveError::InvalidResource {
             source: io::Error::new(io::ErrorKind::NotFound, "Requested resource does not exist"),

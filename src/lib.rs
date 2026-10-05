@@ -173,6 +173,7 @@
 //! resources will return an [`EbookError::Archive`](ebook::errors::EbookError::Archive) error.
 //!
 //! ## See Also
+//! - [`Ebook::contains_resource`] to check if a resource exists.
 //! - [`Epub::copy_resource`] for normalization details.
 //!
 //! # Examples

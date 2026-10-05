@@ -5,7 +5,6 @@ use crate::util::sync::Lock;
 use std::io::{self, Read, Seek, Write};
 use std::path::Path;
 use zip::ZipArchive as Zip;
-use zip::read::ZipFile;
 
 #[cfg(feature = "write")]
 use {super::ResourceKeySet, crate::ebook::resource::ResourceKey, crate::util, std::borrow::Cow};
@@ -22,15 +21,6 @@ impl<R: Read + Seek> ZipArchive<R> {
                 path: path.map(Path::to_path_buf),
             })
     }
-
-    fn get_file<'a>(archive: &'a mut Zip<R>, resource: &Resource) -> ArchiveResult<ZipFile<'a, R>> {
-        archive
-            .by_name(archive::extract_resource_path(resource)?)
-            .map_err(|error| ArchiveError::InvalidResource {
-                source: io::Error::from(error),
-                resource: resource.as_static(),
-            })
-    }
 }
 
 impl<#[cfg(feature = "threadsafe")] R: Send + Sync, #[cfg(not(feature = "threadsafe"))] R> Archive
@@ -38,12 +28,21 @@ impl<#[cfg(feature = "threadsafe")] R: Send + Sync, #[cfg(not(feature = "threads
 where
     R: Read + Seek + 'static,
 {
+    fn contains_resource(&self, resource: &Resource) -> ArchiveResult<bool> {
+        let path = archive::extract_resource_path(resource)?;
+        let lock = self.0.lock().map_err(|_| create_poisoned_error())?;
+
+        Ok(lock.index_for_name(path).is_some())
+    }
+
     fn copy_resource(&self, resource: &Resource, writer: &mut dyn Write) -> ArchiveResult<u64> {
-        let mut lock = self.0.lock().map_err(|_| ArchiveError::UnreadableArchive {
-            source: io::Error::other("Poisoned ZipArchive"),
-            path: None,
-        })?;
-        let mut zip_file = Self::get_file(&mut lock, resource)?;
+        let mut lock = self.0.lock().map_err(|_| create_poisoned_error())?;
+        let mut zip_file = lock
+            .by_name(archive::extract_resource_path(resource)?)
+            .map_err(|error| ArchiveError::InvalidResource {
+                source: io::Error::from(error),
+                resource: resource.as_static(),
+            })?;
 
         std::io::copy(&mut zip_file, writer).map_err(|error| ArchiveError::CannotRead {
             source: error,
@@ -53,10 +52,7 @@ where
 
     #[cfg(feature = "write")]
     fn resources(&self) -> ArchiveResult<ResourceKeySet<'_>> {
-        let lock = self.0.lock().map_err(|_| ArchiveError::UnreadableArchive {
-            source: io::Error::other("Poisoned ZipArchive"),
-            path: None,
-        })?;
+        let lock = self.0.lock().map_err(|_| create_poisoned_error())?;
 
         Ok(lock
             .file_names()
@@ -66,5 +62,12 @@ where
             // - The path is made absolute to maintain consistency throughout the API
             .map(|path| Cow::Owned(ResourceKey::from(util::str::prefix("/", path))))
             .collect())
+    }
+}
+
+fn create_poisoned_error() -> ArchiveError {
+    ArchiveError::UnreadableArchive {
+        source: io::Error::other("Poisoned ZipArchive"),
+        path: None,
     }
 }

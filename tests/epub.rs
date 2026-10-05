@@ -122,6 +122,7 @@ mod epub {
                 matches!(result, Err(ArchiveError::InvalidResource { .. })),
                 "Potential path traversal vulnerability: {attack}",
             );
+            assert!(!epub.contains_resource(&attack))
         }
     }
 }

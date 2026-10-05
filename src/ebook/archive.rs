@@ -25,6 +25,8 @@ use {
 };
 
 pub(crate) trait Archive: util::sync::SendAndSync {
+    fn contains_resource(&self, resource: &Resource) -> ArchiveResult<bool>;
+
     fn copy_resource(&self, resource: &Resource, writer: &mut dyn Write) -> ArchiveResult<u64>;
 
     fn read_resource_as_utf8_bytes(&self, resource: &Resource) -> ArchiveResult<Vec<u8>> {
@@ -50,6 +52,10 @@ pub(crate) trait Archive: util::sync::SendAndSync {
 }
 
 impl Archive for Box<dyn Archive> {
+    fn contains_resource(&self, resource: &Resource) -> ArchiveResult<bool> {
+        (**self).contains_resource(resource)
+    }
+
     fn copy_resource(&self, resource: &Resource, writer: &mut dyn Write) -> ArchiveResult<u64> {
         (**self).copy_resource(resource, writer)
     }
@@ -80,6 +86,15 @@ impl<A: Archive> ResourceArchive<A> {
 }
 
 impl<A: Archive> Archive for ResourceArchive<A> {
+    fn contains_resource(&self, resource: &Resource) -> ArchiveResult<bool> {
+        // `overlay` takes precedence even if the resource exists in `base`
+        #[cfg(feature = "write")]
+        if self.overlay.contains_key(resource.key()) {
+            return Ok(true);
+        }
+        self.base.contains_resource(resource)
+    }
+
     fn copy_resource(&self, resource: &Resource, writer: &mut dyn Write) -> ArchiveResult<u64> {
         // `overlay` takes precedence even if the resource exists in `base`
         #[cfg(feature = "write")]

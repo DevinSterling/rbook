@@ -80,6 +80,30 @@ pub trait Ebook: Sealed {
     /// The Table of Contents ([`Toc`]), encompassing navigation points.
     fn toc(&self) -> impl Toc<'_>;
 
+    /// Returns `true` if the given [`Resource`] exists.
+    ///
+    /// This is a convenience method that treats errors as `false`.
+    ///
+    /// # See Also
+    /// - [`Self::try_contains_resource`] to check for errors.
+    fn contains_resource<'a>(&self, resource: impl Into<Resource<'a>>) -> bool {
+        self.try_contains_resource(resource).unwrap_or_default()
+    }
+
+    /// Returns `Ok(true)` if the given [`Resource`] exists.
+    ///
+    /// In contrast to [`Self::contains_resource`], this method returns
+    /// `Ok(true)` if the resource exists, or `Ok(false)` if it does not.
+    /// If its existence can neither be confirmed (`true`) nor denied (`false`),
+    /// an error is returned instead.
+    ///
+    /// # Errors
+    /// [`ArchiveError`](errors::ArchiveError): When checking fails (e.g., I/O error).
+    ///
+    /// # See Also
+    /// - [`Self::contains_resource`] to treat errors as `false`.
+    fn try_contains_resource<'a>(&self, resource: impl Into<Resource<'a>>) -> ArchiveResult<bool>;
+
     /// Copies the content of a [`Resource`] into the given `writer`,
     /// returning the total number of bytes written on success.
     ///
