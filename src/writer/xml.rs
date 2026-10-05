@@ -112,11 +112,8 @@ impl<'a, W: Write> XmlWriter<'a, W> {
 
 fn new_escaped_attribute<'a>(name: &'a str, value: &'a str) -> Attribute<'a> {
     Attribute {
-        key: quick_xml::name::QName(name.as_bytes()),
-        value: match escape(value.trim()) {
-            Cow::Borrowed(borrowed) => Cow::Borrowed(borrowed.as_bytes()),
-            Cow::Owned(owned) => Cow::Owned(owned.into_bytes()),
-        },
+        key: quick_xml::name::QName(name),
+        value: escape(value.trim()),
     }
 }
 

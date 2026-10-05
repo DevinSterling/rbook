@@ -1,5 +1,5 @@
 use crate::ebook::element::{Attribute, TextDirection};
-use crate::epub::consts::{dc, opf, opf::bytes, xml};
+use crate::epub::consts::{dc, opf, xml};
 use crate::epub::errors::EpubError;
 use crate::epub::metadata::{
     EpubMetaEntryData, EpubMetaGroups, EpubMetadataData, EpubRefinementsData,
@@ -209,7 +209,7 @@ impl<'package, 'a> MetadataParser<'package, 'a> {
     ) -> ParserResult<()> {
         Self::parse_common_attributes(el, entry)?;
 
-        let property = el.name_decoded()?.into_owned();
+        let property = el.name().to_owned();
         let value = if !el.is_self_closing() {
             self.reader.get_element_text(el)?
         } else if !self.is_strict() {
@@ -240,10 +240,10 @@ impl<'package, 'a> MetadataParser<'package, 'a> {
     ) -> ParserResult<()> {
         extract_attributes! {
             el.attributes(),
-            xml::bytes::ID   => id,
-            xml::bytes::LANG => language,
-            bytes::REFINES   => refines,
-            bytes::TEXT_DIR  => text_dir as |attr| TextDirection::from_bytes(attr.value()),
+            xml::ID       => id,
+            xml::LANG     => language,
+            opf::REFINES  => refines,
+            opf::TEXT_DIR => text_dir as |attr| TextDirection::from(attr.value()),
             ..remaining,
         }
 
@@ -259,14 +259,14 @@ impl<'package, 'a> MetadataParser<'package, 'a> {
     ) -> ParserResult<()> {
         extract_attributes! {
             el.attributes(),
-            bytes::NAME    => name,
-            bytes::CONTENT => content,
+            opf::NAME     => name,
+            opf::CONTENT  => content,
             // Optional
-            xml::bytes::ID   => id,
-            xml::bytes::LANG => language,
+            xml::ID       => id,
+            xml::LANG     => language,
             // Technically not supported for EPUB 2 meta entries, although mapped if present.
-            bytes::REFINES   => refines,
-            bytes::TEXT_DIR  => text_dir as |attr| TextDirection::from_bytes(attr.value()),
+            opf::REFINES  => refines,
+            opf::TEXT_DIR => text_dir as |attr| TextDirection::from(attr.value()),
             ..remaining,
         }
         // Validate
@@ -287,13 +287,13 @@ impl<'package, 'a> MetadataParser<'package, 'a> {
     ) -> ParserResult<()> {
         extract_attributes! {
             el.attributes(),
-            bytes::PROPERTY  => property,
-            bytes::CONTENT   => content, // fallback for malformed meta entries
+            opf::PROPERTY => property,
+            opf::CONTENT  => content, // fallback for malformed meta entries
             // Optional
-            xml::bytes::ID   => id,
-            xml::bytes::LANG => language,
-            bytes::REFINES   => refines,
-            bytes::TEXT_DIR  => text_dir as |attr| TextDirection::from_bytes(attr.value()),
+            xml::ID       => id,
+            xml::LANG     => language,
+            opf::REFINES  => refines,
+            opf::TEXT_DIR => text_dir as |attr| TextDirection::from(attr.value()),
             ..remaining,
         }
         // Validate
@@ -340,7 +340,7 @@ impl<'package, 'a> MetadataParser<'package, 'a> {
         for event in &mut self.reader {
             let el = match event? {
                 XmlEvent::Start(el) => el,
-                XmlEvent::End(el) if el.local_name().as_ref() == bytes::METADATA => break,
+                XmlEvent::End(el) if el.local_name().as_ref() == opf::METADATA => break,
                 _ => continue,
             };
 

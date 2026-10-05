@@ -1,5 +1,5 @@
 use crate::ebook::toc::TocEntryKind;
-use crate::epub::consts::{ncx, ncx::bytes, xml};
+use crate::epub::consts::{ncx, xml};
 use crate::epub::metadata::EpubVersion;
 use crate::epub::parser::EpubParserValidator;
 use crate::epub::parser::toc::TocParser;
@@ -14,17 +14,17 @@ impl TocParser<'_, '_> {
         while let Some(event) = self.reader.next() {
             match event? {
                 XmlEvent::Start(el) => match el.local_name() {
-                    bytes::DOC_TITLE => doc_title = self.reader.get_element_text(&el)?,
+                    ncx::DOC_TITLE => doc_title = self.reader.get_element_text(&el)?,
                     // Root Entry
-                    bytes::NAV_MAP | bytes::PAGE_LIST => self.push_ncx_root(&el)?,
+                    ncx::NAV_MAP | ncx::PAGE_LIST => self.push_ncx_root(&el)?,
                     // Nested Entry
-                    bytes::NAV_POINT | bytes::PAGE_TARGET => self.push_ncx_child(&el)?,
-                    bytes::NAV_LABEL => self.handle_ncx_label(&el)?,
-                    bytes::CONTENT => self.handle_ncx_src(&el)?,
+                    ncx::NAV_POINT | ncx::PAGE_TARGET => self.push_ncx_child(&el)?,
+                    ncx::NAV_LABEL => self.handle_ncx_label(&el)?,
+                    ncx::CONTENT => self.handle_ncx_src(&el)?,
                     _ => {}
                 },
                 XmlEvent::End(el) => match el.local_name().as_ref() {
-                    bytes::NAV_MAP | bytes::PAGE_LIST | bytes::NAV_POINT | bytes::PAGE_TARGET => {
+                    ncx::NAV_MAP | ncx::PAGE_LIST | ncx::NAV_POINT | ncx::PAGE_TARGET => {
                         self.handle_pop(EpubVersion::EPUB2);
                     }
                     _ => {}
@@ -47,7 +47,7 @@ impl TocParser<'_, '_> {
     fn push_ncx_root(&mut self, el: &XmlStartElement<'_>) -> ParserResult<()> {
         extract_attributes! {
             el.attributes(),
-            xml::bytes::ID => id,
+            xml::ID => id,
             ..remaining,
         }
 
@@ -55,7 +55,7 @@ impl TocParser<'_, '_> {
         // If the current element is not `navMap`, then it is `pageList`
         let kind = Some(
             match el.local_name() {
-                bytes::NAV_MAP => TocEntryKind::Toc,
+                ncx::NAV_MAP => TocEntryKind::Toc,
                 _ => TocEntryKind::PageList,
             }
             .to_string(),
@@ -71,14 +71,14 @@ impl TocParser<'_, '_> {
     }
 
     fn push_ncx_child(&mut self, el: &XmlStartElement<'_>) -> ParserResult<()> {
-        let is_page_target = el.is_local_name(bytes::PAGE_TARGET);
+        let is_page_target = el.is_local_name(ncx::PAGE_TARGET);
 
         extract_attributes! {
             el.attributes(),
-            xml::bytes::ID => id,
+            xml::ID => id,
             // PageTarget elements require a `type` attribute.
             // - Kinds: "front" | "normal" | "special"
-            bytes::TYPE where is_page_target => kind,
+            ncx::TYPE where is_page_target => kind,
             ..remaining,
         }
 

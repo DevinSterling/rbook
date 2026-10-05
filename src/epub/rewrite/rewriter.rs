@@ -64,7 +64,7 @@ impl<'ebook> ContentRewriter<'ebook> {
     }
 
     fn check_inject_stylesheet(&self, end: &BytesEnd) -> bool {
-        self.config.inject_css.is_some() && end.name().0 == b"head"
+        self.config.inject_css.is_some() && end.name().0 == "head"
     }
 
     fn rewrite_start_element<'a>(&mut self, start: BytesStart<'a>) -> EbookResult<BytesStart<'a>> {
@@ -76,18 +76,18 @@ impl<'ebook> ContentRewriter<'ebook> {
 
     fn check_rewrite_path<'a>(&mut self, start: BytesStart<'a>) -> EbookResult<BytesStart<'a>> {
         match start.name().0 {
-            b"object" => self.rewrite_path(start, |a| matches!(a.key.0, b"data")),
-            b"source" => self.rewrite_path(start, |a| matches!(a.key.0, b"src" | b"srcset")),
-            b"link" => self.rewrite_path(start, |a| matches!(a.key.0, b"href")),
-            b"image" | b"use" => {
-                self.rewrite_path(start, |a| matches!(a.key.0, b"href" | b"xlink:href"))
+            "object" => self.rewrite_path(start, |a| matches!(a.key.0, "data")),
+            "source" => self.rewrite_path(start, |a| matches!(a.key.0, "src" | "srcset")),
+            "link" => self.rewrite_path(start, |a| matches!(a.key.0, "href")),
+            "image" | "use" => {
+                self.rewrite_path(start, |a| matches!(a.key.0, "href" | "xlink:href"))
             }
-            b"iframe" | b"script" | b"img" | b"video" | b"audio" | b"track" | b"input" => {
-                self.rewrite_path(start, |a| matches!(a.key.0, b"src"))
+            "iframe" | "script" | "img" | "video" | "audio" | "track" | "input" => {
+                self.rewrite_path(start, |a| matches!(a.key.0, "src"))
             }
-            b"a" => self.rewrite_path(start, |a| {
+            "a" => self.rewrite_path(start, |a| {
                 // Special case: do not match against if an anchor/fragment is present
-                matches!(a.key.0, b"href") && !a.value.starts_with(b"#")
+                matches!(a.key.0, "href") && !a.value.starts_with("#")
             }),
             _ => Ok(start),
         }
@@ -104,9 +104,9 @@ impl<'ebook> ContentRewriter<'ebook> {
         for attribute_result in start.attributes() {
             let mut attribute = attribute_result.map_err(to_ebook_error)?;
 
-            if matcher(&attribute) && !uri::has_scheme_bytes(&attribute.value) {
+            if matcher(&attribute) && !uri::has_scheme_bytes(attribute.value.as_bytes()) {
                 let path = self.rewrite_path_data(&attribute)?;
-                attribute.value = Cow::Borrowed(path.as_bytes());
+                attribute.value = Cow::Owned(path);
                 el.push_attribute(attribute);
             } else {
                 el.push_attribute(attribute);
@@ -116,9 +116,8 @@ impl<'ebook> ContentRewriter<'ebook> {
         Ok(el)
     }
 
-    fn rewrite_path_data(&self, attribute: &Attribute) -> EbookResult<String> {
-        let relative = str::from_utf8(&attribute.value).map_err(to_ebook_error)?;
-        let mut path = self.resolver.resolve(relative);
+    fn rewrite_path_data(&self, path_attribute: &Attribute) -> EbookResult<String> {
+        let mut path = self.resolver.resolve(&path_attribute.value);
 
         if let PathRewrite::Prefix(prefix) = &self.config.path_rewrite
             && prefix != "/"

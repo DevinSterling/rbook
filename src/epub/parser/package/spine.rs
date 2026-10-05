@@ -1,5 +1,5 @@
 use crate::ebook::spine::PageDirection;
-use crate::epub::consts::{opf::bytes, xml};
+use crate::epub::consts::{opf, xml};
 use crate::epub::errors::EpubError;
 use crate::epub::manifest::EpubManifestData;
 use crate::epub::parser::package::PackageParser;
@@ -45,8 +45,8 @@ impl<'package, 'a> SpineParser<'package, 'a> {
     fn parse_spine(mut self) -> ParserResult<TempEpubSpine> {
         extract_attributes! {
             self.spine_el.attributes(),
-            bytes::PAGE_DIRECTION => direction as |attr| PageDirection::from_bytes(attr.value()),
-            bytes::TOC            => ncx_id,
+            opf::PAGE_DIRECTION => direction as |attr| PageDirection::from_bytes(attr.value()),
+            opf::TOC            => ncx_id,
         }
         // Validate
         let page_direction = direction.unwrap_or_default();
@@ -66,11 +66,11 @@ impl<'package, 'a> SpineParser<'package, 'a> {
     fn parse_itemref(&mut self, itemref: &XmlStartElement<'_>) -> ParserResult<EpubSpineEntryData> {
         extract_attributes! {
             itemref.attributes(),
-            bytes::IDREF      => idref,
+            opf::IDREF      => idref,
             // Optional
-            xml::bytes::ID    => id,
-            bytes::PROPERTIES => properties,
-            bytes::LINEAR     => linear as |attr| attr.value() == bytes::YES,
+            xml::ID         => id,
+            opf::PROPERTIES => properties,
+            opf::LINEAR     => linear as |attr| attr.value() == opf::YES,
             ..remaining,
         }
         // Validate
@@ -137,7 +137,7 @@ impl<'package, 'a> SpineParser<'package, 'a> {
     }
 
     fn next_itemref(&mut self) -> ParserResult<Option<XmlStartElement<'a>>> {
-        PackageParser::simple_handler(self.reader, bytes::SPINE, bytes::ITEMREF)
+        PackageParser::simple_handler(self.reader, opf::SPINE, opf::ITEMREF)
     }
 }
 

@@ -5,7 +5,7 @@ mod spine;
 
 use crate::ebook::element::TextDirection;
 use crate::ebook::metadata::Version;
-use crate::epub::consts::{opf::bytes, xml};
+use crate::epub::consts::{opf, xml};
 use crate::epub::errors::EpubError;
 use crate::epub::manifest::EpubManifestData;
 use crate::epub::metadata::{EpubMetadataData, EpubVersion};
@@ -142,24 +142,24 @@ impl<'parser, 'a> PackageParser<'parser, 'a> {
                 continue;
             };
             match el.local_name() {
-                bytes::PACKAGE => {
+                opf::PACKAGE => {
                     let package = self.parse_package(&el)?;
                     self.package.replace(package);
                 }
-                bytes::METADATA if self.config().parse_metadata => {
+                opf::METADATA if self.config().parse_metadata => {
                     let metadata = self.parse_metadata()?;
                     self.metadata.replace(metadata);
                 }
-                bytes::MANIFEST if self.config().parse_manifest => {
+                opf::MANIFEST if self.config().parse_manifest => {
                     let manifest = self.parse_manifest()?;
                     self.manifest.replace(manifest);
                 }
-                bytes::SPINE if self.config().parse_spine => {
+                opf::SPINE if self.config().parse_spine => {
                     let spine = self.parse_spine(&el)?;
                     self.spine.replace(spine);
                 }
                 // "toc"-related due to its navigational aspect.
-                bytes::GUIDE if self.config().parse_toc => {
+                opf::GUIDE if self.config().parse_toc => {
                     let guide = self.parse_guide(&el)?;
                     self.guide.replace(guide);
                 }
@@ -172,12 +172,12 @@ impl<'parser, 'a> PackageParser<'parser, 'a> {
     fn parse_package(&mut self, package: &XmlStartElement) -> ParserResult<EpubPackageData> {
         extract_attributes! {
             package.attributes(),
-            bytes::VERSION   => raw_version,
-            bytes::UNIQUE_ID => unique_id,
+            opf::VERSION   => raw_version,
+            opf::UNIQUE_ID => unique_id,
             // Optional
-            xml::bytes::LANG => language,
-            bytes::PREFIX    => prefix,
-            bytes::TEXT_DIR  => text_dir as |attr| TextDirection::from_bytes(attr.value()),
+            xml::LANG      => language,
+            opf::PREFIX    => prefix,
+            opf::TEXT_DIR  => text_dir as |attr| TextDirection::from(attr.value()),
             ..remaining,
         }
         // Validate
@@ -253,8 +253,8 @@ impl<'parser, 'a> PackageParser<'parser, 'a> {
 
     fn simple_handler(
         reader: &mut XmlReader<'a>,
-        parent: &[u8],
-        child: &[u8],
+        parent: &str,
+        child: &str,
     ) -> ParserResult<Option<XmlStartElement<'a>>> {
         for event in reader {
             return Ok(Some(match event? {

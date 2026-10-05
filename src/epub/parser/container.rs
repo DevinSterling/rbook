@@ -1,5 +1,5 @@
 use crate::ebook::resource::consts::mime;
-use crate::epub::consts::{ocf, ocf::bytes};
+use crate::epub::consts::ocf;
 use crate::epub::errors::EpubError;
 use crate::epub::parser::{EpubParser, EpubParserValidator};
 use crate::parser::ParserResult;
@@ -16,13 +16,13 @@ impl EpubParser<'_> {
             };
             extract_attributes! {
                 el.attributes(),
-                bytes::MEDIA_TYPE => media_type as |attr| attr.into_value(),
-                bytes::FULL_PATH => full_path,
+                ocf::MEDIA_TYPE => media_type as |attr| attr.into_cow_value(),
+                ocf::FULL_PATH => full_path,
             }
 
             // Although rare, multiple package.opf locations could exist.
             // Only accept the first path as it is the default
-            let (Some(mime::bytes::OEBPS_PACKAGE), Some(package_file)) =
+            let (Some(mime::OEBPS_PACKAGE), Some(package_file)) =
                 (media_type.as_deref(), full_path)
             else {
                 continue;

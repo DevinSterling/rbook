@@ -1,7 +1,7 @@
 use quick_xml::Reader;
 use quick_xml::events::Event;
 
-pub fn extract_attributes(xml: &str, keys: &[&[u8]]) -> impl Iterator<Item = String> {
+pub fn extract_attributes(xml: &str, keys: &[&str]) -> impl Iterator<Item = String> {
     let mut reader = Reader::from_str(xml);
 
     std::iter::from_fn(move || {
@@ -18,8 +18,7 @@ pub fn extract_attributes(xml: &str, keys: &[&[u8]]) -> impl Iterator<Item = Str
                         };
 
                         if keys.contains(&attr.key.0) {
-                            let s = String::from_utf8(attr.value.into_owned());
-                            return Some(s.expect("XML should be valid UTF-8"));
+                            return Some(attr.value.into_owned());
                         }
                     }
                 }

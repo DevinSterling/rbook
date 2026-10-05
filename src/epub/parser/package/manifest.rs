@@ -1,5 +1,5 @@
 use crate::epub::EpubVersion;
-use crate::epub::consts::{opf, opf::bytes, xml};
+use crate::epub::consts::{opf, xml};
 use crate::epub::errors::EpubError;
 use crate::epub::manifest::{EpubManifestData, EpubManifestEntryData};
 use crate::epub::parser::EpubParseConfig;
@@ -50,13 +50,13 @@ impl<'package, 'a> ManifestParser<'package, 'a> {
     ) -> ParserResult<(String, EpubManifestEntryData)> {
         extract_attributes! {
             item.attributes(),
-            xml::bytes::ID       => id,
-            bytes::HREF          => href_raw,
-            bytes::MEDIA_TYPE    => media_type,
+            xml::ID            => id,
+            opf::HREF          => href_raw,
+            opf::MEDIA_TYPE    => media_type,
             // Optional
-            bytes::MEDIA_OVERLAY => media_overlay,
-            bytes::FALLBACK      => fallback,
-            bytes::PROPERTIES    => properties,
+            opf::MEDIA_OVERLAY => media_overlay,
+            opf::FALLBACK      => fallback,
+            opf::PROPERTIES    => properties,
            ..remaining,
         }
         // Validate
@@ -93,7 +93,7 @@ impl<'package, 'a> ManifestParser<'package, 'a> {
     }
 
     fn next_item(&mut self) -> ParserResult<Option<XmlStartElement<'a>>> {
-        PackageParser::simple_handler(self.reader, bytes::MANIFEST, bytes::ITEM)
+        PackageParser::simple_handler(self.reader, opf::MANIFEST, opf::ITEM)
     }
 }
 

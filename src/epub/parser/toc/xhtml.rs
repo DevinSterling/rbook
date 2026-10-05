@@ -1,4 +1,4 @@
-use crate::epub::consts::{epub, xhtml, xhtml::bytes, xml};
+use crate::epub::consts::{epub, xhtml, xml};
 use crate::epub::metadata::EpubVersion;
 use crate::epub::parser::EpubParserValidator;
 use crate::epub::parser::toc::TocParser;
@@ -16,14 +16,14 @@ impl<'a> TocParser<'_, 'a> {
             match event? {
                 XmlEvent::Start(el) => match el.local_name() {
                     // Root Entry
-                    bytes::NAV => self.push_nav_root(&el)?,
+                    xhtml::NAV => self.push_nav_root(&el)?,
                     // Nested Entry
-                    bytes::LIST_ITEM => next_event = self.push_nav_child(&el)?,
-                    bytes::ANCHOR => self.handle_nav_anchor(&el)?,
+                    xhtml::LIST_ITEM => next_event = self.push_nav_child(&el)?,
+                    xhtml::ANCHOR => self.handle_nav_anchor(&el)?,
                     _ => {}
                 },
                 XmlEvent::End(el) => match el.local_name().as_ref() {
-                    bytes::NAV | bytes::LIST_ITEM => {
+                    xhtml::NAV | xhtml::LIST_ITEM => {
                         self.handle_pop(EpubVersion::EPUB3);
                     }
                     _ => {}
@@ -39,9 +39,9 @@ impl<'a> TocParser<'_, 'a> {
         extract_attributes! {
             el.attributes(),
             // Extract root kind
-            epub::bytes::TYPE => epub_type,
+            epub::TYPE => epub_type,
             // Optional
-            xml::bytes::ID    => id,
+            xml::ID    => id,
             ..remaining,
         }
         // Validate
@@ -54,7 +54,7 @@ impl<'a> TocParser<'_, 'a> {
         // Extracts the title of the root toc entry.
         let (_, label) = self
             .reader
-            .get_text_till_either(el.name(), xhtml::ORDERED_LIST.as_bytes())?;
+            .get_text_till_either(el.name(), xhtml::ORDERED_LIST)?;
 
         self.stack.push(EpubTocEntryData {
             attributes: remaining.into(),
@@ -69,7 +69,7 @@ impl<'a> TocParser<'_, 'a> {
     fn push_nav_child(&mut self, el: &XmlStartElement<'_>) -> ParserResult<Option<XmlEvent<'a>>> {
         extract_attributes! {
             el.attributes(),
-            xml::bytes::ID => id,
+            xml::ID => id,
             ..remaining,
         }
         // For EPUB 3, <li> elements may act as a grouping header
@@ -77,9 +77,7 @@ impl<'a> TocParser<'_, 'a> {
         //
         // If the element does contain a direct <a> element,
         // the label retrieved here will be overridden.
-        let (consumed_event, label) = self
-            .reader
-            .get_text_till_either(el.name(), xhtml::ANCHOR.as_bytes())?;
+        let (consumed_event, label) = self.reader.get_text_till_either(el.name(), xhtml::ANCHOR)?;
 
         self.stack.push(EpubTocEntryData {
             attributes: remaining.into(),
@@ -94,9 +92,9 @@ impl<'a> TocParser<'_, 'a> {
         if let Some(nav_entry) = self.stack.last_mut() {
             extract_attributes! {
                 el.attributes(),
-                bytes::HREF       => href_raw,
-                xml::bytes::ID    => id,
-                epub::bytes::TYPE => epub_type,
+                xhtml::HREF => href_raw,
+                xml::ID     => id,
+                epub::TYPE  => epub_type,
             }
             // Validate
             self.ctx.check_attribute(&href_raw, "a[*href]")?;

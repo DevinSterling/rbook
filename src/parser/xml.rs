@@ -3,11 +3,11 @@
 use crate::ebook::element::{Attribute, AttributesData};
 use crate::ebook::errors::FormatError;
 use crate::util::str::StringExt;
+use quick_xml::Error as QError;
 use quick_xml::encoding::EncodingError;
 use quick_xml::escape;
 use quick_xml::events::attributes::{Attribute as QAttribute, Attributes as QAttributes};
 use quick_xml::events::{BytesCData, BytesEnd, BytesRef, BytesStart, BytesText, Event as QEvent};
-use quick_xml::{Decoder, Error as QError};
 use std::borrow::Cow;
 use std::str::{self, Utf8Error};
 
@@ -75,18 +75,18 @@ impl<'a> XmlEvent<'a> {
 
 #[derive(Copy, Clone, Debug)]
 pub(crate) struct XmlContext {
-    decoder: Decoder,
     config: XmlConfig,
 }
 
 impl XmlContext {
-    fn unescape_value(&self, bytes: &[u8]) -> XmlResult<String> {
-        let decoded = self.decoder.decode(bytes)?;
-
-        match escape::unescape(&decoded) {
-            Ok(unescaped) => Ok(unescaped.into_owned()),
+    fn unescape_value(&self, text: Cow<'_, str>) -> XmlResult<String> {
+        match escape::unescape(&text) {
+            Ok(unescaped) => match unescaped {
+                Cow::Owned(unescaped) => Ok(unescaped),
+                Cow::Borrowed(text) => Ok(text.to_owned()),
+            },
             Err(error) if self.config.strict => Err(XmlError::QError(error.into())),
-            Err(_) => Ok(decoded.into_owned()),
+            Err(_) => Ok(text.into_owned()),
         }
     }
 }
@@ -111,7 +111,6 @@ impl<'a> XmlReader<'a> {
 
     fn ctx(&self) -> XmlContext {
         XmlContext {
-            decoder: self.reader.decoder(),
             config: self.config,
         }
     }
@@ -167,8 +166,8 @@ impl<'a> XmlReader<'a> {
     /// See [`Self::get_text`]
     pub(crate) fn get_text_till_either(
         &mut self,
-        start: &[u8],
-        till: &[u8],
+        start: &str,
+        till: &str,
     ) -> XmlResult<(Option<XmlEvent<'a>>, String)> {
         self.get_text(|event| {
             let predicate = |el| el == start || el == till;
@@ -182,18 +181,20 @@ impl<'a> XmlReader<'a> {
     }
 
     fn handle_cdata(value: &mut String, cdata: &BytesCData) -> XmlResult<()> {
-        value.push_str(cdata.decode()?.trim());
+        value.push_str(cdata.trim());
         Ok(())
     }
 
-    fn handle_text(value: &mut String, text: &mut BytesText) -> XmlResult<()> {
-        // Determine when to add spacing
-        let has_padding_start = text.try_trim_start();
-        let has_padding_end = text.try_trim_end();
-        let last_char = value.chars().last().unwrap_or_default();
+    fn handle_text(value: &mut String, bytes_text: &mut BytesText) -> XmlResult<()> {
+        let bytes = bytes_text.as_bytes();
+        // Determine if to add spacing
+        let has_whitespace_start = bytes.first().is_some_and(|c| c.is_ascii_whitespace());
+        let has_whitespace_end = bytes.last().is_some_and(|c| c.is_ascii_whitespace());
+        let text = bytes_text.trim_ascii();
+        let current_last_char = value.chars().last().unwrap_or_default();
 
         // Check "start" spacing
-        if (text.is_empty() || has_padding_start) && last_char != ' ' {
+        if (text.is_empty() || has_whitespace_start) && current_last_char != ' ' {
             // Only add spacing if there's content
             if !value.is_empty() {
                 // Add a space to ensure all text doesn't squeeze together
@@ -204,7 +205,6 @@ impl<'a> XmlReader<'a> {
                 return Ok(());
             }
         }
-        let text = text.decode()?;
 
         // Consolidate into a single paragraph
         for text in text.lines().map(str::trim).filter(|s| !s.is_empty()) {
@@ -212,7 +212,7 @@ impl<'a> XmlReader<'a> {
             value.push(' ');
         }
         // If there should be no end spacing, remove the last space added by the loop
-        if !has_padding_end {
+        if !has_whitespace_end {
             value.pop();
         }
         Ok(())
@@ -249,30 +249,23 @@ impl<'a> XmlStartElement<'a> {
         }
     }
 
-    pub(crate) fn name(&self) -> &[u8] {
+    pub(crate) fn name(&self) -> &str {
         self.element.name().0
     }
 
-    pub(crate) fn name_decoded(&self) -> XmlResult<Cow<'_, str>> {
-        self.ctx
-            .decoder
-            .decode(self.name())
-            .map_err(|error| XmlError::QError(error.into()))
-    }
-
-    pub(crate) fn local_name(&self) -> &[u8] {
+    pub(crate) fn local_name(&self) -> &str {
         self.element.local_name().into_inner()
     }
 
-    pub(crate) fn is_local_name(&self, target_local_name: impl AsRef<[u8]>) -> bool {
-        self.local_name() == target_local_name.as_ref()
+    pub(crate) fn is_local_name(&self, target_local_name: &str) -> bool {
+        self.local_name() == target_local_name
     }
 
-    pub(crate) fn is_prefix(&self, target_prefix: impl AsRef<[u8]>) -> bool {
+    pub(crate) fn is_prefix(&self, target_prefix: &str) -> bool {
         self.element
             .name()
             .prefix()
-            .is_some_and(|p| p.as_ref() == target_prefix.as_ref())
+            .is_some_and(|p| p.as_ref() == target_prefix)
     }
 
     pub(crate) fn is_self_closing(&self) -> bool {
@@ -280,10 +273,7 @@ impl<'a> XmlStartElement<'a> {
     }
 
     /// Returns the raw attribute value
-    pub(crate) fn get_attribute_raw(
-        &self,
-        key: impl AsRef<[u8]>,
-    ) -> XmlResult<Option<Cow<'_, [u8]>>> {
+    pub(crate) fn get_attribute_raw(&self, key: &str) -> XmlResult<Option<Cow<'_, str>>> {
         match self.element.try_get_attribute(key) {
             Ok(option) => Ok(option.map(|attribute| attribute.value)),
             Err(error) if self.ctx.config.strict => Err(XmlError::QError(error.into())),
@@ -291,14 +281,14 @@ impl<'a> XmlStartElement<'a> {
         }
     }
 
-    pub(crate) fn get_attribute(&self, key: impl AsRef<[u8]>) -> XmlResult<Option<String>> {
+    pub(crate) fn get_attribute(&self, key: &str) -> XmlResult<Option<String>> {
         self.get_attribute_raw(key).and_then(|value| match value {
-            Some(value) => self.ctx.unescape_value(&value).map(Some),
+            Some(value) => self.ctx.unescape_value(value).map(Some),
             None => Ok(None),
         })
     }
 
-    pub(crate) fn has_attribute(&self, key: impl AsRef<[u8]>) -> XmlResult<bool> {
+    pub(crate) fn has_attribute(&self, key: &str) -> XmlResult<bool> {
         match self.element.try_get_attribute(key) {
             Ok(attribute) => Ok(attribute.is_some()),
             Err(error) if self.ctx.config.strict => Err(XmlError::QError(error.into())),
@@ -323,31 +313,29 @@ pub(crate) struct XmlAttribute<'a> {
 }
 
 impl<'a> XmlAttribute<'a> {
-    pub(crate) fn name(&self) -> &[u8] {
-        self.attribute.key.as_ref()
+    pub(crate) fn name(&self) -> &'a str {
+        self.attribute.key.0
     }
 
-    pub(crate) fn value_decoded(&self) -> XmlResult<String> {
-        self.ctx.unescape_value(self.value())
-    }
-
-    pub(crate) fn value(&self) -> &[u8] {
+    pub(crate) fn value(&self) -> &str {
         &self.attribute.value
     }
 
-    pub(crate) fn into_value(self) -> Cow<'a, [u8]> {
+    pub(crate) fn into_cow_value(self) -> Cow<'a, str> {
         self.attribute.value
+    }
+
+    pub(crate) fn into_unescaped_value(self) -> XmlResult<String> {
+        self.ctx.unescape_value(self.attribute.value)
     }
 }
 
 impl TryFrom<XmlAttribute<'_>> for Attribute {
     type Error = XmlError;
 
-    fn try_from(attribute: XmlAttribute) -> Result<Self, Self::Error> {
-        let name = str::from_utf8(attribute.name())
-            .map_err(XmlError::from)?
-            .to_owned();
-        let value = attribute.value_decoded()?;
+    fn try_from(attribute: XmlAttribute<'_>) -> Result<Self, Self::Error> {
+        let name = attribute.name();
+        let value = attribute.into_unescaped_value()?;
         Ok(Attribute::create(name, value))
     }
 }
@@ -412,42 +400,18 @@ impl<'a> XmlCharRef<'a> {
                 Ok(None) => {}
                 // An invalid char ref is given
                 Err(QError::Escape(_)) if !self.ctx.config.strict => {
-                    push_unsupported(buffer, &self.reference.decode()?);
+                    push_unsupported(buffer, &self.reference);
                 }
                 Err(error) => return Err(XmlError::QError(error)),
             }
         } else {
-            let decoded = self.reference.decode()?;
-
             // Resolve xml/html entity
-            match escape::resolve_predefined_entity(&decoded) {
+            match escape::resolve_predefined_entity(&self.reference) {
                 Some(resolved) => buffer.push_str(resolved),
-                None => push_unsupported(buffer, &decoded),
+                None => push_unsupported(buffer, &self.reference),
             }
         }
         Ok(())
-    }
-}
-
-pub(crate) trait XmlText {
-    /// Returns `true` if the start was trimmed.
-    fn try_trim_start(&mut self) -> bool;
-
-    /// Returns `true` if the end was trimmed.
-    fn try_trim_end(&mut self) -> bool;
-}
-
-impl XmlText for BytesText<'_> {
-    fn try_trim_start(&mut self) -> bool {
-        let before = self.len();
-        self.inplace_trim_start();
-        self.len() != before
-    }
-
-    fn try_trim_end(&mut self) -> bool {
-        let before = self.len();
-        self.inplace_trim_end();
-        self.len() != before
     }
 }
 
@@ -480,7 +444,7 @@ macro_rules! extract_attributes {
         $map
     }};
     (@value_helper $attribute:ident) => {{
-        $attribute.value_decoded()?
+        $attribute.into_unescaped_value()?
     }};
 }
 

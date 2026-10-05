@@ -10,11 +10,6 @@ pub(crate) mod mime {
     pub(crate) const JAVASCRIPT_TEXT: &str = "text/javascript";
     pub(crate) const CSS: &str = "text/css";
 
-    // constants where calling str.as_bytes() is not possible
-    pub(crate) mod bytes {
-        pub(crate) const OEBPS_PACKAGE: &[u8] = super::OEBPS_PACKAGE.as_bytes();
-    }
-
     #[cfg(feature = "write")]
     mod write {
         pub(crate) const NCX: &str = "application/x-dtbncx+xml";

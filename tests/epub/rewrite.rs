@@ -15,7 +15,7 @@ fn test_manifest_entry_read_str_with() -> EbookResult<()> {
     let entry = epub.manifest().by_id("toc").unwrap();
     let xhtml = entry.read_str_with(&rewrite)?;
 
-    for path in util::xml::extract_attributes(&xhtml, &[b"href", b"src"]) {
+    for path in util::xml::extract_attributes(&xhtml, &["href", "src"]) {
         assert!(path.starts_with("/"));
         epub.read_resource_str(&path)?;
     }
@@ -45,7 +45,7 @@ fn test_epub_read_resource_str_with() -> EbookResult<()> {
         "/toc.xhtml",
     ]);
 
-    for path in util::xml::extract_attributes(&xhtml, &[b"href"]) {
+    for path in util::xml::extract_attributes(&xhtml, &["href"]) {
         hrefs.remove(path.as_str());
     }
 
@@ -72,7 +72,7 @@ fn test_reader_rewrite_paths() -> ReaderResult<()> {
             let data = data_result?;
             let xhtml = data.content();
 
-            for path in util::xml::extract_attributes(xhtml, &[b"href", b"src"]) {
+            for path in util::xml::extract_attributes(xhtml, &["href", "src"]) {
                 // Skip fragments
                 if path.starts_with('#') {
                     continue;

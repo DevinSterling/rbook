@@ -1,5 +1,5 @@
 use crate::ebook::toc::TocEntryKind;
-use crate::epub::consts::{opf::bytes, xml};
+use crate::epub::consts::{opf, xml};
 use crate::epub::metadata::EpubVersion;
 use crate::epub::parser::package::PackageParser;
 use crate::epub::parser::{EpubParseConfig, EpubParserContext, EpubParserValidator};
@@ -48,11 +48,11 @@ impl<'package, 'a> GuideParser<'package, 'a> {
     fn parse_reference(&mut self, el: &XmlStartElement<'_>) -> ParserResult<EpubTocEntryData> {
         extract_attributes! {
             el.attributes(),
-            bytes::HREF    => href_raw,
-            bytes::TITLE   => label,
-            bytes::TYPE    => kind,
+            opf::HREF  => href_raw,
+            opf::TITLE => label,
+            opf::TYPE  => kind,
             // Optional
-            xml::bytes::ID => id,
+            xml::ID    => id,
             ..remaining,
         }
         // Validate
@@ -77,7 +77,7 @@ impl<'package, 'a> GuideParser<'package, 'a> {
     }
 
     fn next_reference(&mut self) -> ParserResult<Option<XmlStartElement<'a>>> {
-        PackageParser::simple_handler(self.reader, bytes::GUIDE, bytes::REFERENCE)
+        PackageParser::simple_handler(self.reader, opf::GUIDE, opf::REFERENCE)
     }
 }
 

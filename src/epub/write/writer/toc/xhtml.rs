@@ -278,7 +278,7 @@ impl<'ebook> StylesheetExtractor<'ebook> {
             };
             if el.is_local_name(xhtml::LINK)
                 && let Ok(Some(rel)) = el.get_attribute_raw(xhtml::REL)
-                && &*rel == xhtml::STYLESHEET.as_bytes()
+                && rel == xhtml::STYLESHEET
                 && let Ok(Some(stylesheet)) = el.get_attribute(xhtml::HREF)
             {
                 return Some(stylesheet);
