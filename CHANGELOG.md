@@ -1,6 +1,19 @@
 # Changelog
+## 0.7.11 (2026-10-05)
+### Additions　**＋**
+- New methods for `Ebook` (and `Epub` as inherent methods):
+  - `contains_resource` (infallible variant, treating errors as `false`) to check if a resource exists within an ebook.
+  - `try_contains_resource` (fallible variant) to check if a resource exists and return an error, if any.
+
+### Changes　**⟳**
+- Migrate to `quick-xml` 0.42.0 and optimize parser performance.
+- Update `indexmap` dependency: 2.14.0 → 2.14.2
+- Update `thiserror` dependency: 2.0.18 → 2.0.21
+- Update `wasm-bindgen-test` dev dependency: 0.3.76 → 0.3.79
+- Refine documentation for enhanced clarity.
+
 ## 0.7.10 (2026-07-01)
-### Additions **＋**
+### Additions　**＋**
 - New methods to assist with EPUB mutation workflows \[[#6](https://github.com/DevinSterling/rbook/issues/6)]:
   - `EpubManifestEntry::index` to get the index of a manifest entry.
   - `EpubManifestMut::by_spine_index_mut` to get a mutable manifest entry by spine index.
@@ -12,7 +25,7 @@
 - Refine documentation for enhanced clarity.
 
 ## 0.7.9 (2026-06-16)
-### Additions **＋**
+### Additions　**＋**
 - For `Epub`, ignore URI query parameters and fragments in resource paths passed to
   `copy_resource`, `read_resource_bytes`, and `read_resource_str`.
 
@@ -23,7 +36,7 @@
 - Refine documentation for enhanced clarity.
 
 ## 0.7.8 (2026-06-14)
-### Additions **＋**
+### Additions　**＋**
 - New module `epub::rewrite` for XHTML content rewriting:
   - `EpubRewriteOptions`: Configuration for path prefixing and CSS injection.
   - `PathRewrite`: Helper for path prefixing.
@@ -40,7 +53,7 @@
 - Refine documentation for enhanced clarity.
 
 ## 0.7.7 (2026-05-22)
-### Additions **＋**
+### Additions　**＋**
 - Implement `DoubleEndedIterator`, `ExactSizeIterator`, and  `FusedIterator` for applicable iterators.
 
 ### Changes　**⟳**
@@ -52,7 +65,7 @@
 - Refine documentation for enhanced clarity.
 
 ## 0.7.6 (2026-04-21)
-### Additions **＋**
+### Additions　**＋**
 - New methods:
   - `EpubManifest::get` to get an entry by index.
   - `EpubManifestMut::get_mut` to get a mutable entry by index.
@@ -88,7 +101,7 @@
 - Deprecate module `rbook::ebook::epub` in favor of `rbook::epub`.
 
 ## 0.7.3 (2026-03-07)
-### Additions **＋**
+### Additions　**＋**
 - Implement `Eq` and `Hash` for `Prefix`.
 - Implement `Eq` for `ResourceContent`.
 - Implement `Display` for all associated `EpubMetaEntry` structs, delegating to `EpubMetaEntry::value`.
