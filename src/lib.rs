@@ -51,7 +51,7 @@
 //! For example, only retaining the `threadsafe` default feature:
 //! ```toml
 //! [dependencies]
-//! rbook = { version = "0.7.10", default-features = false, features = ["threadsafe"] }
+//! rbook = { version = "0.7.11", default-features = false, features = ["threadsafe"] }
 //! ```
 //!
 //! # Opening an [`Ebook`]
@@ -391,7 +391,7 @@ pub use {ebook::Ebook, epub::Epub};
 /// For example, omitting the `prelude` while retaining the `threadsafe` and `write` feature:
 /// ```toml
 /// [dependencies]
-/// rbook = { version = "0.7.10", default-features = false, features = ["threadsafe", "write"] }
+/// rbook = { version = "0.7.11", default-features = false, features = ["threadsafe", "write"] }
 /// ```
 #[cfg(feature = "prelude")]
 pub mod prelude {
