@@ -56,11 +56,16 @@ where
 
         Ok(lock
             .file_names()
+            // An error can be thrown here...
+            // However, that means resource retrieval becomes impossible if a single
+            // entry has a malformed/non-UTF8 name.
+            // (NOTE: EPUBs should only contain UTF-8 filenames)
+            .filter_map(|result| result.ok())
             // Ignore directories; paths that ends with a separator
             .filter(|path| !path.ends_with('/'))
             // Owning is necessary due to the lock
             // - The path is made absolute to maintain consistency throughout the API
-            .map(|path| Cow::Owned(ResourceKey::from(util::str::prefix("/", path))))
+            .map(|path| Cow::Owned(ResourceKey::from(util::str::prefix("/", &path))))
             .collect())
     }
 }
