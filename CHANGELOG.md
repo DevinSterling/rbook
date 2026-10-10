@@ -1,4 +1,9 @@
 # Changelog
+## 0.7.12 (2026-10-10)
+### Changes　**⟳**
+- Migrate to `zip` 9.0.1, improving `Epub` opening performance.
+- Refine documentation for enhanced clarity.
+
 ## 0.7.11 (2026-10-05)
 ### Additions　**＋**
 - New methods for `Ebook` (and `Epub` as inherent methods):
