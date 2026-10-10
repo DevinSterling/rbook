@@ -5,18 +5,21 @@
 //! to handle various datetime strings found in ebook metadata.
 //!
 //! It follows [**ISO 8601-1**](https://www.iso.org/iso-8601-date-and-time-format.html)
-//! (`YYYY-MM-DD T HH:mm:ss [Z|±HH:mm]`) where possible, although handles different varieties,
+//! (`YYYY-MM-DDTHH:mm:ss[Z|±HH:mm]`) where possible, although it handles different varieties,
 //! such as spacing, different separators, and omitted components.
 //!
 //! Absent components default to the earliest valid value.
 //! For example:
-//! - `2024` (original) → `2024-01-01 00:00:00` (absent components defaulted)
-//! - `2025.12` → `2025-12-01 00:00:00`
-//! - `2026.1.26` → `2025-01-26 00:00:00`
-//! - `2024/1/15`
-//! - `2023-01-25 10:11:35Z`
-//! - `2020-10-12T09:05:01+08:21`
-//! - `20250525T121521Z`
+//!
+//! | Original                    | Parsed Date   | Parsed Time      |
+//! |-----------------------------|---------------|------------------|
+//! | `2024`                      | `2024-01-01`  | `00:00:00`       |
+//! | `2025.12`                   | `2025-12-01`  | `00:00:00`       |
+//! | `2026.1.26`                 | `2026-01-26`  | `00:00:00`       |
+//! | `2024/1/15`                 | `2024-01-15`  | `00:00:00`       |
+//! | `2023-01-25 10:11:35Z`      | `2023-01-25`  | `10:11:35Z`      |
+//! | `2020-10-12T09:05:01+09:00` | `2020-10-12`  | `09:05:01+09:00` |
+//! | `20250525T121521Z`          | `2025-05-25`  | `12:15:21Z`      |
 
 use std::fmt::Display;
 use std::iter::Peekable;

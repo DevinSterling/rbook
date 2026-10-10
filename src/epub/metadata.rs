@@ -368,18 +368,30 @@ impl<'ebook> EpubMetadata<'ebook> {
     }
 
     /// The publication date; when an [`Epub`](super::Epub) was published.
+    ///
+    /// EPUB dates should follow
+    /// [**ISO 8601-1**](https://www.iso.org/iso-8601-date-and-time-format.html),
+    /// although some may contain non-conformant formats.
+    /// Parsing is best-effort and [`None`] is returned if the value cannot be parsed.
     #[doc = doc::inherent!(Metadata, published)]
     /// # See Also
     /// - [`Self::published_entry`] to get the source [`EpubMetaEntry`] instead.
+    /// - [`datetime`](crate::ebook::metadata::datetime) module for parsing details.
     pub fn published(&self) -> Option<DateTime> {
         self.published_entry()
             .and_then(|entry| DateTime::parse(entry.value()))
     }
 
     /// The last modified date; when an [`Epub`](super::Epub) was last modified.
+    ///
+    /// EPUB dates should follow
+    /// [**ISO 8601-1**](https://www.iso.org/iso-8601-date-and-time-format.html),
+    /// although some may contain non-conformant formats.
+    /// Parsing is best-effort and [`None`] is returned if the value cannot be parsed.
     #[doc = doc::inherent!(Metadata, modified)]
     /// # See Also
     /// - [`Self::modified_entry`] to get the source [`EpubMetaEntry`] instead.
+    /// - [`datetime`](crate::ebook::metadata::datetime) module for parsing details.
     pub fn modified(&self) -> Option<DateTime> {
         self.modified_entry()
             .and_then(|entry| DateTime::parse(entry.value()))

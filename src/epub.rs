@@ -492,6 +492,20 @@ impl Epub {
     /// # Ok(())
     /// # }
     /// ```
+    /// - Opening from a shared [`Vec`]:
+    /// ```no_run
+    /// # use rbook::epub::Epub;
+    /// # use std::error::Error;
+    /// # use std::io::Cursor;
+    /// use std::sync::Arc;
+    /// # fn main() -> Result<(), Box<dyn Error>> {
+    /// # let epub_bytes = Vec::new();
+    ///
+    /// let shared: Arc<[u8]> = Arc::from(epub_bytes);
+    /// let epub = Epub::read(Cursor::new(Arc::clone(&shared)))?;
+    /// # Ok(())
+    /// # }
+    /// ```
     /// - Opening from a [`File`](std::fs::File) directly:
     /// ```no_run
     /// # use rbook::epub::Epub;
