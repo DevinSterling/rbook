@@ -258,7 +258,7 @@ impl<'parser, 'a> PackageParser<'parser, 'a> {
     ) -> ParserResult<Option<XmlStartElement<'a>>> {
         for event in reader {
             return Ok(Some(match event? {
-                XmlEvent::Start(el) if el.is_local_name(child) => el,
+                XmlEvent::Start(el) if el.local_name() == child => el,
                 XmlEvent::End(el) if el.local_name().as_ref() == parent => break,
                 _ => continue,
             }));

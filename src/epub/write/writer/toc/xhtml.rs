@@ -276,13 +276,13 @@ impl<'ebook> StylesheetExtractor<'ebook> {
             let XmlEvent::Start(el) = event else {
                 continue;
             };
-            if el.is_local_name(xhtml::LINK)
+            if el.local_name() == xhtml::LINK
                 && let Ok(Some(rel)) = el.get_attribute_raw(xhtml::REL)
                 && rel == xhtml::STYLESHEET
                 && let Ok(Some(stylesheet)) = el.get_attribute(xhtml::HREF)
             {
                 return Some(stylesheet);
-            } else if el.is_local_name(xhtml::BODY) {
+            } else if el.local_name() == xhtml::BODY {
                 return None;
             }
         }

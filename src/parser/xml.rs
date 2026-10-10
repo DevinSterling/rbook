@@ -257,10 +257,6 @@ impl<'a> XmlStartElement<'a> {
         self.element.local_name().into_inner()
     }
 
-    pub(crate) fn is_local_name(&self, target_local_name: &str) -> bool {
-        self.local_name() == target_local_name
-    }
-
     pub(crate) fn is_prefix(&self, target_prefix: &str) -> bool {
         self.element
             .name()

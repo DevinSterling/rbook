@@ -71,7 +71,7 @@ impl TocParser<'_, '_> {
     }
 
     fn push_ncx_child(&mut self, el: &XmlStartElement<'_>) -> ParserResult<()> {
-        let is_page_target = el.is_local_name(ncx::PAGE_TARGET);
+        let is_page_target = el.local_name() == ncx::PAGE_TARGET;
 
         extract_attributes! {
             el.attributes(),

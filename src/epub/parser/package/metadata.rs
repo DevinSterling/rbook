@@ -317,7 +317,7 @@ impl<'package, 'a> MetadataParser<'package, 'a> {
     fn extract_kind(el: &XmlStartElement) -> ParserResult<Option<EpubMetaEntryKind>> {
         Ok(if el.is_prefix(dc::PREFIX) {
             Some(EpubMetaEntryKind::DublinCore {})
-        } else if el.is_local_name(opf::META) {
+        } else if el.local_name() == opf::META {
             // Empty tag <meta name="" content=""/>:       EPUB 2
             // Start tag <meta name="" content=""></meta>: EPUB 2
             // Start tag <meta property="">...</meta>:     EPUB 3
@@ -329,7 +329,7 @@ impl<'package, 'a> MetadataParser<'package, 'a> {
                     EpubVersion::EPUB2
                 },
             })
-        } else if el.is_local_name(opf::LINK) {
+        } else if el.local_name() == opf::LINK {
             Some(EpubMetaEntryKind::Link {})
         } else {
             None

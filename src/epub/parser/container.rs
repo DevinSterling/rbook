@@ -11,7 +11,7 @@ impl EpubParser<'_> {
     pub(super) fn parse_container(&self, data: &[u8]) -> ParserResult<String> {
         for event in XmlReader::from_bytes(self.xml_config(), data) {
             let el = match event? {
-                XmlEvent::Start(el) if el.is_local_name(ocf::ROOT_FILE) => el,
+                XmlEvent::Start(el) if el.local_name() == ocf::ROOT_FILE => el,
                 _ => continue,
             };
             extract_attributes! {
