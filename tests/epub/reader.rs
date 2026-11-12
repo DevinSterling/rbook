@@ -1,6 +1,6 @@
-use crate::epub::util::TestEpub::Epub3File;
+use crate::epub::util::TestEpub::{Epub3File, Epub3Relaxed};
 use rbook::epub::reader::{EpubReaderContent, LinearBehavior};
-use rbook::reader::errors::ReaderResult;
+use rbook::reader::errors::{ReaderError, ReaderResult};
 use wasm_bindgen_test::wasm_bindgen_test;
 
 #[test]
@@ -109,6 +109,62 @@ fn test_reader_into_content_integrity() -> ReaderResult<()> {
         assert_eq!(resource, entry_a.into_string());
         assert_eq!(resource.as_bytes(), entry_b.into_bytes());
     }
+
+    Ok(())
+}
+
+#[test]
+fn test_reader_unresolved_spine_entries() -> ReaderResult<()> {
+    let epub = Epub3Relaxed.build(|b| b.strict(false));
+
+    // By default, unresolved spine entries are retained and yield an error
+    let results: Vec<_> = epub.reader().collect();
+    assert_eq!(3, results.len());
+    assert!(matches!(results[0], Err(ReaderError::Format(_))));
+    assert_eq!(
+        "chapter",
+        results[1].as_ref().unwrap().spine_entry().idref()
+    );
+    assert!(matches!(results[2], Err(ReaderError::Format(_))));
+
+    #[rustfmt::skip]
+    let linear_behaviors = [
+        (LinearBehavior::Original, vec!["chapter"]),
+        (LinearBehavior::LinearOnly, vec!["chapter"]),
+        (LinearBehavior::NonLinearOnly, vec![]),
+        (LinearBehavior::PrependNonLinear, vec!["chapter"]),
+        (LinearBehavior::AppendNonLinear, vec!["chapter"]),
+    ];
+
+    for (linear_behavior, cases) in linear_behaviors {
+        let mut reader = epub
+            .reader_builder()
+            .linear_behavior(linear_behavior)
+            .skip_unresolved(true)
+            .create();
+
+        assert_eq!(cases.len(), reader.len());
+        assert_eq!(cases.len(), reader.size_hint().0);
+
+        for (position, case) in cases.into_iter().enumerate() {
+            let content = reader.next().unwrap()?;
+            assert_eq!(case, content.spine_entry().idref());
+            assert_eq!(position, content.position());
+        }
+        assert!(reader.next().is_none());
+    }
+
+    // Skipped entries are not addressable
+    let mut reader = epub.reader_builder().skip_unresolved(true).create();
+    assert_eq!(0, reader.seek("chapter")?);
+    assert!(matches!(
+        reader.seek("cover"),
+        Err(ReaderError::NoMapping(_))
+    ));
+    assert!(matches!(
+        reader.get(1),
+        Err(ReaderError::OutOfBounds { .. })
+    ));
 
     Ok(())
 }

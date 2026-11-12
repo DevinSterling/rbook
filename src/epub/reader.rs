@@ -28,33 +28,42 @@ enum ReaderEntries<'ebook> {
 }
 
 impl<'ebook> ReaderEntries<'ebook> {
-    fn new(epub: &'ebook Epub, linearity: LinearBehavior) -> Self {
+    fn new(epub: &'ebook Epub, config: &EpubReaderConfig) -> Self {
+        let linearity = config.linear_behavior;
+        let skip_unresolved = config.skip_unresolved;
+        let is_retained =
+            move |entry: &EpubSpineEntry<'_>| !skip_unresolved || entry.manifest_entry().is_some();
+        let all_retained = !skip_unresolved || epub.spine().iter().all(|e| is_retained(&e));
+
         match linearity {
             /* No allocation for common cases */
-            LinearBehavior::Original => Self::Original(epub),
+            LinearBehavior::Original if all_retained => Self::Original(epub),
             // If there are only linear entries, use the original slice
             LinearBehavior::LinearOnly
             | LinearBehavior::PrependNonLinear
             | LinearBehavior::AppendNonLinear
-                if epub.spine.entries.iter().all(|entry| entry.linear) =>
+                if all_retained && epub.spine.entries.iter().all(|entry| entry.linear) =>
             {
                 Self::Original(epub)
             }
             // This case may very well never happen
             LinearBehavior::NonLinearOnly
-                if epub.spine.entries.iter().all(|entry| !entry.linear) =>
+                if all_retained && epub.spine.entries.iter().all(|entry| !entry.linear) =>
             {
                 Self::Original(epub)
             }
 
             /* Allocate */
+            LinearBehavior::Original => {
+                Self::Reordered(epub.spine().iter().filter(is_retained).collect())
+            }
             LinearBehavior::LinearOnly | LinearBehavior::NonLinearOnly => {
                 let predicate = linearity == LinearBehavior::LinearOnly;
 
                 Self::Reordered(
                     epub.spine()
                         .iter()
-                        .filter(|entry| entry.is_linear() == predicate)
+                        .filter(|entry| entry.is_linear() == predicate && is_retained(entry))
                         .collect(),
                 )
             }
@@ -64,8 +73,16 @@ impl<'ebook> ReaderEntries<'ebook> {
                 let append = linearity == LinearBehavior::AppendNonLinear;
 
                 // If appending, linear goes first
-                result.extend(spine.iter().filter(|e| e.is_linear() == append));
-                result.extend(spine.iter().filter(|e| e.is_linear() != append));
+                result.extend(
+                    spine
+                        .iter()
+                        .filter(|e| e.is_linear() == append && is_retained(e)),
+                );
+                result.extend(
+                    spine
+                        .iter()
+                        .filter(|e| e.is_linear() != append && is_retained(e)),
+                );
                 Self::Reordered(result)
             }
         }
@@ -158,7 +175,7 @@ pub struct EpubReader<'ebook> {
 
 impl<'ebook> EpubReader<'ebook> {
     pub(super) fn new(epub: &'ebook Epub, config: EpubReaderConfig) -> Self {
-        let entries = ReaderEntries::new(epub, config.linear_behavior);
+        let entries = ReaderEntries::new(epub, &config);
 
         EpubReader {
             rewrite: config.rewrite,
@@ -496,6 +513,8 @@ pub enum LinearBehavior {
 pub(super) struct EpubReaderConfig {
     /// See [`EpubReaderOptions::linear_behavior`]
     linear_behavior: LinearBehavior,
+    /// See [`EpubReaderOptions::skip_unresolved`]
+    skip_unresolved: bool,
     rewrite: EpubRewriteOptions,
 }
 
@@ -503,6 +522,7 @@ impl Default for EpubReaderConfig {
     fn default() -> Self {
         Self {
             linear_behavior: LinearBehavior::Original,
+            skip_unresolved: false,
             rewrite: EpubRewriteOptions::default(),
         }
     }
@@ -526,6 +546,7 @@ impl Default for EpubReaderConfig {
 /// ## Ordering
 /// - [`linear_behavior`](EpubReaderOptions::linear_behavior)
 ///   (Default: [`LinearBehavior::Original`])
+/// - [`skip_unresolved`](EpubReaderOptions::skip_unresolved) (Default: `false`)
 /// ## Modification
 /// - [`rewrite`](EpubReaderOptions::rewrite) (Default: [`EpubRewriteOptions::default`])
 ///
@@ -582,6 +603,23 @@ impl<T> EpubReaderOptions<T> {
     /// Default: [`LinearBehavior::Original`]
     pub fn linear_behavior(mut self, linear_behavior: LinearBehavior) -> Self {
         self.config.linear_behavior = linear_behavior;
+        self
+    }
+
+    /// When set to `true`, spine entries that do not reference an existing
+    /// [`EpubManifestEntry`] (an `idref` with no matching manifest `id`) are omitted.
+    ///
+    /// Omitted entries do not count towards [`EpubReader::len`] or
+    /// [`EpubReaderContent::position`], and cannot be retrieved by
+    /// [`ReaderKey`] (e.g., [`EpubReader::seek`]).
+    ///
+    /// This is useful for malformed EPUBs opened with
+    /// [`strict`](crate::epub::EpubOpenOptions::strict) mode disabled,
+    /// where such entries would otherwise yield an error when read.
+    ///
+    /// Default: `false`
+    pub fn skip_unresolved(mut self, skip: bool) -> Self {
+        self.config.skip_unresolved = skip;
         self
     }
 
