@@ -118,22 +118,24 @@ fn test_reader_unresolved_spine_entries() -> ReaderResult<()> {
     let epub = Epub3Relaxed.build(|b| b.strict(false));
 
     // By default, unresolved spine entries are retained and yield an error
-    let results: Vec<_> = epub.reader().collect();
-    assert_eq!(3, results.len());
+    let results: Vec<_> = epub
+        .reader()
+        .map(|result| result.map(|content| content.spine_entry().idref()))
+        .collect();
+
+    assert_eq!(4, results.len());
     assert!(matches!(results[0], Err(ReaderError::Format(_))));
-    assert_eq!(
-        "chapter",
-        results[1].as_ref().unwrap().spine_entry().idref()
-    );
+    assert_eq!("chapter", results[1].as_deref().unwrap());
     assert!(matches!(results[2], Err(ReaderError::Format(_))));
+    assert_eq!("notes", results[3].as_deref().unwrap());
 
     #[rustfmt::skip]
     let linear_behaviors = [
-        (LinearBehavior::Original, vec!["chapter"]),
+        (LinearBehavior::Original, vec!["chapter", "notes"]),
         (LinearBehavior::LinearOnly, vec!["chapter"]),
-        (LinearBehavior::NonLinearOnly, vec![]),
-        (LinearBehavior::PrependNonLinear, vec!["chapter"]),
-        (LinearBehavior::AppendNonLinear, vec!["chapter"]),
+        (LinearBehavior::NonLinearOnly, vec!["notes"]),
+        (LinearBehavior::PrependNonLinear, vec!["notes", "chapter"]),
+        (LinearBehavior::AppendNonLinear, vec!["chapter", "notes"]),
     ];
 
     for (linear_behavior, cases) in linear_behaviors {
@@ -162,7 +164,7 @@ fn test_reader_unresolved_spine_entries() -> ReaderResult<()> {
         Err(ReaderError::NoMapping(_))
     ));
     assert!(matches!(
-        reader.get(1),
+        reader.get(2),
         Err(ReaderError::OutOfBounds { .. })
     ));
 

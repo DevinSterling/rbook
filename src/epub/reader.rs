@@ -31,61 +31,63 @@ impl<'ebook> ReaderEntries<'ebook> {
     fn new(epub: &'ebook Epub, config: &EpubReaderConfig) -> Self {
         let linearity = config.linear_behavior;
         let skip_unresolved = config.skip_unresolved;
-        let is_retained =
-            move |entry: &EpubSpineEntry<'_>| !skip_unresolved || entry.manifest_entry().is_some();
-        let all_retained = !skip_unresolved || epub.spine().iter().all(|e| is_retained(&e));
+        let spine = epub.spine();
 
-        match linearity {
-            /* No allocation for common cases */
-            LinearBehavior::Original if all_retained => Self::Original(epub),
-            // If there are only linear entries, use the original slice
-            LinearBehavior::LinearOnly
-            | LinearBehavior::PrependNonLinear
-            | LinearBehavior::AppendNonLinear
-                if all_retained && epub.spine.entries.iter().all(|entry| entry.linear) =>
-            {
-                Self::Original(epub)
-            }
-            // This case may very well never happen
-            LinearBehavior::NonLinearOnly
-                if all_retained && epub.spine.entries.iter().all(|entry| !entry.linear) =>
-            {
-                Self::Original(epub)
-            }
+        // Keeps spine entries if:
+        // - Matches the requested linearity
+        // - Is resolvable if `skip_unresolved` is enabled
+        let keep = |entry: &EpubSpineEntry<'_>| {
+            let matches_linearity = match linearity {
+                LinearBehavior::LinearOnly => entry.is_linear(),
+                LinearBehavior::NonLinearOnly => !entry.is_linear(),
+                _ => true,
+            };
 
-            /* Allocate */
-            LinearBehavior::Original => {
-                Self::Reordered(epub.spine().iter().filter(is_retained).collect())
-            }
-            LinearBehavior::LinearOnly | LinearBehavior::NonLinearOnly => {
-                let predicate = linearity == LinearBehavior::LinearOnly;
+            matches_linearity && (!skip_unresolved || entry.manifest_entry().is_some())
+        };
 
-                Self::Reordered(
-                    epub.spine()
-                        .iter()
-                        .filter(|entry| entry.is_linear() == predicate && is_retained(entry))
-                        .collect(),
-                )
-            }
-            LinearBehavior::PrependNonLinear | LinearBehavior::AppendNonLinear => {
-                let spine = epub.spine();
-                let mut result = Vec::with_capacity(spine.len());
-                let append = linearity == LinearBehavior::AppendNonLinear;
+        // The linearity of the group placed first for append/prepend operations,
+        // which reorders entries into two distinct groups.
+        // All other variants retain their relative order.
+        let linear_comes_first = match linearity {
+            // Linear entries first
+            LinearBehavior::AppendNonLinear => Some(true),
+            // Non-linear entries first
+            LinearBehavior::PrependNonLinear => Some(false),
+            // Retain relative order
+            _ => None,
+        };
+        // Whether the spine is already grouped as required
+        let already_grouped = linear_comes_first.is_none_or(|linear_first| {
+            epub.spine
+                .entries
+                .iter()
+                // NOTE: An already grouped spine never has a `true` before a `false`.
+                // The key is `false` for entries in the first group and `true` for the second.
+                .is_sorted_by_key(|entry| entry.linear != linear_first)
+        });
 
-                // If appending, linear goes first
-                result.extend(
-                    spine
-                        .iter()
-                        .filter(|e| e.is_linear() == append && is_retained(e)),
-                );
-                result.extend(
-                    spine
-                        .iter()
-                        .filter(|e| e.is_linear() != append && is_retained(e)),
-                );
-                Self::Reordered(result)
-            }
+        // No allocation for common cases
+        if already_grouped && spine.iter().all(|e| keep(&e)) {
+            return Self::Original(epub);
         }
+
+        // Allocate
+        let mut entries = Vec::with_capacity(spine.len());
+
+        match linear_comes_first {
+            Some(linear_first) => {
+                let group = |linear: bool, entry: &EpubSpineEntry<'_>| {
+                    entry.is_linear() == linear && keep(entry)
+                };
+
+                entries.extend(spine.iter().filter(|entry| group(linear_first, entry)));
+                entries.extend(spine.iter().filter(|entry| group(!linear_first, entry)));
+            }
+            None => entries.extend(spine.iter().filter(|e| keep(e))),
+        }
+
+        Self::Reordered(entries)
     }
 
     fn get(&self, index: usize) -> Option<EpubSpineEntry<'ebook>> {

@@ -22,11 +22,13 @@
         <!-- `../../` resolves to outside the EPUB container, so it's treated as `../` instead -->
         <item href="../../file%20name%20with%20spaces.css" id="style" media-type="text/css"/>
         <item href="chapter.xhtml" id="chapter" media-type="application/xhtml+xml"/>
+        <item href="notes.xhtml" id="notes" media-type="application/xhtml+xml"/>
     </manifest>
     <spine toc="nav" page-progression-direction="rtl">
         <!-- References a non-existent manifest entry -->
         <itemref idref="cover"/>
         <itemref idref="chapter"/>
         <itemref idref="missing" linear="no"/>
+        <itemref idref="notes" linear="no" />
     </spine>
 </package>
