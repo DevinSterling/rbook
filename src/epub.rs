@@ -539,6 +539,8 @@ impl Epub {
     /// let mut epub_reader = epub.reader_builder()
     ///     // Omit linear readable entries
     ///     .linear_behavior(LinearBehavior::NonLinearOnly)
+    ///     // Omit malformed spine entries that do not reference an existing manifest entry
+    ///     .skip_unresolved(true)
     ///     .create();
     ///
     /// for entry in epub_reader {

@@ -145,7 +145,8 @@ impl EpubRewriteOptions {
     /// Passing [`None`] clears the injected CSS.
     ///
     /// # Note
-    /// - The CSS is injected as the last `style` element within the `head` section.
+    /// - The CSS is injected as the last `style` element
+    ///   within the `head` section, wrapped in CDATA.
     ///
     /// # Examples
     /// - Injecting CSS to override anchor colors for an [`EpubReader`](crate::epub::reader::EpubReader):

@@ -292,7 +292,7 @@ impl<'ebook> Scheme<'ebook> {
     }
 
     /// The authority or registry that defines a [`code`](Self::code)
-    /// (e.g. `BCP 47`, `BISAC` `marc:relators`), or [`None`] if unknown.
+    /// (e.g. `BCP 47`, `BISAC`, `marc:relators`), or [`None`] if unknown.
     pub fn source(&self) -> Option<&'ebook str> {
         self.source
     }

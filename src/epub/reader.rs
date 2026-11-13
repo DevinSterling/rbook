@@ -153,7 +153,10 @@ impl PartialEq for ReaderEntries<'_> {
 /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
 /// let epub = Epub::open("tests/ebooks/example_epub")?;
 /// let mut reader = epub.reader_builder()
-///     .linear_behavior(LinearBehavior::LinearOnly) // Omit non-linear readable entries
+///     // Omit non-linear readable entries
+///     .linear_behavior(LinearBehavior::LinearOnly)
+///     // Omit malformed spine entries that do not reference an existing manifest entry
+///     .skip_unresolved(true)
 ///     .create();
 /// # let mut count = 0;
 ///
@@ -566,6 +569,7 @@ impl Default for EpubReaderConfig {
 /// let epub = Epub::open("tests/ebooks/example_epub")?;
 /// let mut reader = epub.reader_builder() // returns EpubReaderOptions
 ///     .linear_behavior(LinearBehavior::AppendNonLinear)
+///     .skip_unresolved(true)
 ///     .create();
 /// # Ok(())
 /// # }

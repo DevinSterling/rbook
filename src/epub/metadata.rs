@@ -1103,7 +1103,7 @@ impl<'ebook> EpubMetaEntry<'ebook> {
     ///
     /// // Occasionally, metadata entries have refinements:
     /// let refinement1 = author.refinements().iter().next().unwrap();
-    /// // All refinement refers to their "parent" via id:
+    /// // Refinements refer to their "parent" via id:
     /// assert_eq!(Some("author"), refinement1.refines());
     ///
     /// // Inspecting a refinement's property and value:

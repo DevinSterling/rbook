@@ -1121,6 +1121,10 @@ impl<'ebook> EpubManifestMut<'ebook> {
     ///
     /// Prefer [`Self::retain`] with a negated predicate if the returned iterator is not needed.
     ///
+    /// # Note
+    /// Archive access is not available for entries yielded within the closure,
+    /// so calling [`EpubManifestEntry::read_bytes`] and related methods will return an error.
+    ///
     /// # See Also
     /// - [`Epub::cleanup`] to remove orphaned entries.
     ///
