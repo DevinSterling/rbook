@@ -1,4 +1,15 @@
 # Changelog
+## 0.7.13 (2026-11-12)
+### Additions　**＋**
+- New method `EpubReaderOptions::skip_unresolved` to omit malformed spine entries
+  that do not reference an existing manifest entry \[[#7](https://github.com/DevinSterling/rbook/pull/7)].
+
+### Changes　**⟳**
+- Optimize `EpubReader` creation.
+- Update `zip` dependency: 9.0.1 → 9.5.1
+- Update `wasm-bindgen-test` dev dependency: 0.3.79 → 0.3.80
+- Refine documentation for enhanced clarity.
+
 ## 0.7.12 (2026-10-10)
 ### Changes　**⟳**
 - Migrate to `zip` 9.0.1, improving `Epub` opening performance.
