@@ -24,10 +24,10 @@ thiserror = "2.0.21"
 percent-encoding = "2.3.2"
 indexmap = "2.14.2"
 quick-xml = { version = "0.42.0", features = ["escape-html"] }
-zip = { version = "9.0.1", default-features = false, features = ["deflate-flate2-zlib-rs"] }
+zip = { version = "9.5.1", default-features = false, features = ["deflate-flate2-zlib-rs"] }
 
 [dev-dependencies]
-wasm-bindgen-test = "0.3.79"
+wasm-bindgen-test = "0.3.80"
 
 [lints.rust]
 unsafe_code = "forbid"
