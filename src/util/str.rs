@@ -14,12 +14,14 @@ impl StringExt for String {
 }
 
 pub(crate) trait StrExt {
-    fn starts_with_ignore_case(&self, start: &str) -> bool;
+    fn starts_with_ignore_ascii_case(&self, start: &str) -> bool;
 }
 
 impl StrExt for str {
-    fn starts_with_ignore_case(&self, start: &str) -> bool {
-        self.len() >= start.len() && self[..start.len()].eq_ignore_ascii_case(start)
+    fn starts_with_ignore_ascii_case(&self, start: &str) -> bool {
+        self.as_bytes()
+            .get(..start.len())
+            .is_some_and(|prefix| prefix.eq_ignore_ascii_case(start.as_bytes()))
     }
 }
 
@@ -91,6 +93,34 @@ mod tests {
             owned.trim_in_place();
 
             assert_eq!(expected, owned);
+        }
+    }
+
+    #[test]
+    fn starts_with_ascii_ignore_case() {
+        #[rustfmt::skip]
+        let expected = [
+            (true,  "xyz", "XYZ"),
+            (true,  "AbCxyz", "aBc"),
+            (false, "XyZ", " xYz"),
+            (true,  "", ""),
+            (false, "", "abc"),
+            (false, "aBc", "abCD"),
+            (true,  "XⓎz", "xⓎZ"),
+            (true,  "å/B/ć/ḋ/ê", "å/b/ć"),
+            (false, "Å/ƀ/ć", "å/ƀ/ć"),
+            (false, "éabc", "e"),
+            (false, "😀abc", "abc"),
+            (true,  "日本語", "日本"),
+            (false, "日本語", "xyz"),
+        ];
+
+        for (expected, a, b) in expected {
+            assert_eq!(
+                expected,
+                a.starts_with_ignore_ascii_case(b),
+                "Expected {expected}, a=`{a}`, b=`{b}`",
+            );
         }
     }
 

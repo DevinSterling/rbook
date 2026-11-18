@@ -661,8 +661,8 @@ impl ResourceKind<'_> {
 
         let subtype = self.subtype();
         // Legacy/obsolete MIME handling
-        subtype.starts_with_ignore_case("font-")
-            || subtype.starts_with_ignore_case("x-font")
+        subtype.starts_with_ignore_ascii_case("font-")
+            || subtype.starts_with_ignore_ascii_case("x-font")
             // Special cases regarding EPUB core media
             || subtype.eq_ignore_ascii_case("vnd.ms-fontobject")
             || subtype.eq_ignore_ascii_case("vnd.ms-opentype")
