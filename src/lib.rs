@@ -81,6 +81,7 @@
 //! # use rbook::Epub;
 //! let epub = Epub::options()
 //!     .strict(true) // Enable strict checks (`false` by default)
+//!     .max_resource_bytes(8 * 1024) // Limit resource reads to 8 KiB (no limit by default)
 //!     // If only metadata is needed, skipping helps quicken parsing time and reduce space.
 //!     .skip_toc(true) // Skips ToC-related parsing, such as toc.ncx (`false` by default)
 //!     .skip_manifest(true) // Skips manifest-related parsing (`false` by default)

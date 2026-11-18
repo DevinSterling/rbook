@@ -418,6 +418,7 @@ impl Epub {
     ///     .skip_metadata(true)
     ///     .skip_spine(true)
     ///     .preferred_toc(EpubVersion::EPUB2)
+    ///     .max_resource_bytes(8 * 1024)
     ///     .open("tests/ebooks/example_epub")?;
     /// # Ok(())
     /// # }
@@ -940,7 +941,8 @@ impl PartialEq for Epub {
 /// options.retain_variants(true)
 ///        .strict(true)
 ///        .skip_toc(true)
-///        .preferred_toc(EpubVersion::EPUB2);
+///        .preferred_toc(EpubVersion::EPUB2)
+///        .max_resource_bytes(16 * 1024);
 ///
 /// // Opening multiple EPUBs with the same options
 /// let epub1 = options.open("example.epub")?;

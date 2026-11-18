@@ -216,9 +216,9 @@ pub enum EpubError {
     ////////////////////////////////////////////////////////////////////////////////
     // Within `toc.ncx/xhtml`
     ////////////////////////////////////////////////////////////////////////////////
-    /// The `table of contents` file contains no `navMap` or `nav` element.
+    /// The Table of Content (ToC) file contains no `navMap` or `nav` element.
     ///
-    /// Error Source: The table of contents (ToC) `.ncx` or `.xhtml` file.
+    /// Error Source: The ToC `.ncx` or `.xhtml` file.
     #[error("No navigation structure (nav or navMap) found in the ToC resource")]
     NoTocFound,
 }

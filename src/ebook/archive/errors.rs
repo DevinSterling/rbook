@@ -11,7 +11,7 @@ pub type ArchiveResult<T> = Result<T, ArchiveError>;
 #[derive(thiserror::Error, Debug)]
 pub enum ArchiveError {
     /// The content exists (such as a resource contained within an archive),
-    /// although is unable to be read due to invalid utf8.
+    /// although is unable to be read due to invalid UTF-8.
     ///
     /// This can occur when requesting to read a resource by string.
     #[error("[InvalidUtf8Resource - `{resource}`]: Resource value cannot be read as UTF-8")]
