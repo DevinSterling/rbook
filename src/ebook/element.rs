@@ -48,6 +48,32 @@ impl<'a> Href<'a> {
         uri::decode(self.0)
     }
 
+    /// The href with any leading root separator (`/`) omitted.
+    ///
+    /// This is useful when working with resource paths
+    /// where an absolute leading slash indicating the root is not desired.
+    ///
+    /// # Examples
+    /// - Omitting the root separator:
+    /// ```
+    /// # use rbook::Epub;
+    /// # fn main() -> rbook::ebook::errors::EbookResult<()> {
+    /// let epub = Epub::open("tests/ebooks/example_epub")?;
+    ///
+    /// let mut package_href = epub.package().location();
+    /// assert_eq!("/EPUB/example.opf", package_href.as_str());
+    /// assert_eq!("EPUB/example.opf", package_href.rootless());
+    ///
+    /// let mut cover_href = epub.manifest().cover_image().unwrap().href();
+    /// assert_eq!("/EPUB/img/cover.webm", cover_href.as_str());
+    /// assert_eq!("EPUB/img/cover.webm", cover_href.rootless());
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn rootless(&self) -> Self {
+        Self(self.0.trim_start_matches(uri::SEPARATOR))
+    }
+
     /// The parent directory, if present.
     ///
     /// # Examples
