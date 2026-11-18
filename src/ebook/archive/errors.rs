@@ -56,4 +56,16 @@ pub enum ArchiveError {
         /// The path responsible for triggering the error, if applicable.
         path: Option<PathBuf>,
     },
+
+    /// The maximum allowed number of bytes has been exceeded for a given resource.
+    ///
+    /// By default, there is no limit unless specified (e.g.,
+    /// [`EpubOpenOptions::max_resource_bytes`](crate::epub::EpubOpenOptions::max_resource_bytes)).
+    #[error("[MaxBytesExceeded - `{resource}`]: Maximum number of bytes exceeded ({limit})")]
+    MaxBytesExceeded {
+        /// The maximum allowed number of bytes.
+        limit: u64,
+        /// The [`Resource`] that exceeds the limit.
+        resource: Resource<'static>,
+    },
 }

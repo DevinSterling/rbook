@@ -1,5 +1,7 @@
 use crate::ebook::archive::errors::ArchiveResult;
-use crate::ebook::archive::{self, Archive, ArchiveError};
+use crate::ebook::archive::{
+    self, Archive, ArchiveConfig, ArchiveError, copy_resource_with_limit, io_to_cannot_read_error,
+};
 use crate::ebook::resource::Resource;
 use std::fs::{self, File};
 use std::io::{self, Write};
@@ -9,12 +11,15 @@ use std::path::{Path, PathBuf};
 use {super::ResourceKeySet, crate::ebook::resource::ResourceKey, crate::util, std::borrow::Cow};
 
 #[derive(Debug)]
-pub(crate) struct DirectoryArchive(PathBuf);
+pub(crate) struct DirectoryArchive {
+    config: ArchiveConfig,
+    base_dir: PathBuf,
+}
 
 impl DirectoryArchive {
-    pub(crate) fn new(file: &Path) -> ArchiveResult<Self> {
+    pub(crate) fn new(config: ArchiveConfig, file: &Path) -> ArchiveResult<Self> {
         match file.canonicalize() {
-            Ok(dir) if dir.is_dir() => Ok(Self(dir)),
+            Ok(base_dir) if base_dir.is_dir() => Ok(Self { config, base_dir }),
             Ok(_) => Err(ArchiveError::UnreadableArchive {
                 path: Some(file.to_path_buf()),
                 source: io::Error::from(io::ErrorKind::NotADirectory),
@@ -36,7 +41,9 @@ impl Archive for DirectoryArchive {
             )
         }
 
-        let path = self.0.join(archive::extract_resource_path(resource)?);
+        let path = self
+            .base_dir
+            .join(archive::extract_resource_path(resource)?);
         let resolved = match path.canonicalize() {
             Ok(path) => path,
             Err(error) if is_absent(&error) => return Ok(false),
@@ -44,7 +51,7 @@ impl Archive for DirectoryArchive {
         };
 
         // Path traversal mitigation
-        if !resolved.starts_with(&self.0) {
+        if !resolved.starts_with(&self.base_dir) {
             return Ok(false);
         }
 
@@ -59,7 +66,9 @@ impl Archive for DirectoryArchive {
     }
 
     fn copy_resource(&self, resource: &Resource, writer: &mut dyn Write) -> ArchiveResult<u64> {
-        let path = self.0.join(archive::extract_resource_path(resource)?);
+        let path = self
+            .base_dir
+            .join(archive::extract_resource_path(resource)?);
         let resolved = path
             .canonicalize()
             .map_err(|source| ArchiveError::InvalidResource {
@@ -68,7 +77,7 @@ impl Archive for DirectoryArchive {
             })?;
 
         // Path traversal mitigation
-        if !resolved.starts_with(&self.0) || !resolved.is_file() {
+        if !resolved.starts_with(&self.base_dir) || !resolved.is_file() {
             return Err(ArchiveError::InvalidResource {
                 source: io::Error::new(
                     io::ErrorKind::NotFound,
@@ -79,10 +88,14 @@ impl Archive for DirectoryArchive {
         }
 
         match File::open(resolved) {
-            Ok(mut file) => io::copy(&mut file, writer),
-            Err(error) => Err(error),
+            Ok(mut file) => copy_resource_with_limit(
+                self.config.max_resource_bytes,
+                resource,
+                &mut file,
+                writer,
+            ),
+            Err(error) => Err(io_to_cannot_read_error(error, resource)),
         }
-        .map_err(|error| io_to_cannot_read_error(error, resource))
     }
 
     #[cfg(feature = "write")]
@@ -135,14 +148,7 @@ impl Archive for DirectoryArchive {
         }
 
         let mut set = ResourceKeySet::new();
-        traverse(&mut set, &self.0, &self.0)?;
+        traverse(&mut set, &self.base_dir, &self.base_dir)?;
         Ok(set)
-    }
-}
-
-fn io_to_cannot_read_error(source: io::Error, resource: &Resource<'_>) -> ArchiveError {
-    ArchiveError::CannotRead {
-        resource: resource.as_static(),
-        source,
     }
 }

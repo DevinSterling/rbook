@@ -85,7 +85,7 @@ pub(crate) mod ocf {
     pub(crate) use write::*;
 
     // Paths
-    pub(crate) const CONTAINER_PATH: &str = "META-INF/container.xml";
+    pub(crate) const CONTAINER_PATH: &str = "/META-INF/container.xml";
 
     // Elements
     pub(crate) const ROOT_FILE: &str = "rootfile";

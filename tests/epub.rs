@@ -2,6 +2,7 @@
 mod epub {
     mod manifest;
     mod metadata;
+    mod options;
     mod reader;
     mod rewrite;
     mod spine;

@@ -15,7 +15,7 @@ use crate::ebook::resource::{Resource, ResourceKey};
 use crate::util;
 use std::fmt::Debug;
 use std::fs;
-use std::io::{self, Write};
+use std::io::{self, Read, Write};
 
 #[cfg(feature = "write")]
 use {
@@ -23,6 +23,21 @@ use {
     std::borrow::Cow,
     write::{ArchiveOverlay, OverlayResource, ResourceKeySet},
 };
+
+#[derive(Copy, Clone, Debug)]
+pub(crate) struct ArchiveConfig {
+    /// Maximum number of bytes allowed per resource.
+    /// Exceeding the limit results in an error.
+    pub(crate) max_resource_bytes: u64,
+}
+
+impl Default for ArchiveConfig {
+    fn default() -> Self {
+        Self {
+            max_resource_bytes: u64::MAX,
+        }
+    }
+}
 
 pub(crate) trait Archive: util::sync::SendAndSync {
     fn contains_resource(&self, resource: &Resource) -> ArchiveResult<bool>;
@@ -173,15 +188,22 @@ impl ResourceProvider<'_> {
 ///
 /// If it is, the contents can be accessed directly,
 /// which makes using a zip file unnecessary.
-pub(crate) fn get_archive(path: &std::path::Path) -> ArchiveResult<Box<dyn Archive>> {
+pub(crate) fn get_archive(
+    config: ArchiveConfig,
+    path: &std::path::Path,
+) -> ArchiveResult<Box<dyn Archive>> {
     Ok(if path.is_file() {
         let file = fs::File::open(path).map_err(|error| ArchiveError::UnreadableArchive {
             source: error,
             path: Some(path.to_path_buf()),
         })?;
-        Box::new(ZipArchive::new(io::BufReader::new(file), Some(path))?)
+        Box::new(ZipArchive::new(
+            config,
+            io::BufReader::new(file),
+            Some(path),
+        )?)
     } else {
-        Box::new(DirectoryArchive::new(path)?)
+        Box::new(DirectoryArchive::new(config, path)?)
     })
 }
 
@@ -200,9 +222,108 @@ fn extract_resource_path<'a>(resource: &'a Resource<'a>) -> ArchiveResult<&'a st
     }
 }
 
+/// Helper to copy a resource with a limit.
+fn copy_resource_with_limit(
+    limit: u64,
+    resource: &Resource<'_>,
+    reader: &mut impl Read,
+    writer: &mut dyn Write,
+) -> ArchiveResult<u64> {
+    let map_err = |error| io_to_cannot_read_error(error, resource);
+
+    if limit == u64::MAX {
+        io::copy(reader, writer).map_err(map_err)
+    } else {
+        let copied = io::copy(&mut reader.take(limit), writer).map_err(map_err)?;
+
+        if copied == limit
+            // Check an extra byte to see if the limit has been exceeded
+            && io::copy(&mut reader.take(1), &mut io::sink()).map_err(map_err)? > 0
+        {
+            Err(ArchiveError::MaxBytesExceeded {
+                resource: resource.as_static(),
+                limit,
+            })
+        } else {
+            Ok(copied)
+        }
+    }
+}
+
+fn io_to_cannot_read_error(source: io::Error, resource: &Resource<'_>) -> ArchiveError {
+    ArchiveError::CannotRead {
+        resource: resource.as_static(),
+        source,
+    }
+}
+
 pub(crate) fn into_utf8_string(resource: &Resource, bytes: Vec<u8>) -> ArchiveResult<String> {
     util::utf::into_utf8_str(bytes).map_err(|source| ArchiveError::InvalidUtf8Resource {
         resource: resource.as_static(),
         source,
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::io::Cursor;
+
+    #[test]
+    fn copy_resource_limit_allows() {
+        let resource = Resource::from("test");
+        let large = vec![b'a'; 10000];
+        #[rustfmt::skip]
+        let cases: &[(&[u8], u64)] = &[
+            (b"", 0),
+            (b"Hello", 5),
+            (b"Hello", 6),
+            (b"Hello", u64::MAX),
+            // Exceeds the internal 8 KiB buffer of `std::io::copy` (Multiple reads)
+            (&large, 10000),
+            (&large, 10001),
+        ];
+
+        for (buffer, max_limit) in cases {
+            let mut reader = Cursor::new(buffer);
+            let mut writer = Vec::new();
+            let copied =
+                copy_resource_with_limit(*max_limit, &resource, &mut reader, &mut writer).unwrap();
+
+            assert_eq!(buffer.len() as u64, copied);
+            assert_eq!(*buffer, writer);
+        }
+    }
+
+    #[test]
+    fn copy_resource_limit_rejects() {
+        let expected_resource = Resource::from("test");
+        let large = vec![b'a'; 10_000];
+        #[rustfmt::skip]
+        let cases: &[(&[u8], u64)] = &[
+            (b"Hello", 0),
+            (b"Hello", 1),
+            (b"Hello", 4),
+            // Exceeds the internal 8 KiB buffer of `std::io::copy` (Multiple reads)
+            (&large, 8192),
+            (&large, 9999),
+        ];
+
+        for (buffer, max_limit) in cases {
+            let mut reader = Cursor::new(buffer);
+            let mut writer = Vec::new();
+
+            let Err(ArchiveError::MaxBytesExceeded { limit, resource }) =
+                copy_resource_with_limit(*max_limit, &expected_resource, &mut reader, &mut writer)
+            else {
+                panic!("expected MaxBytesExceeded");
+            };
+
+            assert_eq!(*max_limit, limit);
+            assert_eq!(expected_resource, resource);
+
+            // Writer must never go beyond the max limit
+            assert!(writer.len() <= *max_limit as usize);
+        }
+    }
 }

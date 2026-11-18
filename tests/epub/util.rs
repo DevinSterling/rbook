@@ -1,5 +1,6 @@
 pub mod xml;
 
+use rbook::ebook::errors::{EbookError, EbookResult};
 use rbook::epub::{Epub, EpubOpenOptions};
 use std::io::Cursor;
 
@@ -9,6 +10,7 @@ const EPUB2_DIR: &str = "tests/ebooks/epub2";
 
 const EPUB3_FILE_BYTES: &[u8] = include_bytes!("../../tests/ebooks/example.epub");
 
+#[derive(Copy, Clone)]
 pub enum TestEpub {
     /// Unzipped Epub `2` + `3` directory
     ///
@@ -36,24 +38,36 @@ impl TestEpub {
     }
 
     pub fn build(self, builder: impl Fn(&mut EpubOpenOptions) -> &mut EpubOpenOptions) -> Epub {
+        self.build_raw(builder).unwrap()
+    }
+
+    pub fn build_fail(
+        self,
+        builder: impl Fn(&mut EpubOpenOptions) -> &mut EpubOpenOptions,
+    ) -> EbookError {
+        self.build_raw(builder).unwrap_err()
+    }
+
+    fn build_raw(
+        self,
+        builder: impl Fn(&mut EpubOpenOptions) -> &mut EpubOpenOptions,
+    ) -> EbookResult<Epub> {
         let mut options = EpubOpenOptions::default();
         builder(&mut options);
 
         // File bytes
         if matches!(self, Self::Epub3File) {
             let cursor = Cursor::new(EPUB3_FILE_BYTES);
-            options.read(cursor).unwrap()
+            options.read(cursor)
         }
         // Directory
         else {
-            options
-                .open(match self {
-                    Self::Epub3Dir => EPUB3_DIR,
-                    Self::Epub3Relaxed => EPUB3_RELAXED,
-                    Self::Epub2Dir => EPUB2_DIR,
-                    _ => panic!("Unexpected test file provided"),
-                })
-                .unwrap()
+            options.open(match self {
+                Self::Epub3Dir => EPUB3_DIR,
+                Self::Epub3Relaxed => EPUB3_RELAXED,
+                Self::Epub2Dir => EPUB2_DIR,
+                _ => panic!("Unexpected test file provided"),
+            })
         }
     }
 }

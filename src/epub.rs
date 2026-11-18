@@ -298,7 +298,7 @@ mod write;
 
 use crate::ebook::Ebook;
 use crate::ebook::archive::zip::ZipArchive;
-use crate::ebook::archive::{Archive, ResourceProvider, get_archive};
+use crate::ebook::archive::{Archive, ArchiveConfig, ResourceProvider, get_archive};
 use crate::ebook::errors::{ArchiveResult, EbookError, EbookResult};
 use crate::ebook::resource::{Resource, ResourceKey};
 use crate::epub::archive::EpubArchive;
@@ -916,6 +916,9 @@ impl PartialEq for Epub {
 /// Configuration to open an [`Epub`] from a source.
 ///
 /// # Options
+/// ## Resource
+/// - [`max_resource_bytes`](EpubOpenOptions::max_resource_bytes)
+///   (Default: [`u64::MAX`]; no limit)
 /// ## Parsing Behavior
 /// - [`strict`](EpubOpenOptions::strict) (Default: `false`)
 /// - [`skip_metadata`](EpubOpenOptions::skip_metadata) (Default: `false`)
@@ -947,7 +950,10 @@ impl PartialEq for Epub {
 /// # }
 /// ```
 #[derive(Clone, Debug, Default)]
-pub struct EpubOpenOptions(EpubParseConfig);
+pub struct EpubOpenOptions {
+    config: EpubParseConfig,
+    archive_config: ArchiveConfig,
+}
 
 impl EpubOpenOptions {
     /// Creates a new builder with default options.
@@ -955,7 +961,7 @@ impl EpubOpenOptions {
     /// # See Also
     /// - [`Epub::options`]
     pub fn new() -> Self {
-        Self(EpubParseConfig::default())
+        Self::default()
     }
 
     /// Opens an [`Epub`] from the given [`Path`] with the specified [options](EpubOpenOptions).
@@ -972,8 +978,8 @@ impl EpubOpenOptions {
     /// - [`Epub::open`] to open an [`Epub`] with default options applied.
     pub fn open(&self, path: impl AsRef<Path>) -> EbookResult<Epub> {
         Epub::parse(
-            &self.0,
-            get_archive(path.as_ref()).map_err(EbookError::Archive)?,
+            &self.config,
+            get_archive(self.archive_config, path.as_ref()).map_err(EbookError::Archive)?,
         )
     }
 
@@ -1002,7 +1008,10 @@ impl EpubOpenOptions {
         &self,
         source: R,
     ) -> EbookResult<Epub> {
-        Epub::parse(&self.0, Box::new(ZipArchive::new(source, None)?))
+        Epub::parse(
+            &self.config,
+            Box::new(ZipArchive::new(self.archive_config, source, None)?),
+        )
     }
 
     //////////////////////////////////
@@ -1025,7 +1034,7 @@ impl EpubOpenOptions {
     ///
     /// Default: [`EpubVersion::Epub3`]
     pub fn preferred_toc(&mut self, version: EpubVersion) -> &mut Self {
-        self.0.preferred_toc = version.as_major();
+        self.config.preferred_toc = version.as_major();
         self
     }
 
@@ -1050,7 +1059,7 @@ impl EpubOpenOptions {
     ///
     /// Default: `false`
     pub fn retain_variants(&mut self, retain: bool) -> &mut Self {
-        self.0.retain_variants = retain;
+        self.config.retain_variants = retain;
         self
     }
 
@@ -1073,7 +1082,7 @@ impl EpubOpenOptions {
     ///
     /// Default: `false`
     pub fn strict(&mut self, strict: bool) -> &mut Self {
-        self.0.strict = strict;
+        self.config.strict = strict;
         self
     }
 
@@ -1093,7 +1102,7 @@ impl EpubOpenOptions {
     ///
     /// Default: `false`
     pub fn skip_metadata(&mut self, skip: bool) -> &mut Self {
-        self.0.parse_metadata = !skip;
+        self.config.parse_metadata = !skip;
         self
     }
 
@@ -1125,7 +1134,7 @@ impl EpubOpenOptions {
     ///
     /// Default: `false`
     pub fn skip_manifest(&mut self, skip: bool) -> &mut Self {
-        self.0.parse_manifest = !skip;
+        self.config.parse_manifest = !skip;
         self
     }
 
@@ -1142,7 +1151,7 @@ impl EpubOpenOptions {
     ///
     /// Default: `false`
     pub fn skip_spine(&mut self, skip: bool) -> &mut Self {
-        self.0.parse_spine = !skip;
+        self.config.parse_spine = !skip;
         self
     }
 
@@ -1155,7 +1164,25 @@ impl EpubOpenOptions {
     ///
     /// Default: `false`
     pub fn skip_toc(&mut self, skip: bool) -> &mut Self {
-        self.0.parse_toc = !skip;
+        self.config.parse_toc = !skip;
+        self
+    }
+
+    /// Sets the maximum number of bytes per resource during parsing and
+    /// whenever retrieving any resource originating from the input EPUB
+    /// (e.g., [`Epub::copy_resource`]).
+    ///
+    /// Exceeding the given `limit` results in
+    /// [`ArchiveError::MaxBytesExceeded`](crate::ebook::errors::ArchiveError::MaxBytesExceeded).
+    ///
+    /// ### Scope
+    /// This limit applies only to resources read from the input EPUB.
+    /// It does not restrict retrieval and the addition of resources added through the write API
+    /// (e.g., [`EpubEditor`], [`Epub::manifest_mut`]).
+    ///
+    /// Default: [`u64::MAX`] (no limit)
+    pub fn max_resource_bytes(&mut self, limit: u64) -> &mut Self {
+        self.archive_config.max_resource_bytes = limit;
         self
     }
 }
